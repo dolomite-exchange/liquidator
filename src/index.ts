@@ -51,6 +51,14 @@ checkDuration('RISK_PARAMS_POLL_INTERVAL_MS', 1000);
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 10);
 checkExists('SUBGRAPH_URL');
 
+if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
+  Logger.info(`Setting auto kill in ${process.env.AUTO_DOWN_FREQUENCY_SECONDS} seconds...`);
+  setTimeout(() => {
+    Logger.info('Killing bot now!');
+    process.exit(0);
+  }, Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS) * 1000);
+}
+
 async function start() {
   const marketStore = new MarketStore();
   const accountStore = new AccountStore(marketStore);
