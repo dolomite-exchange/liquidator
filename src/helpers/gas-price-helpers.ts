@@ -1,6 +1,6 @@
 import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import request from 'request-promise-native';
-import { ChainId } from '../lib/chain-id';
+import { ChainId, isArbitrum, isPolygon } from '../lib/chain-id';
 import Logger from '../lib/logger';
 
 let lastPriceWei: string = process.env.INITIAL_GAS_PRICE_WEI;
@@ -57,8 +57,8 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }>
   });
 
   const networkId = Number(process.env.NETWORK_ID);
-  if (networkId === ChainId.Matic || networkId === ChainId.Mumbai) {
-    const uri = networkId === ChainId.Matic
+  if (isPolygon(networkId)) {
+    const uri = networkId === ChainId.PolygonMatic
       ? 'https://gasstation-mainnet.matic.network/'
       : 'https://gasstation-mumbai.matic.today/';
     const response = await request({
@@ -67,7 +67,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }>
       timeout: process.env.GAS_REQUEST_TIMEOUT_MS,
     });
     return JSON.parse(response);
-  } else if (networkId === ChainId.Arbitrum || networkId === ChainId.ArbitrumTest) {
+  } else if (isArbitrum(networkId)) {
     const result = await dolomite.arbitrumGasInfo.getPricesInWei();
     return {
       fast: result.perArbGasTotal.dividedBy('1000000000').toFixed(), // convert to gwei
