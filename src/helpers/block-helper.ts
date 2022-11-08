@@ -3,7 +3,10 @@ import { DateTime } from 'luxon';
 import { dolomite } from './web3';
 import Logger from '../lib/logger';
 
-const subgraphUrl = process.env.SUBGRAPH_URL;
+const subgraphUrl = process.env.SUBGRAPH_URL ?? '';
+if (!subgraphUrl) {
+  throw new Error('SUBGRAPH_URL is not defined');
+}
 
 let lastBlockTimestamp: DateTime = DateTime.fromSeconds(0);
 let lastBlockNumber: number = 0;

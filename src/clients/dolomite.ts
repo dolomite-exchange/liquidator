@@ -22,7 +22,10 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ethers = require('ethers');
 
-const subgraphUrl = process.env.SUBGRAPH_URL;
+const subgraphUrl = process.env.SUBGRAPH_URL ?? '';
+if (!subgraphUrl) {
+  throw new Error('SUBGRAPH_URL is not set')
+}
 
 async function getAccounts(
   marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } },

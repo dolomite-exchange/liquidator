@@ -2,10 +2,10 @@ import { DolomiteMargin, Web3 } from '@dolomite-exchange/dolomite-margin';
 import { ChainId } from '../lib/chain-id';
 import Logger from '../lib/logger';
 
-const accountWalletAddress = process.env.ACCOUNT_WALLET_ADDRESS.toLowerCase();
+const accountWalletAddress = process.env.ACCOUNT_WALLET_ADDRESS?.toLowerCase() ?? '';
 const opts = { defaultAccount: accountWalletAddress };
 
-const provider: any = new Web3.providers.HttpProvider(process.env.ETHEREUM_NODE_URL);
+const provider: any = new Web3.providers.HttpProvider(process.env.ETHEREUM_NODE_URL ?? '');
 
 const networkId = Number(process.env.NETWORK_ID);
 if (Object.keys(ChainId).indexOf(networkId.toString()) === -1) {
@@ -19,6 +19,10 @@ export const dolomite = new DolomiteMargin(
 );
 
 export async function loadAccounts() {
+  if (!accountWalletAddress) {
+    throw new Error('ACCOUNT_WALLET_ADDRESS is not defined!');
+  }
+
   if (!process.env.ACCOUNT_WALLET_PRIVATE_KEY) {
     const errorMessage = 'ACCOUNT_WALLET_PRIVATE_KEY is not provided';
     Logger.error({
