@@ -76,7 +76,7 @@ export default class AccountStore {
     }
 
     const marketMap = this.marketStore.getMarketMap();
-    const marketIndexMap = await this.getMarketIndexMap(marketMap, blockNumber);
+    const marketIndexMap = await this.getMarketIndexMap(marketMap);
 
     const nextLiquidatableDolomiteAccounts = await Pageable.getPageableValues(async (pageIndex) => {
       const { accounts } = await getLiquidatableDolomiteAccounts(marketIndexMap, blockNumber, pageIndex);
@@ -99,7 +99,6 @@ export default class AccountStore {
 
   private async getMarketIndexMap(
     marketMap: { [marketId: string]: any },
-    blockNumber: number,
   ): Promise<{ [marketId: string]: MarketIndex }> {
     const marketIds = Object.keys(marketMap);
     const indexCalls = marketIds.map(marketId => {
@@ -110,7 +109,8 @@ export default class AccountStore {
       };
     });
 
-    const { results: indexResults } = await dolomite.multiCall.aggregate(indexCalls, { blockNumber });
+    // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
+    const { results: indexResults } = await dolomite.multiCall.aggregate(indexCalls);
 
     return indexResults.reduce<{ [marketId: string]: MarketIndex }>((memo, rawIndexResult, i) => {
       const decodedResults = dolomite.web3.eth.abi.decodeParameters(['uint256', 'uint256', 'uint256'], rawIndexResult);

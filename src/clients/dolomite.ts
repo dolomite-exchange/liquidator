@@ -182,7 +182,8 @@ export async function getDolomiteMarkets(
     };
   });
 
-  const { results: marketPrices } = await dolomite.multiCall.aggregate(calls, { blockNumber });
+  // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
+  const { results: marketPrices } = await dolomite.multiCall.aggregate(calls);
 
   const markets: Promise<ApiMarket>[] = result.data.marketRiskInfos.map(async (market, i) => {
     const oraclePriceString = dolomite.web3.eth.abi.decodeParameter('uint256', marketPrices[i]);
