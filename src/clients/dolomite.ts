@@ -138,6 +138,7 @@ export async function getDolomiteMarkets(
       query: `query getMarketRiskInfos($blockNumber: Int, $skip: Int) {
                 marketRiskInfos(block: { number: $blockNumber } first: 1000 skip: $skip) {
                   token {
+                    id
                     marketId
                     symbol
                     decimals
