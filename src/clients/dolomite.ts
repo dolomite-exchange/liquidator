@@ -1,26 +1,17 @@
 /* eslint-disable max-len */
-import {
-  BigNumber,
-  Decimal,
-} from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
-import fetch from 'node-fetch';
+import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import {
-  ApiAccount,
-  ApiBalance,
-  ApiMarket,
-  ApiRiskParam,
-  MarketIndex,
-} from '../lib/api-types';
-import {
-  GraphqlAccountResult,
-  GraphqlMarketResult,
-  GraphqlRiskParamsResult,
-} from '../lib/graphql-types';
+import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, MarketIndex } from '../lib/api-types';
+import { GraphqlAccountResult, GraphqlMarketResult, GraphqlRiskParamsResult } from '../lib/graphql-types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ethers = require('ethers');
+
+const defaultAxiosConfig = {
+  headers: { 'Accept-Encoding': 'gzip,deflate,compress' },
+};
 
 const subgraphUrl = process.env.SUBGRAPH_URL ?? '';
 if (!subgraphUrl) {
@@ -34,20 +25,18 @@ async function getAccounts(
   pageIndex: number = 0,
 ): Promise<{ accounts: ApiAccount[] }> {
   const decimalBase = new BigNumber('1000000000000000000');
-  const accounts: ApiAccount[] = await fetch(subgraphUrl, {
-    method: 'POST',
-    body: JSON.stringify({
+  const accounts: ApiAccount[] = await axios.post(
+    subgraphUrl,
+    {
       query,
       variables: {
         blockNumber,
         skip: 1000 * pageIndex,
       },
-    }),
-    headers: {
-      'content-type': 'application/json',
     },
-  })
-    .then(response => response.json())
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
     .then((response: any) => {
       if (response.errors && typeof response.errors === 'object') {
         return Promise.reject((response.errors as any)[0]);
@@ -143,9 +132,9 @@ export async function getDolomiteMarkets(
   blockNumber: number,
   pageIndex: number = 0,
 ): Promise<{ markets: ApiMarket[] }> {
-  const result: any = await fetch(subgraphUrl, {
-    method: 'POST',
-    body: JSON.stringify({
+  const result: any = await axios.post(
+    subgraphUrl,
+    {
       query: `query getMarketRiskInfos($blockNumber: Int, $skip: Int) {
                 marketRiskInfos(block: { number: $blockNumber } first: 1000 skip: $skip) {
                   token {
@@ -161,12 +150,10 @@ export async function getDolomiteMarkets(
         blockNumber,
         skip: pageIndex * 1000,
       },
-    }),
-    headers: {
-      'content-type': 'application/json',
     },
-  })
-    .then(response => response.json())
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
     .then(json => json as GraphqlMarketResult);
 
   if (result.errors && typeof result.errors === 'object') {
@@ -189,6 +176,7 @@ export async function getDolomiteMarkets(
     const oraclePriceString = dolomite.web3.eth.abi.decodeParameter('uint256', marketPrices[i]);
     const apiMarket: ApiMarket = {
       id: Number(market.token.marketId),
+      decimals: Number(market.token.decimals),
       tokenAddress: market.token.id,
       oraclePrice: new BigNumber(oraclePriceString),
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),
@@ -201,9 +189,9 @@ export async function getDolomiteMarkets(
 }
 
 export async function getDolomiteRiskParams(blockNumber: number): Promise<{ riskParams: ApiRiskParam }> {
-  const result: any = await fetch(`${process.env.SUBGRAPH_URL}`, {
-    method: 'POST',
-    body: JSON.stringify({
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
       query: `query getDolomiteMargins($blockNumber: Int) {
         dolomiteMargins(block: { number: $blockNumber }) {
           id
@@ -214,12 +202,10 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
       variables: {
         blockNumber,
       },
-    }),
-    headers: {
-      'content-type': 'application/json',
     },
-  })
-    .then(response => response.json())
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
     .then(json => json as GraphqlRiskParamsResult);
 
   if (result.errors && typeof result.errors === 'object') {

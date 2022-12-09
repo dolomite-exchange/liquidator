@@ -19,7 +19,7 @@ export default class GasPriceUpdater {
     for (;;) {
       try {
         await updateGasPrice(dolomite);
-      } catch (error) {
+      } catch (error: any) {
         Logger.error({
           at: 'GasPriceUpdater#updateGasPrices',
           message: 'Failed to update gas price',

@@ -9,7 +9,7 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
   let response;
   try {
     response = await getGasPrices(dolomite);
-  } catch (error) {
+  } catch (error: any) {
     Logger.error({
       at: 'getGasPrices',
       message: 'Failed to retrieve gas prices',

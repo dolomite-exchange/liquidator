@@ -33,7 +33,7 @@ export default class RiskParamsStore {
     for (; ;) {
       try {
         await this._update();
-      } catch (error) {
+      } catch (error: any) {
         Logger.error({
           at: 'RiskParamsStore#_poll',
           message: error.message,

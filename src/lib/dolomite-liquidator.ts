@@ -85,7 +85,8 @@ export default class DolomiteLiquidator {
     const marketMap = this.marketStore.getMarketMap();
     const liquidatableAccounts = this.accountStore.getLiquidatableDolomiteAccounts()
       .filter(account => !this.liquidationStore.contains(account))
-      .filter(account => !this.isCollateralized(account, marketMap, riskParams));
+      .filter(account => !this.isCollateralized(account, marketMap, riskParams))
+      .sort((a, b) => this.borrowAmountSorterDesc(a, b, marketMap));
 
     // Do not put an account in both liquidatable and expired; prioritize liquidation
     expirableAccounts = expirableAccounts.filter((ea) => !liquidatableAccounts.find((la) => la.id === ea.id));
@@ -104,9 +105,9 @@ export default class DolomiteLiquidator {
     for (let i = 0; i < liquidatableAccounts.length; i += 1) {
       const account = liquidatableAccounts[i];
       try {
-        await liquidateAccount(account, lastBlockTimestamp, blockNumber);
+        await liquidateAccount(account, marketMap, riskParams, lastBlockTimestamp, blockNumber);
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
-      } catch (error) {
+      } catch (error: any) {
         Logger.error({
           at: 'DolomiteLiquidator#_liquidateAccounts',
           message: `Failed to liquidate account: ${error.message}`,
@@ -119,9 +120,9 @@ export default class DolomiteLiquidator {
     for (let i = 0; i < expirableAccounts.length; i += 1) {
       const account = expirableAccounts[i];
       try {
-        await liquidateExpiredAccount(account, marketMap, lastBlockTimestamp);
+        await liquidateExpiredAccount(account, marketMap, riskParams, lastBlockTimestamp);
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
-      } catch (error) {
+      } catch (error: any) {
         Logger.error({
           at: 'DolomiteLiquidator#_liquidateAccounts',
           message: `Failed to liquidate expired account: ${error.message}`,
@@ -168,5 +169,32 @@ export default class DolomiteLiquidator {
       .div(borrow.abs())
       .integerValue(BigNumber.ROUND_FLOOR);
     return collateralization.gte(riskParams.liquidationRatio);
+  }
+
+  /**
+   * Used to prioritize larger liquidations first (by sorting by borrow amount, desc)
+   */
+  borrowAmountSorterDesc = (
+    account1: ApiAccount,
+    account2: ApiAccount,
+    marketMap: { [marketId: string]: ApiMarket },
+  ): number => {
+    function sumBorrows(account: ApiAccount): BigNumber {
+      return Object.values(account.balances)
+        .reduce((memo, balance) => {
+          const market = marketMap[balance.marketId.toString()];
+          const value = balance.wei.times(market.oraclePrice);
+          if (balance.wei.lt(INTEGERS.ZERO)) {
+            // use the absolute value to make the comparison easier below
+            memo = memo.plus(value.abs());
+          }
+          return memo;
+        }, INTEGERS.ZERO);
+    }
+
+    const totalBorrow1 = sumBorrows(account1);
+    const totalBorrow2 = sumBorrows(account2);
+
+    return totalBorrow1.gt(totalBorrow2) ? -1 : 1;
   };
 }

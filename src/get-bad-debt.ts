@@ -108,7 +108,7 @@ async function start() {
 start().catch(error => {
   Logger.error({
     message: `Found error while starting: ${error.toString()}`,
-    error: JSON.stringify(error),
+    error,
   })
   process.exit(1)
 });

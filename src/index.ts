@@ -11,15 +11,15 @@ import GasPriceUpdater from './lib/gas-price-updater';
 import {
   checkBigNumber,
   checkBooleanValue,
-  checkConditionally,
   checkDuration,
   checkEthereumAddress,
   checkExists,
   checkJsNumber,
+  checkLiquidationModeConditionally,
   checkPreferences,
   checkPrivateKey,
-  checkUnconditionally,
 } from './lib/invariants';
+import { LIQUIDATION_MODE, LiquidationMode } from './lib/liquidation-mode';
 import LiquidationStore from './lib/liquidation-store';
 import Logger from './lib/logger';
 import MarketStore from './lib/market-store';
@@ -30,13 +30,18 @@ checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
 checkBooleanValue('AUTO_SELL_COLLATERAL');
 checkEthereumAddress('BRIDGE_TOKEN_ADDRESS');
-checkUnconditionally('AUTO_SELL_COLLATERAL', () => checkPreferences('COLLATERAL_PREFERENCES'));
+checkLiquidationModeConditionally(
+  LiquidationMode.Simple,
+  () => checkPreferences('COLLATERAL_PREFERENCES'),
+);
 checkBigNumber('DOLOMITE_ACCOUNT_NUMBER');
 checkExists('ETHEREUM_NODE_URL');
 checkBooleanValue('EXPIRATIONS_ENABLED');
 checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
+checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
-checkDuration('GAS_PRICE_POLL_INTERVAL_MS', 1000);
+checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
+checkDuration('INITIAL_GAS_PRICE_WEI', 1);
 checkDuration('LIQUIDATE_POLL_INTERVAL_MS', 1000);
 checkDuration('LIQUIDATION_KEY_EXPIRATION_SECONDS', 1, /* isMillis = */ false);
 checkBooleanValue('LIQUIDATIONS_ENABLED');
@@ -45,8 +50,11 @@ checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
 checkBigNumber('MIN_OVERHEAD_VALUE');
 checkBigNumber('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT');
 checkJsNumber('NETWORK_ID');
-checkUnconditionally('AUTO_SELL_COLLATERAL', () => checkPreferences('OWED_PREFERENCES'));
-checkConditionally('AUTO_SELL_COLLATERAL', () => checkBooleanValue('REVERT_ON_FAIL_TO_SELL_COLLATERAL'));
+checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkPreferences('OWED_PREFERENCES'));
+checkLiquidationModeConditionally(
+  LiquidationMode.SellWithInternalLiquidity,
+  () => checkBooleanValue('REVERT_ON_FAIL_TO_SELL_COLLATERAL'),
+);
 checkDuration('RISK_PARAMS_POLL_INTERVAL_MS', 1000);
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 10);
 checkExists('SUBGRAPH_URL');
@@ -89,7 +97,7 @@ async function start() {
   Logger.info({
     message: 'DolomiteMargin data',
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
-    autoSellCollateral: process.env.AUTO_SELL_COLLATERAL,
+    liquidationMode: LIQUIDATION_MODE,
     bridgeTokenAddress: process.env.BRIDGE_TOKEN_ADDRESS,
     dolomiteAccountNumber: process.env.DOLOMITE_ACCOUNT_NUMBER,
     dolomiteMargin: libraryDolomiteMargin,
@@ -119,22 +127,31 @@ async function start() {
     riskParamsPollIntervalMillis: process.env.RISK_PARAMS_POLL_INTERVAL_MS,
   });
 
-  if (process.env.AUTO_SELL_COLLATERAL === 'true') {
-    const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true';
-    const discountUsedText = revertOnFailToSellCollateral ? '(unused)' : '';
+  if (LIQUIDATION_MODE === LiquidationMode.Simple) {
     Logger.info({
-      message: 'Auto Sell Collateral variables',
-      revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
-      minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
-    });
-  } else {
-    Logger.info({
+      liquidationMode: LIQUIDATION_MODE,
       message: 'Simple liquidation variables',
       collateralPreferences: process.env.COLLATERAL_PREFERENCES,
       minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
       minOverheadValue: process.env.MIN_OVERHEAD_VALUE,
       owedPreferences: process.env.OWED_PREFERENCES,
     });
+  } else if (LIQUIDATION_MODE === LiquidationMode.SellWithInternalLiquidity) {
+    const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true';
+    const discountUsedText = revertOnFailToSellCollateral ? '(unused)' : '';
+    Logger.info({
+      liquidationMode: LIQUIDATION_MODE,
+      message: 'Sell with internal liquidity variables:',
+      revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
+      minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
+    });
+  } else if (LIQUIDATION_MODE === LiquidationMode.SellWithExternalLiquidity) {
+    Logger.info({
+      liquidationMode: LIQUIDATION_MODE,
+      message: 'Sell with external liquidity variables:',
+    });
+  } else {
+    throw new Error(`Invalid liquidation mode: ${LIQUIDATION_MODE}`);
   }
 
   if (process.env.LIQUIDATIONS_ENABLED === 'true') {

@@ -1,21 +1,19 @@
-import {
-  BigNumber,
-  Integer,
-  INTEGERS,
-} from '@dolomite-exchange/dolomite-margin';
-import {
-  ConfirmationType,
-  TxResult,
-} from '@dolomite-exchange/dolomite-margin/dist/src/types';
+import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { AccountOperation } from '@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation';
+import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
 import { DateTime } from 'luxon';
-import {
-  ApiAccount,
-  ApiMarket,
-} from '../lib/api-types';
-import { getGasPriceWei } from './gas-price-helpers';
+import { getParaswapSwapCalldataForLiquidation } from '../clients/paraswap';
+import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
+import { LIQUIDATION_MODE, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
+import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/math-utils';
+import { getGasPriceWei } from './gas-price-helpers';
 import { dolomite } from './web3';
 
+const solidAccount = {
+  owner: process.env.ACCOUNT_WALLET_ADDRESS,
+  number: new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER),
+};
 const collateralPreferences: string[] = process.env.COLLATERAL_PREFERENCES?.split(',')
   .map((pref) => pref.trim());
 const owedPreferences: string[] = process.env.OWED_PREFERENCES?.split(',')
@@ -31,6 +29,8 @@ export function isExpired(
 
 export async function liquidateAccount(
   liquidAccount: ApiAccount,
+  marketMap: { [marketId: string]: ApiMarket },
+  riskParams: ApiRiskParam,
   lastBlockTimestamp: DateTime,
   blockNumber: number,
 ): Promise<TxResult | undefined> {
@@ -62,7 +62,6 @@ export async function liquidateAccount(
     return undefined;
   }
 
-  const sender = process.env.ACCOUNT_WALLET_ADDRESS;
   const borrowMarkets: string[] = [];
   const supplyMarkets: string[] = [];
 
@@ -85,22 +84,31 @@ export async function liquidateAccount(
     return Promise.reject(new Error('Supposedly liquidatable account has no collateral'));
   }
 
-  if (process.env.AUTO_SELL_COLLATERAL.toLowerCase() === 'true') {
-    return liquidateAccountInternalAndSellCollateral(liquidAccount, sender, lastBlockTimestamp, false);
+  if (LIQUIDATION_MODE === LiquidationMode.SellWithExternalLiquidity) {
+    return liquidateAccountInternalAndSellWithExternalLiquidity(
+      liquidAccount,
+      marketMap,
+      riskParams,
+      lastBlockTimestamp,
+      false,
+    );
+  } else if (LIQUIDATION_MODE === LiquidationMode.SellWithInternalLiquidity) {
+    return liquidateAccountInternalAndSellWithInternalLiquidity(liquidAccount, marketMap, lastBlockTimestamp, false);
+  } else if (LIQUIDATION_MODE === LiquidationMode.Simple) {
+    return liquidateAccountInternal(liquidAccount);
   } else {
-    return liquidateAccountInternal(liquidAccount, sender);
+    throw new Error(`Unknown liquidation mode: ${LIQUIDATION_MODE}`);
   }
 }
 
 async function liquidateAccountInternal(
   liquidAccount: ApiAccount,
-  sender: string,
 ): Promise<TxResult> {
   const gasPrice = getGasPriceWei();
 
-  return dolomite.liquidatorProxy.liquidate(
-    process.env.ACCOUNT_WALLET_ADDRESS,
-    new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER),
+  return dolomite.liquidatorProxyV1.liquidate(
+    solidAccount.owner,
+    solidAccount.number,
     liquidAccount.owner,
     liquidAccount.number,
     new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION),
@@ -109,15 +117,16 @@ async function liquidateAccountInternal(
     collateralPreferences.map((p) => new BigNumber(p)),
     {
       gasPrice: gasPrice.toFixed(),
-      from: sender,
+      from: solidAccount.owner,
       confirmationType: ConfirmationType.Hash,
     },
   );
 }
 
 export async function liquidateExpiredAccount(
-  account: ApiAccount,
+  expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
+  riskParams: ApiRiskParam,
   lastBlockTimestamp: DateTime,
 ) {
   if (process.env.EXPIRATIONS_ENABLED.toLowerCase() !== 'true') {
@@ -127,22 +136,86 @@ export async function liquidateExpiredAccount(
   Logger.info({
     at: 'dolomite-helpers#liquidateExpiredAccount',
     message: 'Starting account expiry liquidation',
-    accountOwner: account.owner,
-    accountNumber: account.number,
+    accountOwner: expiredAccount.owner,
+    accountNumber: expiredAccount.number,
   });
 
-  const sender = process.env.ACCOUNT_WALLET_ADDRESS;
-
-  if (process.env.AUTO_SELL_COLLATERAL.toLowerCase() === 'true') {
-    return liquidateAccountInternalAndSellCollateral(account, sender, lastBlockTimestamp, true);
+  if (LIQUIDATION_MODE === LiquidationMode.SellWithExternalLiquidity) {
+    return liquidateAccountInternalAndSellWithExternalLiquidity(
+      expiredAccount,
+      marketMap,
+      riskParams,
+      lastBlockTimestamp,
+      true,
+    );
+  } else if (LIQUIDATION_MODE === LiquidationMode.SellWithInternalLiquidity) {
+    return liquidateAccountInternalAndSellWithInternalLiquidity(expiredAccount, marketMap, lastBlockTimestamp, true);
+  } else if (LIQUIDATION_MODE === LiquidationMode.Simple) {
+    return liquidateExpiredAccountInternalSimple(expiredAccount, marketMap, lastBlockTimestamp);
   } else {
-    return liquidateExpiredAccountInternal(account, marketMap, sender, lastBlockTimestamp);
+    throw new Error(`Unknown liquidation mode: ${LIQUIDATION_MODE}`);
   }
 }
 
-async function liquidateAccountInternalAndSellCollateral(
+async function liquidateAccountInternalAndSellWithExternalLiquidity(
   liquidAccount: ApiAccount,
-  sender: string,
+  marketMap: { [marketId: string]: ApiMarket },
+  riskParams: ApiRiskParam,
+  lastBlockTimestamp: DateTime,
+  isExpiring: boolean,
+): Promise<TxResult> {
+  const owedBalance = getLargestBalanceUSD(
+    Object.values(liquidAccount.balances),
+    true,
+    marketMap,
+    lastBlockTimestamp,
+    isExpiring,
+  );
+  const heldBalance = getLargestBalanceUSD(
+    Object.values(liquidAccount.balances),
+    false,
+    marketMap,
+    lastBlockTimestamp,
+    isExpiring,
+  );
+  const owedMarket = marketMap[owedBalance.marketId];
+  const heldMarket = marketMap[heldBalance.marketId];
+  const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskParams);
+  const { owedWei, heldWei } = getAmountsForLiquidation(
+    owedBalance.wei.abs(),
+    owedPriceAdj,
+    heldBalance.wei.abs(),
+    heldMarket.oraclePrice,
+  );
+  const paraswapCallData = await getParaswapSwapCalldataForLiquidation(
+    heldMarket,
+    heldWei,
+    owedMarket,
+    owedWei,
+    solidAccount.owner,
+    dolomite.liquidatorProxyV2WithExternalLiquidity.address,
+  );
+
+  return dolomite.liquidatorProxyV2WithExternalLiquidity.liquidate(
+    solidAccount.owner,
+    solidAccount.number,
+    liquidAccount.owner,
+    liquidAccount.number,
+    new BigNumber(owedBalance.marketId),
+    new BigNumber(heldBalance.marketId),
+    isExpiring ? (owedBalance.expiresAt ?? null) : null,
+    paraswapCallData,
+    {
+      gasPrice: getGasPriceWei().toFixed(),
+      from: solidAccount.owner,
+      confirmationType: ConfirmationType.Hash,
+    },
+  );
+}
+
+async function liquidateAccountInternalAndSellWithInternalLiquidity(
+  liquidAccount: ApiAccount,
+  marketMap: { [marketId: string]: ApiMarket },
   lastBlockTimestamp: DateTime,
   isExpiring: boolean,
 ): Promise<TxResult> {
@@ -157,18 +230,20 @@ async function liquidateAccountInternalAndSellCollateral(
   }
 
   const bridgeAddress = process.env.BRIDGE_TOKEN_ADDRESS.toLowerCase();
-  const owedBalance = Object.values(liquidAccount.balances)
-    .filter(balance => {
-      if (isExpiring) {
-        // Return any market that has expired and is borrowed (negative)
-        return isExpired(balance.expiresAt, lastBlockTimestamp) && balance.wei.lt('0');
-      } else {
-        return balance.wei.lt('0');
-      }
-    })[0];
-  const heldBalance = Object.values(liquidAccount.balances)
-    .filter(value => value.wei.gt('0'))[0];
-  const gasPrice = getGasPriceWei();
+  const owedBalance = getLargestBalanceUSD(
+    Object.values(liquidAccount.balances),
+    true,
+    marketMap,
+    lastBlockTimestamp,
+    isExpiring,
+  );
+  const heldBalance = getLargestBalanceUSD(
+    Object.values(liquidAccount.balances),
+    false,
+    marketMap,
+    lastBlockTimestamp,
+    isExpiring,
+  );
 
   const owedToken = owedBalance.tokenAddress.toLowerCase();
   const heldToken = heldBalance.tokenAddress.toLowerCase();
@@ -192,9 +267,11 @@ async function liquidateAccountInternalAndSellCollateral(
     .integerValue(BigNumber.ROUND_FLOOR);
   const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL.toLowerCase() === 'true';
 
-  return dolomite.liquidatorProxyWithAmm.liquidate(
-    process.env.ACCOUNT_WALLET_ADDRESS,
-    new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER),
+  const gasPrice = getGasPriceWei();
+
+  return dolomite.liquidatorProxyV1WithAmm.liquidate(
+    solidAccount.owner,
+    solidAccount.number,
     liquidAccount.owner,
     liquidAccount.number,
     new BigNumber(owedBalance.marketId),
@@ -205,16 +282,15 @@ async function liquidateAccountInternalAndSellCollateral(
     revertOnFailToSellCollateral,
     {
       gasPrice: gasPrice.toFixed(),
-      from: sender,
+      from: solidAccount.owner,
       confirmationType: ConfirmationType.Hash,
     },
   );
 }
 
-async function liquidateExpiredAccountInternal(
-  account: ApiAccount,
+async function liquidateExpiredAccountInternalSimple(
+  expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
-  sender: string,
   lastBlockTimestamp: DateTime,
 ) {
   const expiredMarkets: string[] = [];
@@ -227,7 +303,7 @@ async function liquidateExpiredAccountInternal(
 
   for (let i = 0; i < collateralPreferences.length; i += 1) {
     const marketId = collateralPreferences[i];
-    const balance = account.balances[marketId];
+    const balance = expiredAccount.balances[marketId];
 
     if (!balance) {
       weis[marketId] = INTEGERS.ZERO;
@@ -244,9 +320,9 @@ async function liquidateExpiredAccountInternal(
     liquidationRewardPremiums[marketId] = market.liquidationRewardPremium;
   }
 
-  Object.keys(account.balances)
+  Object.keys(expiredAccount.balances)
     .forEach((marketId) => {
-      const balance = account.balances[marketId];
+      const balance = expiredAccount.balances[marketId];
 
       // 0 indicates the balance never expires
       if (!balance.expiresAt || balance.expiresAt.eq(0)) {
@@ -266,10 +342,10 @@ async function liquidateExpiredAccountInternal(
       if (delayHasPassed) {
         expiredMarkets.push(marketId);
         operation.fullyLiquidateExpiredAccount(
-          process.env.ACCOUNT_WALLET_ADDRESS,
-          new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER),
-          account.owner,
-          account.number,
+          solidAccount.owner,
+          solidAccount.number,
+          expiredAccount.owner,
+          expiredAccount.number,
           new BigNumber(marketId),
           expiryTimestamp,
           lastBlockTimestampBN,
@@ -285,24 +361,27 @@ async function liquidateExpiredAccountInternal(
     throw new Error('Supposedly expirable account has no expirable balances');
   }
 
-  return commitLiquidation(account, operation, sender);
+  return commitLiquidation(expiredAccount, operation);
 }
 
-async function commitLiquidation(account, operation, sender): Promise<boolean> {
+async function commitLiquidation(
+  liquidAccount: ApiAccount,
+  operation: AccountOperation,
+): Promise<boolean> {
   const gasPrice = getGasPriceWei();
 
   Logger.info({
     at: 'dolomite-helpers#commitLiquidation',
     message: 'Sending account liquidation transaction',
-    accountOwner: account.owner,
-    accountNumber: account.number,
+    accountOwner: liquidAccount.owner,
+    accountNumber: liquidAccount.number,
     gasPrice,
-    from: sender,
+    from: solidAccount,
   });
 
   const response = await operation.commit({
-    gasPrice,
-    from: sender,
+    gasPrice: gasPrice.toFixed(),
+    from: solidAccount.owner,
     confirmationType: ConfirmationType.Hash,
   });
 
@@ -310,8 +389,8 @@ async function commitLiquidation(account, operation, sender): Promise<boolean> {
     Logger.info({
       at: 'dolomite-helpers#commitLiquidation',
       message: 'Liquidation transaction has already been received',
-      accountOwner: account.owner,
-      accountNumber: account.number,
+      accountOwner: liquidAccount.owner,
+      accountNumber: liquidAccount.number,
     });
 
     return false;
@@ -320,10 +399,45 @@ async function commitLiquidation(account, operation, sender): Promise<boolean> {
   Logger.info({
     at: 'dolomite-helpers#commitLiquidation',
     message: 'Successfully submitted liquidation transaction',
-    accountOwner: account.owner,
-    accountNumber: account.number,
+    accountOwner: liquidAccount.owner,
+    accountNumber: liquidAccount.number,
     response,
   });
 
   return !!response;
+}
+
+function getLargestBalanceUSD(
+  balances: ApiBalance[],
+  isOwed: boolean,
+  marketMap: { [marketId: string]: ApiMarket },
+  lastBlockTimestamp: DateTime,
+  isExpiring: boolean,
+): ApiBalance {
+  return balances
+    .filter(balance => {
+      if (isOwed) {
+        if (isExpiring) {
+          // Return any market that has expired and is borrowed (negative)
+          return isExpired(balance.expiresAt, lastBlockTimestamp) && balance.wei.lt('0');
+        } else {
+          return balance.wei.lt('0');
+        }
+      } else {
+        return balance.wei.gte('0');
+      }
+    })
+    .sort((a, b) => balanceUSDSorterDesc(a, b, marketMap))[0]
+}
+
+function balanceUSDSorterDesc(
+  balance1: ApiBalance,
+  balance2: ApiBalance,
+  marketMap: { [marketId: string]: ApiMarket },
+): number {
+  const market1 = marketMap[balance1.marketId];
+  const market2 = marketMap[balance1.marketId];
+  const balanceUSD1 = balance1.wei.abs().times(market1.oraclePrice);
+  const balanceUSD2 = balance2.wei.abs().times(market2.oraclePrice);
+  return balanceUSD1.gt(balanceUSD2) ? -1 : 1;
 }

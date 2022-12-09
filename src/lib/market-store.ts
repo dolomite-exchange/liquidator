@@ -42,7 +42,7 @@ export default class MarketStore {
     for (;;) {
       try {
         await this._update();
-      } catch (error) {
+      } catch (error: any) {
         Logger.error({
           at: 'MarketStore#_poll',
           message: error.message,

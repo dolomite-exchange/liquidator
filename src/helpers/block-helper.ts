@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import axios from 'axios';
 import { DateTime } from 'luxon';
 import { dolomite } from './web3';
 import Logger from '../lib/logger';
@@ -12,13 +12,10 @@ let lastBlockTimestamp: DateTime = DateTime.fromSeconds(0);
 let lastBlockNumber: number = 0;
 
 export async function getSubgraphBlockNumber(): Promise<{blockNumber: number, blockTimestamp: DateTime}> {
-  const gqlBlockNumber = await fetch(subgraphUrl, {
-    method: 'POST',
-    body: JSON.stringify({
-      query: '{ _meta { block { number } } }',
-    }),
+  const gqlBlockNumber = await axios.post(subgraphUrl, {
+    query: '{ _meta { block { number } } }',
   })
-    .then(response => response.json())
+    .then(response => response.data)
     .then((json: any) => Number(json.data._meta.block.number))
     .catch(() => lastBlockNumber);
 
@@ -27,7 +24,7 @@ export async function getSubgraphBlockNumber(): Promise<{blockNumber: number, bl
     const block = await dolomite.web3.eth.getBlock('latest');
     web3BlockNumber = block.number;
     lastBlockTimestamp = DateTime.fromMillis(Number(block.timestamp) * 1000);
-  } catch (error) {
+  } catch (error: any) {
     web3BlockNumber = gqlBlockNumber;
     Logger.error({
       at: 'block-helper#getBlockNumber',

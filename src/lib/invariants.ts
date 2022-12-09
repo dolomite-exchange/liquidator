@@ -1,4 +1,5 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { LiquidationMode } from './liquidation-mode';
 
 export function checkDuration(key: string, minValue: number, isMillis: boolean = true) {
   if (Number.isNaN(Number(process.env[key])) || Number(process.env[key]) < minValue) {
@@ -57,14 +58,17 @@ export function checkExists(key: string) {
   }
 }
 
-export function checkConditionally(conditionKey: string, checker: () => void) {
-  if (process.env[conditionKey] === 'true') {
-    checker();
+export function checkLiquidationModeIsSet(enumKey: string = 'LIQUIDATION_MODE') {
+  checkExists(enumKey);
+  if (!Object.values(LiquidationMode).includes(process.env[enumKey]! as LiquidationMode)) {
+    throw new Error(`${enumKey} is not provided or invalid`);
   }
 }
 
-export function checkUnconditionally(conditionKey: string, checker: () => void) {
-  if (process.env[conditionKey] === 'false') {
+export function checkLiquidationModeConditionally(value: LiquidationMode, checker: () => void) {
+  const enumKey = 'LIQUIDATION_MODE';
+  checkLiquidationModeIsSet(enumKey);
+  if (process.env[enumKey] === value) {
     checker();
   }
 }

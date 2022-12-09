@@ -13,6 +13,9 @@ module.exports = {
     'json',
     'node',
   ],
+  moduleNameMapper: {
+    axios: 'axios/dist/node/axios.cjs',
+  },
   testPathIgnorePatterns: ['/node_modules/', '/__tests__/helpers/'],
   testEnvironment: 'node',
   testTimeout: 10000,

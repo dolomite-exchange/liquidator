@@ -1,13 +1,13 @@
 import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { AccountOperation } from '@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation';
 import { DateTime } from 'luxon';
-import { dolomite } from '../src/helpers/web3';
-import AccountStore from '../src/lib/account-store';
-import { ApiAccount, ApiMarket, ApiRiskParam } from '../src/lib/api-types';
-import DolomiteLiquidator from '../src/lib/dolomite-liquidator';
-import LiquidationStore from '../src/lib/liquidation-store';
-import MarketStore from '../src/lib/market-store';
-import RiskParamsStore from '../src/lib/risk-params-store';
+import { dolomite } from '../../src/helpers/web3';
+import AccountStore from '../../src/lib/account-store';
+import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
+import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
+import LiquidationStore from '../../src/lib/liquidation-store';
+import MarketStore from '../../src/lib/market-store';
+import RiskParamsStore from '../../src/lib/risk-params-store';
 
 jest.mock('@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation');
 
@@ -62,7 +62,7 @@ describe('dolomite-liquidator', () => {
           },
         }
       ));
-      dolomite.liquidatorProxy.liquidate = jest.fn().mockImplementation((...args) => {
+      dolomite.liquidatorProxyV1.liquidate = jest.fn().mockImplementation((...args) => {
         liquidations.push(args);
         return { gas: 1 };
       });
@@ -138,7 +138,7 @@ describe('dolomite-liquidator', () => {
 
       const liquidations: any[] = [];
       const liquidatableExpiredAccounts: any[] = [];
-      dolomite.liquidatorProxyWithAmm.liquidate = jest.fn().mockImplementation((...args) => {
+      dolomite.liquidatorProxyV1WithAmm.liquidate = jest.fn().mockImplementation((...args) => {
         if (args[7]) {
           liquidatableExpiredAccounts.push(args);
         } else {
@@ -341,6 +341,7 @@ function getTestMarkets(): ApiMarket[] {
       oraclePrice: new BigNumber('173192500000000000000'),
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
+      decimals: 18,
     },
     {
       id: 1,
@@ -348,6 +349,7 @@ function getTestMarkets(): ApiMarket[] {
       oraclePrice: new BigNumber('985976069960621971'),
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
+      decimals: 18,
     },
     {
       id: 2,
@@ -355,6 +357,7 @@ function getTestMarkets(): ApiMarket[] {
       oraclePrice: new BigNumber('985976069960621971'),
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
+      decimals: 18,
     },
     {
       id: 3,
@@ -362,6 +365,7 @@ function getTestMarkets(): ApiMarket[] {
       oraclePrice: new BigNumber('985976069960621971'),
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
+      decimals: 18,
     },
   ];
 }

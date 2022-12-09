@@ -48,7 +48,7 @@ export default class AccountStore {
     for (; ;) {
       try {
         await this._update();
-      } catch (error) {
+      } catch (error: any) {
         Logger.error({
           at: 'AccountStore#_poll',
           message: error.message,
