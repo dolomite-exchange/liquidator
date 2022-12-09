@@ -68,7 +68,11 @@ export async function initializeDolomiteLiquidations() {
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV2WithExternalLiquidity.options.address);
 }
 
-async function checkOperatorIsApproved(operator: string) {
+async function checkOperatorIsApproved(operator?: string) {
+  if (!operator) {
+    return
+  }
+
   if (!(await getIsGlobalOperator(operator)) && !(await getIsLocalOperator(operator))) {
     Logger.info({
       at: 'web3#loadAccounts',
