@@ -36,7 +36,7 @@ export function getOwedPriceForLiquidation(
   heldMarket: ApiMarket,
   riskParams: ApiRiskParam,
 ): Integer {
-  let reward = riskParams.liquidationReward;
+  let reward = riskParams.liquidationReward.minus(BASE);
   reward = reward.plus(getPartial(reward, heldMarket.liquidationRewardPremium, BASE));
   reward = reward.plus(getPartial(reward, owedMarket.liquidationRewardPremium, BASE));
   return owedMarket.oraclePrice.plus(getPartial(owedMarket.oraclePrice, reward, BASE));

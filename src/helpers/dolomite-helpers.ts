@@ -185,6 +185,15 @@ async function liquidateAccountInternalAndSellWithExternalLiquidity(
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
   );
+  Logger.info({
+    message: 'Performing liquidation via external liquidity',
+    owedBalance: owedBalance.wei.abs().toFixed(),
+    heldBalance: heldBalance.wei.abs().toFixed(),
+    owedWeiForLiquidation: owedWei.toFixed(),
+    heldWeiForLiquidation: heldWei.toFixed(),
+    owedPriceAdj: owedPriceAdj.toFixed(),
+    heldPrice: heldMarket.oraclePrice.toFixed(),
+  });
   const paraswapCallData = await getParaswapSwapCalldataForLiquidation(
     heldMarket,
     heldWei,
