@@ -58,7 +58,6 @@ export default class DolomiteLiquidator {
 
   _liquidateAccounts = async () => {
     const lastBlockTimestamp: DateTime = this.marketStore.getBlockTimestamp();
-    const blockNumber = this.marketStore.getBlockNumber();
 
     let expirableAccounts = this.accountStore.getExpirableDolomiteAccounts()
       .filter(a => !this.liquidationStore.contains(a))
@@ -105,7 +104,7 @@ export default class DolomiteLiquidator {
     for (let i = 0; i < liquidatableAccounts.length; i += 1) {
       const account = liquidatableAccounts[i];
       try {
-        await liquidateAccount(account, marketMap, riskParams, lastBlockTimestamp, blockNumber);
+        await liquidateAccount(account, marketMap, riskParams, lastBlockTimestamp);
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
       } catch (error: any) {
         Logger.error({

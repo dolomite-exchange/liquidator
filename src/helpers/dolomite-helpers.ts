@@ -32,7 +32,6 @@ export async function liquidateAccount(
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
   lastBlockTimestamp: DateTime,
-  blockNumber: number,
 ): Promise<TxResult | undefined> {
   if (process.env.LIQUIDATIONS_ENABLED !== 'true') {
     return undefined;
@@ -48,7 +47,6 @@ export async function liquidateAccount(
   const liquidatable = await dolomite.getters.isAccountLiquidatable(
     liquidAccount.owner,
     new BigNumber(liquidAccount.number),
-    { blockNumber },
   );
 
   if (!liquidatable) {
