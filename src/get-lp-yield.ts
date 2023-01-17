@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { address, BigNumber } from '@dolomite-exchange/dolomite-margin';
 import Logger from './lib/logger';
 
 // eslint-disable-next-line
@@ -12,35 +12,24 @@ if (process.env.ENV_FILENAME) {
 }
 
 import v8 from 'v8';
-import { getDolomiteRiskParams, getTimestampToBlockNumberMap, getTotalAmmPairYield } from './clients/dolomite';
-import { getSubgraphBlockNumber } from './helpers/block-helper';
-import { dolomite } from './helpers/web3';
+import { getTimestampToBlockNumberMap, getTotalAmmPairYield } from './clients/dolomite';
 
 async function start() {
-  const { blockNumber } = await getSubgraphBlockNumber();
-  const { riskParams } = await getDolomiteRiskParams(blockNumber);
-  const networkId = await dolomite.web3.eth.net.getId();
-
-  const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
-  if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
-    const message = `Invalid dolomite margin address found!\n
-    { network: ${riskParams.dolomiteMargin} library: ${libraryDolomiteMargin} }`;
-    Logger.error(message);
-    return Promise.reject(new Error(message));
-  } else if (networkId !== Number(process.env.NETWORK_ID)) {
-    const message = `Invalid network ID found!\n
-    { network: ${networkId} environment: ${Number(process.env.NETWORK_ID)} }`;
-    Logger.error(message);
+  let userAddress: address;
+  if (process.env.USER_ADDRESS) {
+    userAddress = process.env.USER_ADDRESS as address;
+  } else {
+    const message = 'No USER_ADDRESS specified!';
+    Logger.error({ message });
     return Promise.reject(new Error(message));
   }
 
   Logger.info({
-    message: 'DolomiteMargin data',
-    dolomiteMargin: libraryDolomiteMargin,
-    ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
+    message: 'Get LP Yield Configuration:',
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
-    networkId,
     subgraphUrl: process.env.SUBGRAPH_URL,
+    subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
+    userAddress,
   });
 
   const currentDate = Math.floor(new Date().getTime() / 1000 / 86400) * 86400;
@@ -52,7 +41,7 @@ async function start() {
   const timestampToBlockNumberMap = await getTimestampToBlockNumberMap(timestamps);
   const result = await getTotalAmmPairYield(
     Object.values(timestampToBlockNumberMap),
-    process.env.USER_ADDRESS as string,
+    userAddress,
   );
   const startTimestampString = new Date(startTimestamp * 1000).toISOString().substring(0, 10);
   const endTimestampString = new Date(timestamps[timestamps.length - 1] * 1000).toISOString().substring(0, 10);
