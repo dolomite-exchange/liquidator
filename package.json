@@ -12,7 +12,8 @@
     "compose-clean": "docker-compose rm -f",
     "migrate": "echo 'Nothing to migrate'",
     "seed": "echo 'Nothing to seed'",
-    "check-bad-debt": "ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node ./src/get-bad-debt.ts"
+    "check-bad-debt": "ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node ./src/get-bad-debt.ts",
+    "get-lp-yield": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node ./src/get-lp-yield.ts"
   },
   "repository": {
     "type": "git",
@@ -30,7 +31,7 @@
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",
     "lru-cache": "^5.1.1",
-    "luxon": "^1.25.0",
+    "luxon": "^1.28.1",
     "request-promise-native": "^1.0.9",
     "winston": "^3.2.1",
     "winston-transport": "^4.3.0"

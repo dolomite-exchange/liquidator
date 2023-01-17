@@ -51,3 +51,33 @@ export interface GraphqlRiskParams {
   liquidationRatio: string
   liquidationReward: string
 }
+
+interface GraphqlBlockResult {
+  number: string
+}
+
+export interface GraphqlTimestampToBlockResult {
+  data: Record<string, GraphqlBlockResult[]>
+}
+
+export interface GraphqlAmmPairData {
+  volumeUSD: string
+  reserveUSD: string
+  reserve0: string
+  reserve1: string
+  totalSupply: string
+}
+
+export interface GraphqlInterestRate {
+  supplyInterestRate: string
+}
+
+export interface GraphqlAmmLiquidityPosition {
+  liquidityTokenBalance: string
+}
+
+type GraphqlAmmDataForUserResultSubResult = GraphqlAmmPairData | GraphqlInterestRate | GraphqlAmmLiquidityPosition
+
+export interface GraphqlAmmDataForUserResult {
+  data: Record<string, GraphqlAmmDataForUserResultSubResult[]>
+}

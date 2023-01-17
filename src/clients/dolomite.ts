@@ -1,10 +1,19 @@
 /* eslint-disable max-len */
-import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, MarketIndex } from '../lib/api-types';
-import { GraphqlAccountResult, GraphqlMarketResult, GraphqlRiskParamsResult } from '../lib/graphql-types';
+import {
+  GraphqlAccountResult,
+  GraphqlAmmDataForUserResult,
+  GraphqlAmmLiquidityPosition,
+  GraphqlAmmPairData,
+  GraphqlInterestRate,
+  GraphqlMarketResult,
+  GraphqlRiskParamsResult,
+  GraphqlTimestampToBlockResult,
+} from '../lib/graphql-types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ethers = require('ethers');
@@ -223,4 +232,101 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
   });
 
   return { riskParams: riskParams[0] };
+}
+
+export async function getTimestampToBlockNumberMap(timestamps: number[]): Promise<Record<string, number>> {
+  let queries = '';
+  timestamps.forEach(timestamp => {
+    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 30}, timestamp_lt: ${timestamp + 30} } first: 1) { number }`
+  });
+  const result = await axios.post(
+    `${process.env.SUBGRAPH_BLOCKS_URL}`,
+    {
+      query: `query getTimestampToBlockNumberMap {
+        ${queries}
+      }`,
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlTimestampToBlockResult);
+
+  return timestamps.reduce((memo, timestamp) => {
+    memo[timestamp.toString()] = result.data[`_${timestamp}`]?.[0]?.number;
+    return memo;
+  }, {});
+}
+
+export interface TotalYield {
+  totalEntries: number
+  swapYield: Decimal
+  lendingYield: Decimal
+  totalYield: Decimal
+}
+export async function getTotalAmmPairYield(blockNumbers: number[], user: address): Promise<TotalYield> {
+  let queries = '';
+  blockNumbers.forEach(blockNumber => {
+    queries += `
+      ammPair_${blockNumber}:ammPairs(where: { id: "0xb77a493a4950cad1b049e222d62bce14ff423c6f" } block: { number: ${blockNumber} }) {
+        volumeUSD
+        reserveUSD
+        reserve0
+        reserve1
+        totalSupply
+      }
+      wethInterestRate_${blockNumber}:interestRates(where: {id: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1" } block: { number: ${blockNumber} }) {
+        supplyInterestRate
+      }
+      usdcInterestRate_${blockNumber}:interestRates(where: {id: "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8" } block: { number: ${blockNumber} }) {
+        supplyInterestRate
+      }
+      ammLiquidityPosition_${blockNumber}:ammLiquidityPositions(where: { user: "${user}"} block: { number: ${blockNumber} }) {
+        liquidityTokenBalance
+      }
+    `
+  });
+  const result = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query: `query getAmmDataForUser {
+        ${queries}
+      }`,
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlAmmDataForUserResult);
+
+  const blockNumbersAsc = blockNumbers.sort((a, b) => a - b);
+
+  return blockNumbersAsc.reduce<TotalYield>((memo, blockNumber, i) => {
+    const blockNumberYesterday = i === 0 ? undefined : blockNumbersAsc[i - 1];
+    const ammPair = result.data[`ammPair_${blockNumber}`]?.[0] as GraphqlAmmPairData | undefined;
+    const ammPairYesterday = result.data[`ammPair_${blockNumberYesterday}`]?.[0] as GraphqlAmmPairData | undefined;
+    const wethInterestRateStruct = result.data[`wethInterestRate_${blockNumber}`]?.[0] as GraphqlInterestRate | undefined;
+    const usdcInterestRateStruct = result.data[`usdcInterestRate_${blockNumber}`]?.[0] as GraphqlInterestRate | undefined;
+    const ammLiquidityPosition = result.data[`ammLiquidityPosition_${blockNumber}`]?.[0] as GraphqlAmmLiquidityPosition | undefined;
+    if (!ammPair || !ammPairYesterday || !wethInterestRateStruct || !usdcInterestRateStruct || !ammLiquidityPosition) {
+      return memo
+    }
+    const wethInterestRate = new BigNumber(wethInterestRateStruct.supplyInterestRate).div(365);
+    const usdcInterestRate = new BigNumber(usdcInterestRateStruct.supplyInterestRate).div(365);
+
+    const ratio = new BigNumber(ammLiquidityPosition.liquidityTokenBalance).div(ammPair.totalSupply);
+    const lendingYield = wethInterestRate.plus(usdcInterestRate).div(2).times(ratio).times(ammPair.reserveUSD);
+    const volumeUSD = new BigNumber(ammPair.volumeUSD).minus(ammPairYesterday.volumeUSD);
+    const swapYield = volumeUSD.times(ratio).times(0.003);
+    const totalYield = lendingYield.plus(swapYield);
+    return {
+      totalEntries: memo.totalEntries + 1,
+      swapYield: memo.swapYield.plus(swapYield),
+      lendingYield: memo.lendingYield.plus(lendingYield),
+      totalYield: memo.totalYield.plus(totalYield),
+    }
+  }, {
+    totalEntries: 0,
+    swapYield: new BigNumber(0),
+    lendingYield: new BigNumber(0),
+    totalYield: new BigNumber(0),
+  });
 }
