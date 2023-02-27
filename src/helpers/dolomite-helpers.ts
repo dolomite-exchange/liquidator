@@ -185,15 +185,30 @@ async function liquidateAccountInternalAndSellWithExternalLiquidity(
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
   );
-  Logger.info({
-    message: 'Performing liquidation via external liquidity',
-    owedBalance: owedBalance.wei.abs().toFixed(),
-    heldBalance: heldBalance.wei.abs().toFixed(),
-    owedWeiForLiquidation: owedWei.toFixed(),
-    heldWeiForLiquidation: heldWei.toFixed(),
-    owedPriceAdj: owedPriceAdj.toFixed(),
-    heldPrice: heldMarket.oraclePrice.toFixed(),
-  });
+
+  if (heldMarket.unwrapperAddress) {
+    Logger.info({
+      message: 'Performing liquidation for liquidity token via external liquidity',
+      owedBalance: owedBalance.wei.abs().toFixed(),
+      heldBalance: heldBalance.wei.abs().toFixed(),
+      owedWeiForLiquidation: owedWei.toFixed(),
+      heldWeiForLiquidation: heldWei.toFixed(),
+      owedPriceAdj: owedPriceAdj.toFixed(),
+      heldPrice: heldMarket.oraclePrice.toFixed(),
+      unwrapperAddress: heldMarket.unwrapperAddress,
+    });
+  } else {
+    Logger.info({
+      message: 'Performing liquidation via external liquidity',
+      owedBalance: owedBalance.wei.abs().toFixed(),
+      heldBalance: heldBalance.wei.abs().toFixed(),
+      owedWeiForLiquidation: owedWei.toFixed(),
+      heldWeiForLiquidation: heldWei.toFixed(),
+      owedPriceAdj: owedPriceAdj.toFixed(),
+      heldPrice: heldMarket.oraclePrice.toFixed(),
+    });
+  }
+
   const paraswapCallData = await getParaswapSwapCalldataForLiquidation(
     heldMarket,
     heldWei,
@@ -236,7 +251,6 @@ async function liquidateAccountInternalAndSellWithInternalLiquidity(
     return Promise.reject(new Error(message));
   }
 
-  const bridgeAddress = process.env.BRIDGE_TOKEN_ADDRESS.toLowerCase();
   const owedBalance = getLargestBalanceUSD(
     Object.values(liquidAccount.balances),
     true,
@@ -256,6 +270,7 @@ async function liquidateAccountInternalAndSellWithInternalLiquidity(
   const heldToken = heldBalance.tokenAddress.toLowerCase();
 
   let tokenPath: string[];
+  const bridgeAddress = process.env.BRIDGE_TOKEN_ADDRESS.toLowerCase();
   if (owedToken === bridgeAddress || heldToken === bridgeAddress) {
     tokenPath = [heldBalance.tokenAddress, owedBalance.tokenAddress];
   } else {

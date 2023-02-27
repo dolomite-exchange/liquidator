@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { address, ADDRESSES, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
@@ -171,19 +171,28 @@ export async function getDolomiteMarkets(
     return Promise.reject(result.errors[0]);
   }
 
-  const calls = result.data.marketRiskInfos.map(market => {
+  const marketPriceCalls = result.data.marketRiskInfos.map(market => {
     return {
-      target: (dolomite.contracts.dolomiteMargin.options as any).address,
-      callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.token.marketId)
-        .encodeABI(),
+      target: dolomite.address,
+      callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.token.marketId).encodeABI(),
+    };
+  });
+
+  const tokenUnwrapperCalls = result.data.marketRiskInfos.map(market => {
+    const contract = dolomite.contracts.liquidatorProxyV3WithLiquidityToken;
+    return {
+      target: contract.options.address,
+      callData: contract.methods.marketIdToTokenUnwrapperMap(market.token.marketId).encodeABI(),
     };
   });
 
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
-  const { results: marketPrices } = await dolomite.multiCall.aggregate(calls);
+  const { results: marketPrices } = await dolomite.multiCall.aggregate(marketPriceCalls);
+  const { results: tokenUnwrappers } = await dolomite.multiCall.aggregate(tokenUnwrapperCalls);
 
   const markets: Promise<ApiMarket>[] = result.data.marketRiskInfos.map(async (market, i) => {
     const oraclePriceString = dolomite.web3.eth.abi.decodeParameter('uint256', marketPrices[i]);
+    const tokenUnwrapperString = dolomite.web3.eth.abi.decodeParameter('address', tokenUnwrappers[i]);
     const apiMarket: ApiMarket = {
       id: Number(market.token.marketId),
       decimals: Number(market.token.decimals),
@@ -191,6 +200,7 @@ export async function getDolomiteMarkets(
       oraclePrice: new BigNumber(oraclePriceString),
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),
       liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
+      unwrapperAddress: tokenUnwrapperString !== ADDRESSES.ZERO ? tokenUnwrapperString : undefined,
     };
     return apiMarket;
   });
@@ -237,7 +247,8 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
 export async function getTimestampToBlockNumberMap(timestamps: number[]): Promise<Record<string, number>> {
   let queries = '';
   timestamps.forEach(timestamp => {
-    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 30}, timestamp_lt: ${timestamp + 30} } first: 1) { number }`
+    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 30}, timestamp_lt: ${timestamp
+    + 30} } first: 1) { number }`
   });
   const result = await axios.post(
     `${process.env.SUBGRAPH_BLOCKS_URL}`,
@@ -263,6 +274,7 @@ export interface TotalYield {
   lendingYield: Decimal
   totalYield: Decimal
 }
+
 export async function getTotalAmmPairYield(blockNumbers: number[], user: address): Promise<TotalYield> {
   let queries = '';
   blockNumbers.forEach(blockNumber => {

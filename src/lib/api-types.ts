@@ -24,11 +24,12 @@ export interface ApiAccount {
 
 export interface ApiMarket {
   id: number
-  tokenAddress: string
+  tokenAddress: address
   decimals: number
   oraclePrice: Integer
   marginPremium: Integer
   liquidationRewardPremium: Integer
+  unwrapperAddress: address | undefined
 }
 
 export interface ApiRiskParam {
