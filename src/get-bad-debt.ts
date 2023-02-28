@@ -53,6 +53,7 @@ async function start() {
   await accountStore._update();
 
   const marketMap = marketStore.getMarketMap();
+
   // These accounts are not actually liquidatable, but rather accounts that have ANY debt.
   const accounts = accountStore.getLiquidatableDolomiteAccounts();
 
@@ -106,9 +107,6 @@ async function start() {
 }
 
 start().catch(error => {
-  Logger.error({
-    message: `Found error while starting: ${error.toString()}`,
-    error,
-  })
+  console.error(`Found error while starting: ${error.toString()}`, error);
   process.exit(1)
 });

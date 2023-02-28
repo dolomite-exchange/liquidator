@@ -187,14 +187,15 @@ export async function getDolomiteMarkets(
   });
 
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
-  const { results: marketPrices } = await dolomite.multiCall.aggregate(marketPriceCalls);
-  const { results: tokenUnwrappers } = await dolomite.multiCall.aggregate(tokenUnwrapperCalls);
+  const { results: marketPriceResults } = await dolomite.multiCall.aggregate(marketPriceCalls);
+  const { results: tokenUnwrapperResults } = await dolomite.multiCall.aggregate(tokenUnwrapperCalls);
 
-  const outputMarketIdCalls = tokenUnwrappers.reduce<{ marketId: number, target: string; callData: string; }[]>((memo, unwrapper, i) => {
+  const outputMarketIdCalls = tokenUnwrapperResults.reduce<{ marketId: number, target: string; callData: string; }[]>((memo, unwrapperResult, i) => {
+    const unwrapper = dolomite.web3.eth.abi.decodeParameter('address', unwrapperResult);
     if (unwrapper !== ADDRESSES.ZERO) {
       const contract = dolomite.getTokenUnwrapper(unwrapper);
       memo.push({
-        marketId: result.data.marketRiskInfos[i].marketId,
+        marketId: result.data.marketRiskInfos[i].token.marketId,
         target: contract.address,
         callData: contract.unwrapperContract.methods.outputMarketId().encodeABI(),
       });
@@ -202,20 +203,20 @@ export async function getDolomiteMarkets(
     return memo;
   }, []);
 
-  const { results: outputMarketIds } = await dolomite.multiCall.aggregate(outputMarketIdCalls);
+  const { results: outputMarketIdResults } = await dolomite.multiCall.aggregate(outputMarketIdCalls);
   const marketIdToOutputMarketIdMap = outputMarketIdCalls.reduce<{ [marketId: number]: number }>((memo, call, i) => {
-    const outputMarketIdString = dolomite.web3.eth.abi.decodeParameter('uint256', outputMarketIds[i]);
-    memo[call.marketId] = Number(outputMarketIdString);
+    const outputMarketId = dolomite.web3.eth.abi.decodeParameter('uint256', outputMarketIdResults[i]);
+    memo[call.marketId] = Number(outputMarketId);
     return memo;
   }, {})
 
   const markets: Promise<ApiMarket>[] = result.data.marketRiskInfos.map(async (market, i) => {
-    const oraclePriceString = dolomite.web3.eth.abi.decodeParameter('uint256', marketPrices[i]);
-    const tokenUnwrapperString = dolomite.web3.eth.abi.decodeParameter('address', tokenUnwrappers[i]);
+    const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
+    const tokenUnwrapper = dolomite.web3.eth.abi.decodeParameter('address', tokenUnwrapperResults[i]);
     let unwrapperInfo: ApiUnwrapperInfo | undefined;
-    if (tokenUnwrapperString !== ADDRESSES.ZERO) {
+    if (tokenUnwrapper !== ADDRESSES.ZERO) {
       unwrapperInfo = {
-        unwrapperAddress: tokenUnwrapperString,
+        unwrapperAddress: tokenUnwrapper,
         outputMarketId: marketIdToOutputMarketIdMap[market.token.marketId],
       };
     }
@@ -223,7 +224,7 @@ export async function getDolomiteMarkets(
       id: Number(market.token.marketId),
       decimals: Number(market.token.decimals),
       tokenAddress: market.token.id,
-      oraclePrice: new BigNumber(oraclePriceString),
+      oraclePrice: new BigNumber(oraclePrice),
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),
       liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
       unwrapperInfo,
