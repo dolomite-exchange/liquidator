@@ -12,6 +12,7 @@ describe('paraswap', () => {
         marginPremium: new BigNumber('0'),
         liquidationRewardPremium: new BigNumber('0'),
         decimals: 18,
+        unwrapperInfo: undefined,
       };
       const outputMarket: ApiMarket = {
         id: 2,
@@ -20,6 +21,7 @@ describe('paraswap', () => {
         marginPremium: new BigNumber('0'),
         liquidationRewardPremium: new BigNumber('0'),
         decimals: 6,
+        unwrapperInfo: undefined,
       };
       const inputAmount = new BigNumber('1000000000000000000'); // 1 ETH
       const minOutputAmount = new BigNumber('100000000'); // 100 USDC

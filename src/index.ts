@@ -19,7 +19,7 @@ import {
   checkPreferences,
   checkPrivateKey,
 } from './lib/invariants';
-import { LIQUIDATION_MODE, LiquidationMode } from './lib/liquidation-mode';
+import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
 import LiquidationStore from './lib/liquidation-store';
 import Logger from './lib/logger';
 import MarketStore from './lib/market-store';
@@ -28,7 +28,6 @@ import RiskParamsStore from './lib/risk-params-store';
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
-checkBooleanValue('AUTO_SELL_COLLATERAL');
 checkEthereumAddress('BRIDGE_TOKEN_ADDRESS');
 checkLiquidationModeConditionally(
   LiquidationMode.Simple,
@@ -74,6 +73,7 @@ async function start() {
   const riskParamsStore = new RiskParamsStore(marketStore);
   const dolomiteLiquidator = new DolomiteLiquidator(accountStore, marketStore, liquidationStore, riskParamsStore);
   const gasPriceUpdater = new GasPriceUpdater();
+  const liquidationMode = getLiquidationMode();
 
   await loadAccounts();
 
@@ -97,7 +97,7 @@ async function start() {
   Logger.info({
     message: 'DolomiteMargin data',
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
-    liquidationMode: LIQUIDATION_MODE,
+    liquidationMode: liquidationMode,
     bridgeTokenAddress: process.env.BRIDGE_TOKEN_ADDRESS,
     dolomiteAccountNumber: process.env.DOLOMITE_ACCOUNT_NUMBER,
     dolomiteMargin: libraryDolomiteMargin,
@@ -127,31 +127,31 @@ async function start() {
     riskParamsPollIntervalMillis: process.env.RISK_PARAMS_POLL_INTERVAL_MS,
   });
 
-  if (LIQUIDATION_MODE === LiquidationMode.Simple) {
+  if (liquidationMode === LiquidationMode.Simple) {
     Logger.info({
-      liquidationMode: LIQUIDATION_MODE,
+      liquidationMode: liquidationMode,
       message: 'Simple liquidation variables',
       collateralPreferences: process.env.COLLATERAL_PREFERENCES,
       minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
       minOverheadValue: process.env.MIN_OVERHEAD_VALUE,
       owedPreferences: process.env.OWED_PREFERENCES,
     });
-  } else if (LIQUIDATION_MODE === LiquidationMode.SellWithInternalLiquidity) {
+  } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {
     const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true';
     const discountUsedText = revertOnFailToSellCollateral ? '(unused)' : '';
     Logger.info({
-      liquidationMode: LIQUIDATION_MODE,
+      liquidationMode: liquidationMode,
       message: 'Sell with internal liquidity variables:',
       revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
       minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
     });
-  } else if (LIQUIDATION_MODE === LiquidationMode.SellWithExternalLiquidity) {
+  } else if (liquidationMode === LiquidationMode.SellWithExternalLiquidity) {
     Logger.info({
-      liquidationMode: LIQUIDATION_MODE,
+      liquidationMode: liquidationMode,
       message: 'Sell with external liquidity variables:',
     });
   } else {
-    throw new Error(`Invalid liquidation mode: ${LIQUIDATION_MODE}`);
+    throw new Error(`Invalid liquidation mode: ${liquidationMode}`);
   }
 
   if (process.env.LIQUIDATIONS_ENABLED === 'true') {

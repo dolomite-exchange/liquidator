@@ -4,7 +4,7 @@ import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/d
 import { DateTime } from 'luxon';
 import { getParaswapSwapCalldataForLiquidation } from '../clients/paraswap';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
-import { LIQUIDATION_MODE, LiquidationMode } from '../lib/liquidation-mode';
+import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
 import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/math-utils';
 import { getGasPriceWei } from './gas-price-helpers';
@@ -82,7 +82,7 @@ export async function liquidateAccount(
     return Promise.reject(new Error('Supposedly liquidatable account has no collateral'));
   }
 
-  if (LIQUIDATION_MODE === LiquidationMode.SellWithExternalLiquidity) {
+  if (getLiquidationMode() === LiquidationMode.SellWithExternalLiquidity) {
     return liquidateAccountInternalAndSellWithExternalLiquidity(
       liquidAccount,
       marketMap,
@@ -90,12 +90,12 @@ export async function liquidateAccount(
       lastBlockTimestamp,
       false,
     );
-  } else if (LIQUIDATION_MODE === LiquidationMode.SellWithInternalLiquidity) {
+  } else if (getLiquidationMode() === LiquidationMode.SellWithInternalLiquidity) {
     return liquidateAccountInternalAndSellWithInternalLiquidity(liquidAccount, marketMap, lastBlockTimestamp, false);
-  } else if (LIQUIDATION_MODE === LiquidationMode.Simple) {
+  } else if (getLiquidationMode() === LiquidationMode.Simple) {
     return liquidateAccountInternal(liquidAccount);
   } else {
-    throw new Error(`Unknown liquidation mode: ${LIQUIDATION_MODE}`);
+    throw new Error(`Unknown liquidation mode: ${getLiquidationMode()}`);
   }
 }
 
@@ -138,7 +138,7 @@ export async function liquidateExpiredAccount(
     accountNumber: expiredAccount.number,
   });
 
-  if (LIQUIDATION_MODE === LiquidationMode.SellWithExternalLiquidity) {
+  if (getLiquidationMode() === LiquidationMode.SellWithExternalLiquidity) {
     return liquidateAccountInternalAndSellWithExternalLiquidity(
       expiredAccount,
       marketMap,
@@ -146,12 +146,12 @@ export async function liquidateExpiredAccount(
       lastBlockTimestamp,
       true,
     );
-  } else if (LIQUIDATION_MODE === LiquidationMode.SellWithInternalLiquidity) {
+  } else if (getLiquidationMode() === LiquidationMode.SellWithInternalLiquidity) {
     return liquidateAccountInternalAndSellWithInternalLiquidity(expiredAccount, marketMap, lastBlockTimestamp, true);
-  } else if (LIQUIDATION_MODE === LiquidationMode.Simple) {
+  } else if (getLiquidationMode() === LiquidationMode.Simple) {
     return liquidateExpiredAccountInternalSimple(expiredAccount, marketMap, lastBlockTimestamp);
   } else {
-    throw new Error(`Unknown liquidation mode: ${LIQUIDATION_MODE}`);
+    throw new Error(`Unknown liquidation mode: ${getLiquidationMode()}`);
   }
 }
 
@@ -186,20 +186,63 @@ async function liquidateAccountInternalAndSellWithExternalLiquidity(
     heldMarket.oraclePrice,
   );
 
-  if (heldMarket.unwrapperAddress) {
+  if (heldMarket.unwrapperInfo) {
     Logger.info({
       message: 'Performing liquidation for liquidity token via external liquidity',
+      owedMarketId: owedMarket.id,
+      heldMarketId: heldMarket.id,
       owedBalance: owedBalance.wei.abs().toFixed(),
       heldBalance: heldBalance.wei.abs().toFixed(),
       owedWeiForLiquidation: owedWei.toFixed(),
       heldWeiForLiquidation: heldWei.toFixed(),
       owedPriceAdj: owedPriceAdj.toFixed(),
       heldPrice: heldMarket.oraclePrice.toFixed(),
-      unwrapperAddress: heldMarket.unwrapperAddress,
+      unwrapperAddress: heldMarket.unwrapperInfo.unwrapperAddress,
+      outputMarketId: heldMarket.unwrapperInfo.outputMarketId,
     });
+
+    const outputMarket = marketMap[heldMarket.unwrapperInfo.outputMarketId];
+
+    let paraswapCallData = '0x';
+    if (owedMarket.id !== outputMarket.id) {
+      // If the unwrapped token is not the same as the owed token, we need to swap it for the owed token
+      const unwrapper = dolomite.getTokenUnwrapper(heldMarket.unwrapperInfo.unwrapperAddress);
+      const outputMarketAmount = await unwrapper.getExchangeCost(
+        heldMarket.tokenAddress,
+        outputMarket.tokenAddress,
+        heldWei,
+        '0x',
+      );
+      paraswapCallData = await getParaswapSwapCalldataForLiquidation(
+        outputMarket,
+        outputMarketAmount.times(999).dividedToIntegerBy(1000),
+        owedMarket,
+        owedWei,
+        solidAccount.owner,
+        dolomite.liquidatorProxyV3WithLiquidityToken.address,
+      );
+    }
+
+    return dolomite.liquidatorProxyV3WithLiquidityToken.liquidate(
+      solidAccount.owner,
+      solidAccount.number,
+      liquidAccount.owner,
+      liquidAccount.number,
+      new BigNumber(owedBalance.marketId),
+      new BigNumber(heldBalance.marketId),
+      isExpiring ? (owedBalance.expiresAt ?? null) : null,
+      paraswapCallData,
+      {
+        gasPrice: getGasPriceWei().toFixed(),
+        from: solidAccount.owner,
+        confirmationType: ConfirmationType.Hash,
+      },
+    );
   } else {
     Logger.info({
       message: 'Performing liquidation via external liquidity',
+      owedMarketId: owedMarket.id,
+      heldMarketId: heldMarket.id,
       owedBalance: owedBalance.wei.abs().toFixed(),
       heldBalance: heldBalance.wei.abs().toFixed(),
       owedWeiForLiquidation: owedWei.toFixed(),
@@ -207,32 +250,32 @@ async function liquidateAccountInternalAndSellWithExternalLiquidity(
       owedPriceAdj: owedPriceAdj.toFixed(),
       heldPrice: heldMarket.oraclePrice.toFixed(),
     });
+
+    const paraswapCallData = await getParaswapSwapCalldataForLiquidation(
+      heldMarket,
+      heldWei,
+      owedMarket,
+      owedWei,
+      solidAccount.owner,
+      dolomite.liquidatorProxyV2WithExternalLiquidity.address,
+    );
+
+    return dolomite.liquidatorProxyV2WithExternalLiquidity.liquidate(
+      solidAccount.owner,
+      solidAccount.number,
+      liquidAccount.owner,
+      liquidAccount.number,
+      new BigNumber(owedBalance.marketId),
+      new BigNumber(heldBalance.marketId),
+      isExpiring ? (owedBalance.expiresAt ?? null) : null,
+      paraswapCallData,
+      {
+        gasPrice: getGasPriceWei().toFixed(),
+        from: solidAccount.owner,
+        confirmationType: ConfirmationType.Hash,
+      },
+    );
   }
-
-  const paraswapCallData = await getParaswapSwapCalldataForLiquidation(
-    heldMarket,
-    heldWei,
-    owedMarket,
-    owedWei,
-    solidAccount.owner,
-    dolomite.liquidatorProxyV2WithExternalLiquidity.address,
-  );
-
-  return dolomite.liquidatorProxyV2WithExternalLiquidity.liquidate(
-    solidAccount.owner,
-    solidAccount.number,
-    liquidAccount.owner,
-    liquidAccount.number,
-    new BigNumber(owedBalance.marketId),
-    new BigNumber(heldBalance.marketId),
-    isExpiring ? (owedBalance.expiresAt ?? null) : null,
-    paraswapCallData,
-    {
-      gasPrice: getGasPriceWei().toFixed(),
-      from: solidAccount.owner,
-      confirmationType: ConfirmationType.Hash,
-    },
-  );
 }
 
 async function liquidateAccountInternalAndSellWithInternalLiquidity(

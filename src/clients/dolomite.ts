@@ -3,7 +3,7 @@ import { address, ADDRESSES, BigNumber, Decimal } from '@dolomite-exchange/dolom
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, MarketIndex } from '../lib/api-types';
+import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, ApiUnwrapperInfo, MarketIndex } from '../lib/api-types';
 import {
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
@@ -190,9 +190,35 @@ export async function getDolomiteMarkets(
   const { results: marketPrices } = await dolomite.multiCall.aggregate(marketPriceCalls);
   const { results: tokenUnwrappers } = await dolomite.multiCall.aggregate(tokenUnwrapperCalls);
 
+  const outputMarketIdCalls = tokenUnwrappers.reduce<{ marketId: number, target: string; callData: string; }[]>((memo, unwrapper, i) => {
+    if (unwrapper !== ADDRESSES.ZERO) {
+      const contract = dolomite.getTokenUnwrapper(unwrapper);
+      memo.push({
+        marketId: result.data.marketRiskInfos[i].marketId,
+        target: contract.address,
+        callData: contract.unwrapperContract.methods.outputMarketId().encodeABI(),
+      });
+    }
+    return memo;
+  }, []);
+
+  const { results: outputMarketIds } = await dolomite.multiCall.aggregate(outputMarketIdCalls);
+  const marketIdToOutputMarketIdMap = outputMarketIdCalls.reduce<{ [marketId: number]: number }>((memo, call, i) => {
+    const outputMarketIdString = dolomite.web3.eth.abi.decodeParameter('uint256', outputMarketIds[i]);
+    memo[call.marketId] = Number(outputMarketIdString);
+    return memo;
+  }, {})
+
   const markets: Promise<ApiMarket>[] = result.data.marketRiskInfos.map(async (market, i) => {
     const oraclePriceString = dolomite.web3.eth.abi.decodeParameter('uint256', marketPrices[i]);
     const tokenUnwrapperString = dolomite.web3.eth.abi.decodeParameter('address', tokenUnwrappers[i]);
+    let unwrapperInfo: ApiUnwrapperInfo | undefined;
+    if (tokenUnwrapperString !== ADDRESSES.ZERO) {
+      unwrapperInfo = {
+        unwrapperAddress: tokenUnwrapperString,
+        outputMarketId: marketIdToOutputMarketIdMap[market.token.marketId],
+      };
+    }
     const apiMarket: ApiMarket = {
       id: Number(market.token.marketId),
       decimals: Number(market.token.decimals),
@@ -200,7 +226,7 @@ export async function getDolomiteMarkets(
       oraclePrice: new BigNumber(oraclePriceString),
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),
       liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
-      unwrapperAddress: tokenUnwrapperString !== ADDRESSES.ZERO ? tokenUnwrapperString : undefined,
+      unwrapperInfo,
     };
     return apiMarket;
   });

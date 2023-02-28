@@ -29,7 +29,12 @@ export interface ApiMarket {
   oraclePrice: Integer
   marginPremium: Integer
   liquidationRewardPremium: Integer
-  unwrapperAddress: address | undefined
+  unwrapperInfo: ApiUnwrapperInfo | undefined
+}
+
+export interface ApiUnwrapperInfo {
+  unwrapperAddress: address
+  outputMarketId: number
 }
 
 export interface ApiRiskParam {

@@ -5,6 +5,7 @@ import { dolomite } from '../../src/helpers/web3';
 import AccountStore from '../../src/lib/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
 import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
+import { LiquidationMode } from '../../src/lib/liquidation-mode';
 import LiquidationStore from '../../src/lib/liquidation-store';
 import MarketStore from '../../src/lib/market-store';
 import RiskParamsStore from '../../src/lib/risk-params-store';
@@ -34,7 +35,7 @@ describe('dolomite-liquidator', () => {
     it('Successfully liquidates accounts normally', async () => {
       process.env.EXPIRATIONS_ENABLED = 'true';
       process.env.BRIDGE_TOKEN_ADDRESS = getTestMarkets()[0].tokenAddress;
-      process.env.AUTO_SELL_COLLATERAL = 'false';
+      process.env.LIQUIDATION_MODE = LiquidationMode.Simple;
 
       const liquidatableAccounts = getTestLiquidatableAccounts();
       const expiredAccounts = getTestExpiredAccounts();
@@ -123,7 +124,7 @@ describe('dolomite-liquidator', () => {
     it('Successfully liquidates accounts while selling collateral', async () => {
       process.env.EXPIRATIONS_ENABLED = 'true';
       process.env.BRIDGE_TOKEN_ADDRESS = getTestMarkets()[0].tokenAddress; // WETH
-      process.env.AUTO_SELL_COLLATERAL = 'true';
+      process.env.LIQUIDATION_MODE = LiquidationMode.SellWithInternalLiquidity;
       process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL = 'false';
 
       const liquidatableAccounts = getTestLiquidatableAccounts();
@@ -342,6 +343,7 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
+      unwrapperInfo: undefined,
     },
     {
       id: 1,
@@ -350,6 +352,7 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
+      unwrapperInfo: undefined,
     },
     {
       id: 2,
@@ -358,6 +361,7 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
+      unwrapperInfo: undefined,
     },
     {
       id: 3,
@@ -366,6 +370,7 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
+      unwrapperInfo: undefined,
     },
   ];
 }

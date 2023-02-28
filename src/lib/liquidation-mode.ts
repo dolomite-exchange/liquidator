@@ -4,4 +4,6 @@ export enum LiquidationMode {
   SellWithExternalLiquidity = 'SellWithExternalLiquidity',
 }
 
-export const LIQUIDATION_MODE = LiquidationMode[process.env.LIQUIDATION_MODE as keyof typeof LiquidationMode];
+export function getLiquidationMode(): LiquidationMode {
+  return LiquidationMode[process.env.LIQUIDATION_MODE as keyof typeof LiquidationMode];
+}
