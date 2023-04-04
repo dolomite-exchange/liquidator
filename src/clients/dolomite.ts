@@ -3,7 +3,15 @@ import { address, ADDRESSES, BigNumber, Decimal } from '@dolomite-exchange/dolom
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, ApiUnwrapperInfo, MarketIndex } from '../lib/api-types';
+import {
+  ApiAccount,
+  ApiAccountFromNativeSubgraph,
+  ApiBalance,
+  ApiMarket,
+  ApiRiskParam,
+  ApiUnwrapperInfo,
+  MarketIndex,
+} from '../lib/api-types';
 import {
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
@@ -108,6 +116,36 @@ export async function getLiquidatableDolomiteAccounts(
                 }
               }`;
   return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
+}
+
+export async function getAllDolomiteAccounts(
+  marketIndexMap: { [marketId: string]: MarketIndex },
+  blockNumber: number,
+  pageIndex: number = 0,
+): Promise<{ accounts: ApiAccountFromNativeSubgraph[] }> {
+  const query = `
+            query getActiveMarginAccounts($blockNumber: Int, $skip: Int) {
+                marginAccounts(where: { hasSupplyValue: true } block: { number: $blockNumber } first: 1000 skip: $skip) {
+                  id
+                  user {
+                    id
+                  }
+                  accountNumber
+                  tokenValues {
+                    token {
+                      id
+                      marketId
+                      decimals
+                      symbol
+                    }
+                    valuePar
+                    expirationTimestamp
+                    expiryAddress
+                  }
+                }
+              }`;
+  const accounts = await getAccounts(marketIndexMap, query, blockNumber, pageIndex);
+  return (accounts as any) as { accounts: ApiAccountFromNativeSubgraph[] };
 }
 
 export async function getExpiredAccounts(

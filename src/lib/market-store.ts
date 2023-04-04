@@ -1,5 +1,7 @@
+import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { DateTime } from 'luxon';
-import { ApiMarket } from './api-types';
+import { dolomite } from '../helpers/web3';
+import { ApiMarket, MarketIndex } from './api-types';
 import { getDolomiteMarkets } from '../clients/dolomite';
 import { delay } from './delay';
 import Logger from './logger';
@@ -27,6 +29,32 @@ export default class MarketStore {
 
   public getMarketMap(): { [marketId: string]: ApiMarket } {
     return this.marketMap;
+  }
+
+  async getMarketIndexMap(
+    marketMap: { [marketId: string]: any },
+  ): Promise<{ [marketId: string]: MarketIndex }> {
+    const marketIds = Object.keys(marketMap);
+    const indexCalls = marketIds.map(marketId => {
+      return {
+        target: dolomite.contracts.dolomiteMargin.options.address,
+        callData: dolomite.contracts.dolomiteMargin.methods.getMarketCurrentIndex(marketId)
+          .encodeABI(),
+      };
+    });
+
+    // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
+    const { results: indexResults } = await dolomite.multiCall.aggregate(indexCalls);
+
+    return indexResults.reduce<{ [marketId: string]: MarketIndex }>((memo, rawIndexResult, i) => {
+      const decodedResults = dolomite.web3.eth.abi.decodeParameters(['uint256', 'uint256', 'uint256'], rawIndexResult);
+      memo[marketIds[i]] = {
+        marketId: Number(marketIds[i]),
+        borrow: new BigNumber(decodedResults[0]).div('1000000000000000000'),
+        supply: new BigNumber(decodedResults[1]).div('1000000000000000000'),
+      };
+      return memo;
+    }, {});
   }
 
   start = () => {
