@@ -1,9 +1,9 @@
 /* eslint-disable */
-import Logger from './lib/logger';
+import Logger from '../lib/logger';
 
 // eslint-disable-next-line
 if (process.env.ENV_FILENAME) {
-  require('dotenv').config({ path: `${__dirname}/../${process.env.ENV_FILENAME}` });
+  require('dotenv').config({ path: `${__dirname}/../../${process.env.ENV_FILENAME}` });
 } else {
   Logger.warn({
     message: 'No ENV_FILENAME specified, using default env variables passed through the environment.'
@@ -13,11 +13,11 @@ if (process.env.ENV_FILENAME) {
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
-import { getDolomiteRiskParams } from './clients/dolomite';
-import { getSubgraphBlockNumber } from './helpers/block-helper';
-import { dolomite } from './helpers/web3';
-import AccountStore from './lib/account-store';
-import MarketStore from './lib/market-store';
+import { getDolomiteRiskParams } from '../clients/dolomite';
+import { getSubgraphBlockNumber } from '../helpers/block-helper';
+import { dolomite } from '../helpers/web3';
+import AccountStore from '../lib/account-store';
+import MarketStore from '../lib/market-store';
 
 async function start() {
   const marketStore = new MarketStore();

@@ -22,17 +22,6 @@ export interface ApiAccount {
   };
 }
 
-export interface ApiAccountFromNativeSubgraph {
-  id: string;
-  owner: {
-    id: string
-  };
-  number: Integer;
-  balances: {
-    [marketNumber: string]: ApiBalance;
-  };
-}
-
 export interface ApiMarket {
   id: number
   tokenAddress: address

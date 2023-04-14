@@ -1,7 +1,7 @@
 // eslint-disable-next-line
 if (process.env.ENV_FILENAME) {
-  // eslint-disable-next-line import/no-extraneous-dependencies
-  require('dotenv').config({ path: `${__dirname}/../${process.env.ENV_FILENAME}` });
+  // eslint-disable-next-line
+  require('dotenv').config({ path: `${__dirname}/../../${process.env.ENV_FILENAME}` });
 } else {
   Logger.warn({
     message: 'No ENV_FILENAME specified, using default env variables passed through the environment.',
@@ -12,13 +12,13 @@ if (process.env.ENV_FILENAME) {
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
-import { getAllDolomiteAccounts, getDolomiteRiskParams } from './clients/dolomite';
-import { getSubgraphBlockNumber } from './helpers/block-helper';
-import { dolomite } from './helpers/web3';
-import Logger from './lib/logger';
-import MarketStore from './lib/market-store';
-import Pageable from './lib/pageable';
-import vGlpAbi from './abis/gmx-vester.json';
+import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../clients/dolomite';
+import { getSubgraphBlockNumber } from '../helpers/block-helper';
+import { dolomite } from '../helpers/web3';
+import Logger from '../lib/logger';
+import MarketStore from '../lib/market-store';
+import Pageable from '../lib/pageable';
+import vGlpAbi from '../abis/gmx-vester.json';
 
 const GLP_MARKET_ID = 6;
 const GLP_TOKEN_ADDRESS = '0x1aDDD80E6039594eE970E5872D247bf0414C8903';
@@ -58,9 +58,8 @@ async function start() {
   const marketMap = marketStore.getMarketMap();
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
-  // These accounts are not actually liquidatable, but rather accounts that have ANY debt.
   const accounts = await Pageable.getPageableValues(async (pageIndex) => {
-    const { accounts } = await getAllDolomiteAccounts(marketIndexMap, blockNumber, pageIndex);
+    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockNumber, pageIndex);
     return accounts;
   });
 
@@ -75,8 +74,8 @@ async function start() {
         }
         return memo;
       }, INTEGERS.ZERO);
-    const oldBalance = accountToDolomiteBalanceMap[account.owner.id] ?? INTEGERS.ZERO;
-    accountToDolomiteBalanceMap[account.owner.id] = oldBalance.plus(dolomiteBalance);
+    const oldBalance = accountToDolomiteBalanceMap[account.owner] ?? INTEGERS.ZERO;
+    accountToDolomiteBalanceMap[account.owner] = oldBalance.plus(dolomiteBalance);
   }
 
   const vGlpToken = new dolomite.web3.eth.Contract(vGlpAbi, V_GLP_TOKEN_ADDRESS);

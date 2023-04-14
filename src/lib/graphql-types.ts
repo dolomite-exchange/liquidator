@@ -18,7 +18,9 @@ export interface GraphqlTokenValue {
 
 export interface GraphqlAccount {
   id: string
-  user: string
+  user: {
+    id: string
+  }
   accountNumber: string
   tokenValues: GraphqlTokenValue[]
 }

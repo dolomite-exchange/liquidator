@@ -1,10 +1,10 @@
 /* eslint-disable */
 import { address, BigNumber } from '@dolomite-exchange/dolomite-margin';
-import Logger from './lib/logger';
+import Logger from '../lib/logger';
 
 // eslint-disable-next-line
 if (process.env.ENV_FILENAME) {
-  require('dotenv').config({ path: `${__dirname}/../${process.env.ENV_FILENAME}` });
+  require('dotenv').config({ path: `${__dirname}/../../${process.env.ENV_FILENAME}` });
 } else {
   Logger.warn({
     message: 'No ENV_FILENAME specified, using default env variables passed through the environment.'
@@ -12,7 +12,7 @@ if (process.env.ENV_FILENAME) {
 }
 
 import v8 from 'v8';
-import { getTimestampToBlockNumberMap, getTotalAmmPairYield } from './clients/dolomite';
+import { getTimestampToBlockNumberMap, getTotalAmmPairYield } from '../clients/dolomite';
 
 async function start() {
   let userAddress: address;

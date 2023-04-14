@@ -12,6 +12,10 @@ let lastBlockTimestamp: DateTime = DateTime.fromSeconds(0);
 let lastBlockNumber: number = 0;
 
 export async function getSubgraphBlockNumber(): Promise<{blockNumber: number, blockTimestamp: DateTime}> {
+  if (!Number.isNaN(Number(process.env.BLOCK_NUMBER))) {
+    return Promise.resolve({ blockNumber: Number(process.env.BLOCK_NUMBER), blockTimestamp: lastBlockTimestamp });
+  }
+
   const gqlBlockNumber = await axios.post(subgraphUrl, {
     query: '{ _meta { block { number } } }',
   })

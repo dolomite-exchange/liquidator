@@ -5,7 +5,6 @@ import axios from 'axios';
 import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
-  ApiAccountFromNativeSubgraph,
   ApiBalance,
   ApiMarket,
   ApiRiskParam,
@@ -22,6 +21,7 @@ import {
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
 } from '../lib/graphql-types';
+import Pageable from '../lib/pageable';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ethers = require('ethers');
@@ -48,7 +48,7 @@ async function getAccounts(
       query,
       variables: {
         blockNumber,
-        skip: 1000 * pageIndex,
+        skip: Pageable.MAX_PAGE_SIZE * pageIndex,
       },
     },
     defaultAxiosConfig,
@@ -81,8 +81,8 @@ async function getAccounts(
         return memo;
       }, {});
       return {
-        id: `${account.user}-${account.accountNumber}`,
-        owner: account.user,
+        id: `${account.user.id}-${account.accountNumber}`,
+        owner: account.user.id,
         number: new BigNumber(account.accountNumber),
         balances,
       };
@@ -98,34 +98,7 @@ export async function getLiquidatableDolomiteAccounts(
 ): Promise<{ accounts: ApiAccount[] }> {
   const query = `
             query getActiveMarginAccounts($blockNumber: Int, $skip: Int) {
-                marginAccounts(where: { hasBorrowValue: true } block: { number: $blockNumber } first: 1000 skip: $skip) {
-                  id
-                  user
-                  accountNumber
-                  tokenValues {
-                    token {
-                      id
-                      marketId
-                      decimals
-                      symbol
-                    }
-                    valuePar
-                    expirationTimestamp
-                    expiryAddress
-                  }
-                }
-              }`;
-  return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
-}
-
-export async function getAllDolomiteAccounts(
-  marketIndexMap: { [marketId: string]: MarketIndex },
-  blockNumber: number,
-  pageIndex: number = 0,
-): Promise<{ accounts: ApiAccountFromNativeSubgraph[] }> {
-  const query = `
-            query getActiveMarginAccounts($blockNumber: Int, $skip: Int) {
-                marginAccounts(where: { hasSupplyValue: true } block: { number: $blockNumber } first: 1000 skip: $skip) {
+                marginAccounts(where: { hasBorrowValue: true } block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE} skip: $skip) {
                   id
                   user {
                     id
@@ -144,8 +117,36 @@ export async function getAllDolomiteAccounts(
                   }
                 }
               }`;
-  const accounts = await getAccounts(marketIndexMap, query, blockNumber, pageIndex);
-  return (accounts as any) as { accounts: ApiAccountFromNativeSubgraph[] };
+  return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
+}
+
+export async function getAllDolomiteAccountsWithSupplyValue(
+  marketIndexMap: { [marketId: string]: MarketIndex },
+  blockNumber: number,
+  pageIndex: number = 0,
+): Promise<{ accounts: ApiAccount[] }> {
+  const query = `
+            query getActiveMarginAccounts($blockNumber: Int, $skip: Int) {
+                marginAccounts(where: { hasSupplyValue: true } block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE} skip: $skip) {
+                  id
+                  user {
+                    id
+                  }
+                  accountNumber
+                  tokenValues {
+                    token {
+                      id
+                      marketId
+                      decimals
+                      symbol
+                    }
+                    valuePar
+                    expirationTimestamp
+                    expiryAddress
+                  }
+                }
+              }`;
+  return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
 }
 
 export async function getExpiredAccounts(
@@ -155,9 +156,11 @@ export async function getExpiredAccounts(
 ): Promise<{ accounts: ApiAccount[] }> {
   const query = `
             query getActiveMarginAccounts($blockNumber: Int, $skip: Int) {
-                marginAccounts(where: { hasBorrowValue: true hasExpiration: true } block: { number: $blockNumber } first: 1000 skip: $skip) {
+                marginAccounts(where: { hasBorrowValue: true hasExpiration: true } block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE} skip: $skip) {
                   id
-                  user
+                  user {
+                    id
+                  }
                   accountNumber
                   tokenValues {
                     token {
@@ -183,7 +186,7 @@ export async function getDolomiteMarkets(
     subgraphUrl,
     {
       query: `query getMarketRiskInfos($blockNumber: Int, $skip: Int) {
-                marketRiskInfos(block: { number: $blockNumber } first: 1000 skip: $skip) {
+                marketRiskInfos(block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE} skip: $skip) {
                   token {
                     id
                     marketId
@@ -196,7 +199,7 @@ export async function getDolomiteMarkets(
               }`,
       variables: {
         blockNumber,
-        skip: pageIndex * 1000,
+        skip: pageIndex * Pageable.MAX_PAGE_SIZE,
       },
     },
     defaultAxiosConfig,
@@ -228,7 +231,11 @@ export async function getDolomiteMarkets(
   const { results: marketPriceResults } = await dolomite.multiCall.aggregate(marketPriceCalls);
   const { results: tokenUnwrapperResults } = await dolomite.multiCall.aggregate(tokenUnwrapperCalls);
 
-  const outputMarketIdCalls = tokenUnwrapperResults.reduce<{ marketId: number, target: string; callData: string; }[]>((memo, unwrapperResult, i) => {
+  const outputMarketIdCalls = tokenUnwrapperResults.reduce<{
+    marketId: number,
+    target: string;
+    callData: string;
+  }[]>((memo, unwrapperResult, i) => {
     const unwrapper = dolomite.web3.eth.abi.decodeParameter('address', unwrapperResult);
     if (unwrapper !== ADDRESSES.ZERO) {
       const contract = dolomite.getTokenUnwrapper(unwrapper);
