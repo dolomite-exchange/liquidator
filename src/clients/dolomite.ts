@@ -348,9 +348,11 @@ export interface TotalYield {
 }
 
 export async function getTotalAmmPairYield(blockNumbers: number[], user: address): Promise<TotalYield> {
-  let queries = '';
-  blockNumbers.forEach(blockNumber => {
-    queries += `
+  const queryChunks = blockNumbers.reduce<string[]>((memo, blockNumber, i) => {
+    if (!memo[Math.floor(i / 100)]) {
+      memo[Math.floor(i / 100)] = '';
+    }
+    memo[Math.floor(i / 100)] += `
       ammPair_${blockNumber}:ammPairs(where: { id: "0xb77a493a4950cad1b049e222d62bce14ff423c6f" } block: { number: ${blockNumber} }) {
         volumeUSD
         reserveUSD
@@ -368,19 +370,41 @@ export async function getTotalAmmPairYield(blockNumbers: number[], user: address
         liquidityTokenBalance
       }
     `
-  });
-  const result = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
-    {
-      query: `query getAmmDataForUser {
-        ${queries}
-      }`,
-    },
-    defaultAxiosConfig,
-  )
-    .then(response => response.data)
-    .then(json => json as GraphqlAmmDataForUserResult);
+    return memo;
+  }, []);
 
+  const totalYield: TotalYield = {
+    totalEntries: 0,
+    swapYield: new BigNumber(0),
+    lendingYield: new BigNumber(0),
+    totalYield: new BigNumber(0),
+  }
+  for (let i = 0; i < queryChunks.length; i += 1) {
+    const result = await axios.post(
+      `${process.env.SUBGRAPH_URL}`,
+      {
+        query: `query getAmmDataForUser {
+        ${queryChunks[i]}
+      }`,
+      },
+      defaultAxiosConfig,
+    )
+      .then(response => response.data)
+      .then(json => json as GraphqlAmmDataForUserResult);
+    const tempTotalYield = reduceResultIntoTotalYield(result, blockNumbers);
+    totalYield.totalEntries += tempTotalYield.totalEntries;
+    totalYield.swapYield = totalYield.swapYield.plus(tempTotalYield.swapYield);
+    totalYield.lendingYield = totalYield.lendingYield.plus(tempTotalYield.lendingYield);
+    totalYield.totalYield = totalYield.totalYield.plus(tempTotalYield.totalYield);
+  }
+
+  return totalYield;
+}
+
+function reduceResultIntoTotalYield(
+  result: GraphqlAmmDataForUserResult,
+  blockNumbers: number[],
+): TotalYield {
   const blockNumbersAsc = blockNumbers.sort((a, b) => a - b);
 
   return blockNumbersAsc.reduce<TotalYield>((memo, blockNumber, i) => {
