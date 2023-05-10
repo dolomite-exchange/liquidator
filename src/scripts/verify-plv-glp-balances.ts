@@ -81,6 +81,8 @@ async function start() {
   const plvGlpFarm = new dolomite.web3.eth.Contract(plvGlpFarmAbi, PLV_GLP_FARM_ADDRESS);
 
   let amount = 0;
+  let usersNotStaking = 0;
+  let amountNotStaked = new BigNumber(0);
   const accountOwners = Object.keys(accountToDolomiteBalanceMap);
   for (let i = 0; i < accountOwners.length; i++) {
     const dolomiteBalance = accountToDolomiteBalanceMap[accountOwners[i]];
@@ -90,7 +92,16 @@ async function start() {
         plvGlpFarm.methods['userInfo'](accountOwners[i]),
         { blockNumber },
       );
-      actualBalance = actualBalance.plus(plvGlpFarmUserInfo.amount);
+      if (actualBalance.gt(0)) {
+        usersNotStaking += 1;
+        amountNotStaked = amountNotStaked.plus(actualBalance);
+        Logger.info({
+          message: `Found user not staking: ${accountOwners[i]}`,
+          amountNotStaked: actualBalance.div(1e18).toFixed(18),
+        })
+      }
+      const stakedPlvGlp = new BigNumber(plvGlpFarmUserInfo.amount);
+      actualBalance = actualBalance.plus(stakedPlvGlp);
 
       if (!dolomiteBalance.eq(actualBalance)) {
         amount += 1;
@@ -100,10 +111,15 @@ async function start() {
           dolomiteBalance: dolomiteBalance.div(1e18).toFixed(18),
           actualBalance: actualBalance.div(1e18).toFixed(18),
           holeBalance: dolomiteBalance.minus(actualBalance).div(1e18).toFixed(18),
-        })
+        });
       }
     }
   }
+
+  Logger.info({
+    message: `Found ${usersNotStaking} users not staking`,
+    amountNotStaked: amountNotStaked.div(1e18).toFixed(18),
+  });
 
   Logger.info(`Number of invalid balances found ${amount}`);
   return true
