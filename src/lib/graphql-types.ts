@@ -8,6 +8,7 @@ export interface GraphqlTokenValue {
   token: {
     id: string
     marketId: string
+    name: string
     symbol: string
     decimals: string
   }
@@ -29,15 +30,20 @@ export interface GraphqlMarketResult {
   data: {
     marketRiskInfos: GraphqlMarket[]
   }
+  errors: any
+}
+
+export interface GraphqlToken {
+  id: string
+  decimals: string
+  marketId: string
+  name: string
+  symbol: string
 }
 
 export interface GraphqlMarket {
   id: string
-  token: {
-    id: string
-    decimals: string
-    marketId: string
-  }
+  token: GraphqlToken
   marginPremium: string
   liquidationRewardPremium: string
 }

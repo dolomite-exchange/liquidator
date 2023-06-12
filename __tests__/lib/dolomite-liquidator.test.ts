@@ -88,7 +88,7 @@ describe('dolomite-liquidator', () => {
       expect(sortedLiquidations[0][4].toFixed())
         .toBe(process.env.MIN_ACCOUNT_COLLATERALIZATION);
       expect(sortedLiquidations[0][5].toFixed())
-        .toBe(new BigNumber(process.env.MIN_OVERHEAD_VALUE).toFixed());
+        .toBe(new BigNumber(process.env.MIN_VALUE_LIQUIDATED).toFixed());
       expect(sortedLiquidations[0][6])
         .toEqual(process.env.OWED_PREFERENCES.split(',')
           .map((p) => new BigNumber(p)));
@@ -103,7 +103,7 @@ describe('dolomite-liquidator', () => {
       expect(sortedLiquidations[1][4].toFixed())
         .toBe(process.env.MIN_ACCOUNT_COLLATERALIZATION);
       expect(sortedLiquidations[1][5].toFixed())
-        .toBe(new BigNumber(process.env.MIN_OVERHEAD_VALUE).toFixed());
+        .toBe(new BigNumber(process.env.MIN_VALUE_LIQUIDATED).toFixed());
       expect(sortedLiquidations[1][6])
         .toEqual(process.env.OWED_PREFERENCES.split(',')
           .map((p) => new BigNumber(p)));
@@ -243,6 +243,7 @@ function getTestLiquidatableAccounts(): ApiAccount[] {
           wei: new BigNumber('200'),
           marketId: 0,
           tokenAddress: '0x0000000000000000000000000000000000000000',
+          tokenName: 'Ethereum',
           tokenSymbol: 'ETH',
           expiresAt: null,
           expiryAddress: null,
@@ -252,6 +253,7 @@ function getTestLiquidatableAccounts(): ApiAccount[] {
           wei: new BigNumber('-31146'),
           marketId: 1,
           tokenAddress: '0x0000000000000000000000000000000000000001',
+          tokenName: 'USD Coin',
           tokenSymbol: 'USDC',
           expiresAt: null,
           expiryAddress: null,
@@ -268,6 +270,7 @@ function getTestLiquidatableAccounts(): ApiAccount[] {
           wei: new BigNumber('-2010101010101010010101010010101010101001010'),
           marketId: 0,
           tokenAddress: '0x0000000000000000000000000000000000000000',
+          tokenName: 'Ethereum',
           tokenSymbol: 'ETH',
           expiresAt: null,
           expiryAddress: null,
@@ -277,6 +280,7 @@ function getTestLiquidatableAccounts(): ApiAccount[] {
           wei: new BigNumber('2010101010101010010101010010101010101001010'),
           marketId: 1,
           tokenAddress: '0x0000000000000000000000000000000000000001',
+          tokenName: 'USD Coin',
           tokenSymbol: 'USDC',
           expiresAt: null,
           expiryAddress: null,
@@ -298,6 +302,7 @@ function getTestExpiredAccounts(): ApiAccount[] {
           wei: new BigNumber('-2010101010101010010101010010101010101001010'),
           marketId: 0,
           tokenAddress: '0x0000000000000000000000000000000000000000',
+          tokenName: 'Ethereum',
           tokenSymbol: 'ETH',
           expiresAt: new BigNumber(Math.floor(new Date(2050, 5, 25).getTime() / 1000)),
           expiryAddress: dolomite.contracts.expiry.options.address,
@@ -307,6 +312,7 @@ function getTestExpiredAccounts(): ApiAccount[] {
           wei: new BigNumber('2010101010101010010101010010101010101001010'),
           marketId: 1,
           tokenAddress: '0x0000000000000000000000000000000000000001',
+          tokenName: 'USD Coin',
           tokenSymbol: 'USDC',
           expiresAt: null,
           expiryAddress: null,
@@ -316,6 +322,7 @@ function getTestExpiredAccounts(): ApiAccount[] {
           wei: new BigNumber('-2010101010101010010101010010101010101001010'),
           marketId: 2,
           tokenAddress: '0x0000000000000000000000000000000000000002',
+          tokenName: 'DAI Stablecoin',
           tokenSymbol: 'DAI',
           expiresAt: new BigNumber(Math.floor(new Date(1982, 5, 25).getTime() / 1000)),
           expiryAddress: dolomite.contracts.expiry.options.address,
@@ -323,6 +330,7 @@ function getTestExpiredAccounts(): ApiAccount[] {
         3: {
           marketId: 3,
           tokenAddress: '0x0000000000000000000000000000000000000003',
+          tokenName: 'Chainlink Token',
           tokenSymbol: 'LINK',
           par: new BigNumber('-1010101010101010010101010010101010101001010'),
           wei: new BigNumber('-2010101010101010010101010010101010101001010'),
@@ -343,7 +351,8 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
-      unwrapperInfo: undefined,
+      isolationModeUnwrapperInfo: undefined,
+      liquidityTokenUnwrapperInfo: undefined,
     },
     {
       id: 1,
@@ -352,7 +361,8 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
-      unwrapperInfo: undefined,
+      isolationModeUnwrapperInfo: undefined,
+      liquidityTokenUnwrapperInfo: undefined,
     },
     {
       id: 2,
@@ -361,7 +371,8 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
-      unwrapperInfo: undefined,
+      isolationModeUnwrapperInfo: undefined,
+      liquidityTokenUnwrapperInfo: undefined,
     },
     {
       id: 3,
@@ -370,7 +381,8 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
-      unwrapperInfo: undefined,
+      isolationModeUnwrapperInfo: undefined,
+      liquidityTokenUnwrapperInfo: undefined,
     },
   ];
 }

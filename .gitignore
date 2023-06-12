@@ -19,6 +19,7 @@ consoleScripts.js
 .coveralls.yml
 
 start-docker-test.sh
+start-ts-node-test.sh
 
 output.log
 

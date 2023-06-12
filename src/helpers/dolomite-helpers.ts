@@ -1,5 +1,4 @@
 import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
-import { AccountOperation } from '@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation';
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
 import { DateTime } from 'luxon';
 import { getParaswapSwapCalldataForLiquidation } from '../clients/paraswap';
@@ -11,19 +10,21 @@ import { getGasPriceWei } from './gas-price-helpers';
 import { dolomite } from './web3';
 
 const solidAccount = {
-  owner: process.env.ACCOUNT_WALLET_ADDRESS,
-  number: new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER),
+  owner: process.env.ACCOUNT_WALLET_ADDRESS as string,
+  number: new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER as string),
 };
-const collateralPreferences: string[] = process.env.COLLATERAL_PREFERENCES?.split(',')
-  .map((pref) => pref.trim());
-const owedPreferences: string[] = process.env.OWED_PREFERENCES?.split(',')
-  .map((pref) => pref.trim());
+const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? '')?.split(',')
+  .map((pref) => new BigNumber(pref.trim()));
+const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split(',')
+  .map((pref) => new BigNumber(pref.trim()));
+
+const minValueLiquidatedForExternalSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL as string);
 
 export function isExpired(
   expiresAt: Integer | null,
   latestBlockTimestamp: DateTime,
 ): boolean {
-  const expiresAtPlusDelay = expiresAt?.plus(process.env.EXPIRED_ACCOUNT_DELAY_SECONDS);
+  const expiresAtPlusDelay = expiresAt?.plus(process.env.EXPIRED_ACCOUNT_DELAY_SECONDS as string);
   return expiresAtPlusDelay?.lt(latestBlockTimestamp.toSeconds()) ?? false;
 }
 
@@ -101,6 +102,9 @@ export async function liquidateAccount(
 
 async function liquidateAccountInternal(
   liquidAccount: ApiAccount,
+  owedMarkets: Integer[] = owedPreferences,
+  collateralMarkets: Integer[] = collateralPreferences,
+  minValueLiquidated: Integer = new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string),
 ): Promise<TxResult> {
   const gasPrice = getGasPriceWei();
 
@@ -109,10 +113,10 @@ async function liquidateAccountInternal(
     solidAccount.number,
     liquidAccount.owner,
     liquidAccount.number,
-    new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION),
-    new BigNumber(process.env.MIN_OVERHEAD_VALUE),
-    owedPreferences.map((p) => new BigNumber(p)),
-    collateralPreferences.map((p) => new BigNumber(p)),
+    new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
+    minValueLiquidated,
+    owedMarkets.map((p) => new BigNumber(p)),
+    collateralMarkets.map((p) => new BigNumber(p)),
     {
       gasPrice: gasPrice.toFixed(),
       from: solidAccount.owner,
@@ -127,8 +131,8 @@ export async function liquidateExpiredAccount(
   riskParams: ApiRiskParam,
   lastBlockTimestamp: DateTime,
 ) {
-  if (process.env.EXPIRATIONS_ENABLED.toLowerCase() !== 'true') {
-    return false;
+  if (process.env.EXPIRATIONS_ENABLED?.toLowerCase() !== 'true') {
+    return Promise.reject(new Error('Expirations are not enabled'));
   }
 
   Logger.info({
@@ -151,7 +155,7 @@ export async function liquidateExpiredAccount(
   } else if (getLiquidationMode() === LiquidationMode.Simple) {
     return liquidateExpiredAccountInternalSimple(expiredAccount, marketMap, lastBlockTimestamp);
   } else {
-    throw new Error(`Unknown liquidation mode: ${getLiquidationMode()}`);
+    return Promise.reject(new Error(`Unknown liquidation mode: ${getLiquidationMode()}`))
   }
 }
 
@@ -186,7 +190,7 @@ async function liquidateAccountInternalAndSellWithExternalLiquidity(
     heldMarket.oraclePrice,
   );
 
-  if (heldMarket.unwrapperInfo) {
+  if (heldMarket.isolationModeUnwrapperInfo) {
     Logger.info({
       message: 'Performing liquidation for liquidity token via external liquidity',
       owedMarketId: owedMarket.id,
@@ -197,16 +201,16 @@ async function liquidateAccountInternalAndSellWithExternalLiquidity(
       heldWeiForLiquidation: heldWei.toFixed(),
       owedPriceAdj: owedPriceAdj.toFixed(),
       heldPrice: heldMarket.oraclePrice.toFixed(),
-      unwrapperAddress: heldMarket.unwrapperInfo.unwrapperAddress,
-      outputMarketId: heldMarket.unwrapperInfo.outputMarketId,
+      unwrapperAddress: heldMarket.isolationModeUnwrapperInfo.unwrapperAddress,
+      outputMarketId: heldMarket.isolationModeUnwrapperInfo.outputMarketId,
     });
 
-    const outputMarket = marketMap[heldMarket.unwrapperInfo.outputMarketId];
+    const outputMarket = marketMap[heldMarket.isolationModeUnwrapperInfo.outputMarketId];
 
     let paraswapCallData = '0x';
     if (owedMarket.id !== outputMarket.id) {
       // If the unwrapped token is not the same as the owed token, we need to swap it for the owed token
-      const unwrapper = dolomite.getTokenUnwrapper(heldMarket.unwrapperInfo.unwrapperAddress);
+      const unwrapper = dolomite.getIsolationModeUnwrapper(heldMarket.isolationModeUnwrapperInfo.unwrapperAddress);
       const outputMarketAmount = await unwrapper.getExchangeCost(
         heldMarket.tokenAddress,
         outputMarket.tokenAddress,
@@ -238,6 +242,35 @@ async function liquidateAccountInternalAndSellWithExternalLiquidity(
         confirmationType: ConfirmationType.Hash,
       },
     );
+  } else if (owedBalance.wei.abs().times(owedMarket.oraclePrice).isLessThan(minValueLiquidatedForExternalSell)) {
+    Logger.info({
+      message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
+      owedMarketId: owedMarket.id,
+      heldMarketId: heldMarket.id,
+      owedBalance: owedBalance.wei.abs().toFixed(),
+      heldBalance: heldBalance.wei.abs().toFixed(),
+      owedWeiForLiquidation: owedWei.toFixed(),
+      heldWeiForLiquidation: heldWei.toFixed(),
+      owedPriceAdj: owedPriceAdj.toFixed(),
+      heldPrice: heldMarket.oraclePrice.toFixed(),
+    });
+
+    if (isExpiring) {
+      return liquidateExpiredAccountInternalSimple(
+        liquidAccount,
+        marketMap,
+        lastBlockTimestamp,
+        [new BigNumber(heldBalance.marketId)],
+        [new BigNumber(owedBalance.marketId)],
+      );
+    } else {
+      return liquidateAccountInternal(
+        liquidAccount,
+        [new BigNumber(owedBalance.marketId)],
+        [new BigNumber(heldBalance.marketId)],
+        INTEGERS.ZERO,
+      );
+    }
   } else {
     Logger.info({
       message: 'Performing liquidation via external liquidity',
@@ -313,14 +346,14 @@ async function liquidateAccountInternalAndSellWithInternalLiquidity(
   const heldToken = heldBalance.tokenAddress.toLowerCase();
 
   let tokenPath: string[];
-  const bridgeAddress = process.env.BRIDGE_TOKEN_ADDRESS.toLowerCase();
+  const bridgeAddress = (process.env.BRIDGE_TOKEN_ADDRESS as string).toLowerCase();
   if (owedToken === bridgeAddress || heldToken === bridgeAddress) {
     tokenPath = [heldBalance.tokenAddress, owedBalance.tokenAddress];
   } else {
     tokenPath = [heldBalance.tokenAddress, bridgeAddress, owedBalance.tokenAddress];
   }
 
-  const minOwedOutputDiscount = new BigNumber(process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT);
+  const minOwedOutputDiscount = new BigNumber(process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT as string);
   if (minOwedOutputDiscount.gte(INTEGERS.ONE)) {
     return Promise.reject(new Error('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT must be less than 1.00'));
   } else if (minOwedOutputDiscount.lt(INTEGERS.ZERO)) {
@@ -357,119 +390,57 @@ async function liquidateExpiredAccountInternalSimple(
   expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   lastBlockTimestamp: DateTime,
-) {
-  const expiredMarkets: string[] = [];
-  const operation = dolomite.operation.initiate();
-
-  const weis: { [marketId: string]: Integer } = {};
-  const prices: { [marketId: string]: Integer } = {};
-  const liquidationRewardPremiums: { [marketId: string]: Integer } = {};
-  const collateralPreferencesBN = collateralPreferences.map((p) => new BigNumber(p));
-
-  for (let i = 0; i < collateralPreferences.length; i += 1) {
-    const marketId = collateralPreferences[i];
-    const balance = expiredAccount.balances[marketId];
-
-    if (!balance) {
-      weis[marketId] = INTEGERS.ZERO;
-    } else {
-      weis[marketId] = new BigNumber(balance.wei);
+  heldMarketIds: Integer[] = collateralPreferences,
+  owedMarketIds: Integer[] = owedPreferences,
+): Promise<TxResult> {
+  const preferredHeldBalances = heldMarketIds.reduce<ApiBalance[]>((memo, marketId) => {
+    const balance = expiredAccount.balances[marketId.toFixed()];
+    if (balance.wei.gt(INTEGERS.ZERO)) {
+      return [...memo, balance];
     }
-
-    const market = marketMap[marketId];
-    if (!market) {
-      throw new Error(`Could not find API market with ID ${marketId}`);
+    return memo
+  }, []);
+  const preferredOwedBalances = owedMarketIds.reduce<ApiBalance[]>((memo, marketId) => {
+    const balance = expiredAccount.balances[marketId.toFixed()];
+    if (balance.expiresAt && balance.expiresAt.lt(lastBlockTimestamp.toSeconds()) && balance.wei.lt(INTEGERS.ZERO)) {
+      return [...memo, balance];
     }
+    return memo
+  }, []);
+  const preferredBalances = [...preferredHeldBalances, ...preferredOwedBalances];
+  const owedBalance = getLargestBalanceUSD(
+    preferredBalances,
+    true,
+    marketMap,
+    lastBlockTimestamp,
+    true,
+  );
+  const heldBalance = getLargestBalanceUSD(
+    preferredBalances,
+    false,
+    marketMap,
+    lastBlockTimestamp,
+    true,
+  );
 
-    prices[marketId] = market.oraclePrice;
-    liquidationRewardPremiums[marketId] = market.liquidationRewardPremium;
+  if (!owedBalance?.expiresAt) {
+    throw new Error('Could not find an expired balance');
   }
 
-  Object.keys(expiredAccount.balances)
-    .forEach((marketId) => {
-      const balance = expiredAccount.balances[marketId];
-
-      // 0 indicates the balance never expires
-      if (!balance.expiresAt || balance.expiresAt.eq(0)) {
-        return;
-      }
-
-      // Can't expire positive balances
-      if (!new BigNumber(balance.par).isNegative()) {
-        return;
-      }
-
-      const expiryTimestamp = balance.expiresAt;
-      const lastBlockTimestampBN = new BigNumber(Math.floor(lastBlockTimestamp.toMillis() / 1000));
-      const delayHasPassed = expiryTimestamp.plus(process.env.EXPIRED_ACCOUNT_DELAY_SECONDS)
-        .lte(lastBlockTimestampBN);
-
-      if (delayHasPassed) {
-        expiredMarkets.push(marketId);
-        operation.fullyLiquidateExpiredAccount(
-          solidAccount.owner,
-          solidAccount.number,
-          expiredAccount.owner,
-          expiredAccount.number,
-          new BigNumber(marketId),
-          expiryTimestamp,
-          lastBlockTimestampBN,
-          weis,
-          prices,
-          liquidationRewardPremiums,
-          collateralPreferencesBN,
-        );
-      }
-    });
-
-  if (expiredMarkets.length === 0) {
-    throw new Error('Supposedly expirable account has no expirable balances');
-  }
-
-  return commitLiquidation(expiredAccount, operation);
-}
-
-async function commitLiquidation(
-  liquidAccount: ApiAccount,
-  operation: AccountOperation,
-): Promise<boolean> {
-  const gasPrice = getGasPriceWei();
-
-  Logger.info({
-    at: 'dolomite-helpers#commitLiquidation',
-    message: 'Sending account liquidation transaction',
-    accountOwner: liquidAccount.owner,
-    accountNumber: liquidAccount.number,
-    gasPrice,
-    from: solidAccount,
-  });
-
-  const response = await operation.commit({
-    gasPrice: gasPrice.toFixed(),
-    from: solidAccount.owner,
-    confirmationType: ConfirmationType.Hash,
-  });
-
-  if (!response) {
-    Logger.info({
-      at: 'dolomite-helpers#commitLiquidation',
-      message: 'Liquidation transaction has already been received',
-      accountOwner: liquidAccount.owner,
-      accountNumber: liquidAccount.number,
-    });
-
-    return false;
-  }
-
-  Logger.info({
-    at: 'dolomite-helpers#commitLiquidation',
-    message: 'Successfully submitted liquidation transaction',
-    accountOwner: liquidAccount.owner,
-    accountNumber: liquidAccount.number,
-    response,
-  });
-
-  return !!response;
+  return dolomite.expiryProxy.expire(
+    solidAccount.owner,
+    solidAccount.number,
+    expiredAccount.owner,
+    expiredAccount.number,
+    new BigNumber(owedBalance.marketId),
+    new BigNumber(heldBalance.marketId),
+    owedBalance.expiresAt,
+    {
+      gasPrice: getGasPriceWei().toFixed(),
+      from: solidAccount.owner,
+      confirmationType: ConfirmationType.Hash,
+    },
+  );
 }
 
 function getLargestBalanceUSD(

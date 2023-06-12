@@ -46,7 +46,8 @@ checkDuration('LIQUIDATION_KEY_EXPIRATION_SECONDS', 1, /* isMillis = */ false);
 checkBooleanValue('LIQUIDATIONS_ENABLED');
 checkDuration('MARKET_POLL_INTERVAL_MS', 1000);
 checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
-checkBigNumber('MIN_OVERHEAD_VALUE');
+checkBigNumber('MIN_VALUE_LIQUIDATED');
+checkBigNumber('MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL');
 checkBigNumber('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT');
 checkJsNumber('NETWORK_ID');
 checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkPreferences('OWED_PREFERENCES'));
@@ -97,7 +98,7 @@ async function start() {
   Logger.info({
     message: 'DolomiteMargin data',
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
-    liquidationMode: liquidationMode,
+    liquidationMode,
     bridgeTokenAddress: process.env.BRIDGE_TOKEN_ADDRESS,
     dolomiteAccountNumber: process.env.DOLOMITE_ACCOUNT_NUMBER,
     dolomiteMargin: libraryDolomiteMargin,
@@ -133,7 +134,7 @@ async function start() {
       message: 'Simple liquidation variables',
       collateralPreferences: process.env.COLLATERAL_PREFERENCES,
       minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
-      minOverheadValue: process.env.MIN_OVERHEAD_VALUE,
+      minOverheadValue: process.env.MIN_VALUE_LIQUIDATED,
       owedPreferences: process.env.OWED_PREFERENCES,
     });
   } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {

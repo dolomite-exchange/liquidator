@@ -3,7 +3,7 @@ import request from 'request-promise-native';
 import { ChainId, isArbitrum, isPolygon } from '../lib/chain-id';
 import Logger from '../lib/logger';
 
-let lastPriceWei: string = process.env.INITIAL_GAS_PRICE_WEI;
+let lastPriceWei: string = process.env.INITIAL_GAS_PRICE_WEI as string;
 
 export async function updateGasPrice(dolomite: DolomiteMargin) {
   let response;
@@ -27,8 +27,8 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
     return;
   }
 
-  const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER);
-  const addition = new BigNumber(process.env.GAS_PRICE_ADDITION);
+  const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
+  const addition = new BigNumber(process.env.GAS_PRICE_ADDITION as string);
   const networkId = Number(process.env.NETWORK_ID)
   const base = networkId === ChainId.Ethereum ? 100_000_000 : 1_000_000_000;
   const totalWei = new BigNumber(fast)

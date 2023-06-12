@@ -4,7 +4,7 @@ import { ApiMarket } from '../lib/api-types';
 import Logger from '../lib/logger';
 
 const API_URL = 'https://apiv5.paraswap.io';
-const NETWORK_ID = process.env.NETWORK_ID?.toString();
+const NETWORK_ID = process.env.NETWORK_ID!.toString();
 
 export async function getParaswapSwapCalldataForLiquidation(
   heldMarket: ApiMarket,

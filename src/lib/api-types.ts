@@ -6,6 +6,7 @@ import {
 export interface ApiBalance {
   marketId: number;
   tokenAddress: string
+  tokenName: string
   tokenSymbol: string
   par: Integer;
   wei: Integer;
@@ -29,7 +30,8 @@ export interface ApiMarket {
   oraclePrice: Integer
   marginPremium: Integer
   liquidationRewardPremium: Integer
-  unwrapperInfo: ApiUnwrapperInfo | undefined
+  isolationModeUnwrapperInfo: ApiUnwrapperInfo | undefined
+  liquidityTokenUnwrapperInfo: ApiUnwrapperInfo | undefined
 }
 
 export interface ApiUnwrapperInfo {
