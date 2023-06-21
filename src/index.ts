@@ -130,7 +130,7 @@ async function start() {
 
   if (liquidationMode === LiquidationMode.Simple) {
     Logger.info({
-      liquidationMode: liquidationMode,
+      liquidationMode,
       message: 'Simple liquidation variables',
       collateralPreferences: process.env.COLLATERAL_PREFERENCES,
       minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
@@ -141,15 +141,20 @@ async function start() {
     const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true';
     const discountUsedText = revertOnFailToSellCollateral ? '(unused)' : '';
     Logger.info({
-      liquidationMode: liquidationMode,
+      liquidationMode,
       message: 'Sell with internal liquidity variables:',
       revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
       minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
     });
   } else if (liquidationMode === LiquidationMode.SellWithExternalLiquidity) {
     Logger.info({
-      liquidationMode: liquidationMode,
+      liquidationMode,
       message: 'Sell with external liquidity variables:',
+    });
+  } else if (liquidationMode === LiquidationMode.Generic) {
+    Logger.info({
+      liquidationMode,
+      message: 'Generic liquidation mode variables:',
     });
   } else {
     throw new Error(`Invalid liquidation mode: ${liquidationMode}`);

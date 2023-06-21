@@ -242,8 +242,10 @@ export async function getDolomiteMarkets(
       };
     }
     const apiMarket: ApiMarket = {
-      id: marketId.toNumber(),
+      marketId: marketId.toNumber(),
       decimals: Number(market.token.decimals),
+      symbol: market.token.symbol,
+      name: market.token.name,
       tokenAddress: market.token.id,
       oraclePrice: new BigNumber(oraclePrice),
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),

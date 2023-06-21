@@ -103,7 +103,7 @@ export default class MarketStore {
     this.blockNumber = blockNumber;
     this.blockTimestamp = blockTimestamp;
     this.marketMap = nextDolomiteMarkets.reduce<{ [marketId: string]: ApiMarket }>((memo, market) => {
-      memo[market.id.toString()] = market;
+      memo[market.marketId.toString()] = market;
       return memo;
     }, {});
 

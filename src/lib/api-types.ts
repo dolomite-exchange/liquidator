@@ -24,7 +24,9 @@ export interface ApiAccount {
 }
 
 export interface ApiMarket {
-  id: number
+  marketId: number
+  symbol: string
+  name: string
   tokenAddress: address
   decimals: number
   oraclePrice: Integer

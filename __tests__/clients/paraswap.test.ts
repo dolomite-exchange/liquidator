@@ -6,7 +6,7 @@ describe('paraswap', () => {
   describe('#getParaswapSwapCalldataForLiquidation', () => {
     it('should work under normal conditions', async () => {
       const inputMarket: ApiMarket = {
-        id: 0,
+        marketId: 0,
         tokenAddress: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
         oraclePrice: new BigNumber('1234000000000000000000'),
         marginPremium: new BigNumber('0'),
@@ -16,7 +16,7 @@ describe('paraswap', () => {
         liquidityTokenUnwrapperInfo: undefined,
       };
       const outputMarket: ApiMarket = {
-        id: 2,
+        marketId: 2,
         tokenAddress: '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8',
         oraclePrice: new BigNumber('1000000000000000000000000000000'),
         marginPremium: new BigNumber('0'),
