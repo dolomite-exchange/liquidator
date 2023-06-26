@@ -1,13 +1,11 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { DateTime } from 'luxon';
+import { getDolomiteMarkets } from '../clients/dolomite';
+import { getSubgraphBlockNumber } from '../helpers/block-helper';
 import { dolomite } from '../helpers/web3';
 import { ApiMarket, MarketIndex } from './api-types';
-import { getDolomiteMarkets } from '../clients/dolomite';
 import { delay } from './delay';
 import Logger from './logger';
-import {
-  getSubgraphBlockNumber,
-} from '../helpers/block-helper';
 
 export default class MarketStore {
   private blockNumber: number;
@@ -67,7 +65,7 @@ export default class MarketStore {
 
   _poll = async () => {
     // noinspection InfiniteLoopJS
-    for (;;) {
+    for (; ;) {
       try {
         await this._update();
       } catch (error: any) {

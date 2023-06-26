@@ -1,5 +1,5 @@
-import { ApiRiskParam } from './api-types';
 import { getDolomiteRiskParams } from '../clients/dolomite';
+import { ApiRiskParam } from './api-types';
 import { delay } from './delay';
 import Logger from './logger';
 import MarketStore from './market-store';

@@ -1,9 +1,8 @@
 import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { DolomiteZap, BigNumber as ZapBigNumber } from '@dolomite-exchange/zap-sdk';
+import { BigNumber as ZapBigNumber, DolomiteZap } from '@dolomite-exchange/zap-sdk/dist';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
-import { getParaswapSwapCalldataForLiquidation } from '../clients/paraswap';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
@@ -21,6 +20,13 @@ const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split('
   .map((pref) => new BigNumber(pref.trim()));
 
 const minValueLiquidatedForExternalSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL as string);
+
+const networkId = Number(process.env.NETWORK_ID);
+const zap = new DolomiteZap(
+  networkId,
+  process.env.DOLOMITE_SUBGRAPH_URL ?? '',
+  new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, networkId),
+);
 
 export function isExpired(
   expiresAt: Integer | null,
@@ -94,14 +100,6 @@ export async function liquidateAccount(
       lastBlockTimestamp,
       false,
     );
-  } else if (getLiquidationMode() === LiquidationMode.SellWithExternalLiquidity) {
-    return _liquidateAccountAndSellWithExternalLiquidity(
-      liquidAccount,
-      marketMap,
-      riskParams,
-      lastBlockTimestamp,
-      false,
-    );
   } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {
     return _liquidateAccountAndSellWithInternalLiquidity(liquidAccount, marketMap, lastBlockTimestamp, false);
   } else if (liquidationMode === LiquidationMode.Simple) {
@@ -131,14 +129,6 @@ export async function liquidateExpiredAccount(
   const liquidationMode = getLiquidationMode();
   if (liquidationMode === LiquidationMode.Generic) {
     return _liquidateAccountAndSellWithGenericLiquidity(
-      expiredAccount,
-      marketMap,
-      riskParams,
-      lastBlockTimestamp,
-      true,
-    );
-  } else if (liquidationMode === LiquidationMode.SellWithExternalLiquidity) {
-    return _liquidateAccountAndSellWithExternalLiquidity(
       expiredAccount,
       marketMap,
       riskParams,
@@ -210,10 +200,11 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     heldMarket.oraclePrice,
   );
 
-  // if (owedBalance.wei.abs().times(owedMarket.oraclePrice).isLessThan(minValueLiquidatedForExternalSell)) {
-  const neverTrue = false;
-  if (neverTrue) {
-    // TODO fix
+  const hasIsolationModeMarket = zap.getIsolationModeConverterByMarketId(owedMarket.marketId)
+    || zap.getIsolationModeConverterByMarketId(heldMarket.marketId);
+  if (!hasIsolationModeMarket && owedBalance.wei.abs()
+    .times(owedMarket.oraclePrice)
+    .isLessThan(minValueLiquidatedForExternalSell)) {
     Logger.info({
       message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
       owedMarketId: owedMarket.marketId,
@@ -255,12 +246,6 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       heldPrice: heldMarket.oraclePrice.toFixed(),
     });
 
-    const networkId = Number(process.env.NETWORK_ID);
-    const zap = new DolomiteZap(
-      networkId,
-      process.env.SUBGRAPH_URL,
-      new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, networkId),
-    );
     const outputs = await zap.getSwapExactTokensForTokensParams(
       heldMarket,
       new ZapBigNumber(heldWei),
@@ -278,7 +263,13 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
           liquidAccount.owner,
           liquidAccount.number,
           outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
-          outputs[i].amountWeisPath.map((p) => new BigNumber(p)),
+          outputs[i].amountWeisPath.map((p, j) => {
+            if (j === 0 || j === outputs[i].amountWeisPath.length - 1) {
+              return INTEGERS.MAX_UINT;
+            } else {
+              return new BigNumber(p)
+            }
+          }),
           outputs[i].traderParams,
           outputs[i].makerAccounts,
           isExpiring ? (owedBalance.expiresAt ?? null) : null,
@@ -294,158 +285,6 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     }
 
     return Promise.reject(latestError);
-  }
-}
-
-async function _liquidateAccountAndSellWithExternalLiquidity(
-  liquidAccount: ApiAccount,
-  marketMap: { [marketId: string]: ApiMarket },
-  riskParams: ApiRiskParam,
-  lastBlockTimestamp: DateTime,
-  isExpiring: boolean,
-): Promise<TxResult> {
-  const owedBalance = _getLargestBalanceUSD(
-    Object.values(liquidAccount.balances),
-    true,
-    marketMap,
-    lastBlockTimestamp,
-    isExpiring,
-  );
-  const heldBalance = _getLargestBalanceUSD(
-    Object.values(liquidAccount.balances),
-    false,
-    marketMap,
-    lastBlockTimestamp,
-    isExpiring,
-  );
-  const owedMarket = marketMap[owedBalance.marketId];
-  const heldMarket = marketMap[heldBalance.marketId];
-  const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskParams);
-  const { owedWei, heldWei } = getAmountsForLiquidation(
-    owedBalance.wei.abs(),
-    owedPriceAdj,
-    heldBalance.wei.abs(),
-    heldMarket.oraclePrice,
-  );
-
-  if (heldMarket.isolationModeUnwrapperInfo) {
-    Logger.info({
-      message: 'Performing liquidation for liquidity token via external liquidity',
-      owedMarketId: owedMarket.marketId,
-      heldMarketId: heldMarket.marketId,
-      owedBalance: owedBalance.wei.abs().toFixed(),
-      heldBalance: heldBalance.wei.abs().toFixed(),
-      owedWeiForLiquidation: owedWei.toFixed(),
-      heldWeiForLiquidation: heldWei.toFixed(),
-      owedPriceAdj: owedPriceAdj.toFixed(),
-      heldPrice: heldMarket.oraclePrice.toFixed(),
-      unwrapperAddress: heldMarket.isolationModeUnwrapperInfo.unwrapperAddress,
-      outputMarketId: heldMarket.isolationModeUnwrapperInfo.outputMarketId,
-    });
-
-    const outputMarket = marketMap[heldMarket.isolationModeUnwrapperInfo.outputMarketId];
-
-    let paraswapCallData = '0x';
-    if (owedMarket.marketId !== outputMarket.marketId) {
-      // If the unwrapped token is not the same as the owed token, we need to swap it for the owed token
-      const unwrapper = dolomite.getIsolationModeUnwrapper(heldMarket.isolationModeUnwrapperInfo.unwrapperAddress);
-      const outputMarketAmount = await unwrapper.getExchangeCost(
-        heldMarket.tokenAddress,
-        outputMarket.tokenAddress,
-        heldWei,
-        '0x',
-      );
-      paraswapCallData = await getParaswapSwapCalldataForLiquidation(
-        outputMarket,
-        outputMarketAmount.times(999).dividedToIntegerBy(1000),
-        owedMarket,
-        owedWei,
-        solidAccount.owner,
-        dolomite.liquidatorProxyV3WithLiquidityToken.address,
-      );
-    }
-
-    return dolomite.liquidatorProxyV3WithLiquidityToken.liquidate(
-      solidAccount.owner,
-      solidAccount.number,
-      liquidAccount.owner,
-      liquidAccount.number,
-      new BigNumber(owedBalance.marketId),
-      new BigNumber(heldBalance.marketId),
-      isExpiring ? (owedBalance.expiresAt ?? null) : null,
-      paraswapCallData,
-      {
-        gasPrice: getGasPriceWei().toFixed(),
-        from: solidAccount.owner,
-        confirmationType: ConfirmationType.Hash,
-      },
-    );
-  } else if (owedBalance.wei.abs().times(owedMarket.oraclePrice).isLessThan(minValueLiquidatedForExternalSell)) {
-    Logger.info({
-      message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
-      owedMarketId: owedMarket.marketId,
-      heldMarketId: heldMarket.marketId,
-      owedBalance: owedBalance.wei.abs().toFixed(),
-      heldBalance: heldBalance.wei.abs().toFixed(),
-      owedWeiForLiquidation: owedWei.toFixed(),
-      heldWeiForLiquidation: heldWei.toFixed(),
-      owedPriceAdj: owedPriceAdj.toFixed(),
-      heldPrice: heldMarket.oraclePrice.toFixed(),
-    });
-
-    if (isExpiring) {
-      return _liquidateExpiredAccountInternalSimple(
-        liquidAccount,
-        marketMap,
-        lastBlockTimestamp,
-        [new BigNumber(heldBalance.marketId)],
-        [new BigNumber(owedBalance.marketId)],
-      );
-    } else {
-      return _liquidateAccountSimple(
-        liquidAccount,
-        [new BigNumber(owedBalance.marketId)],
-        [new BigNumber(heldBalance.marketId)],
-        INTEGERS.ZERO,
-      );
-    }
-  } else {
-    Logger.info({
-      message: 'Performing liquidation via external liquidity',
-      owedMarketId: owedMarket.marketId,
-      heldMarketId: heldMarket.marketId,
-      owedBalance: owedBalance.wei.abs().toFixed(),
-      heldBalance: heldBalance.wei.abs().toFixed(),
-      owedWeiForLiquidation: owedWei.toFixed(),
-      heldWeiForLiquidation: heldWei.toFixed(),
-      owedPriceAdj: owedPriceAdj.toFixed(),
-      heldPrice: heldMarket.oraclePrice.toFixed(),
-    });
-
-    const paraswapCallData = await getParaswapSwapCalldataForLiquidation(
-      heldMarket,
-      heldWei,
-      owedMarket,
-      owedWei,
-      solidAccount.owner,
-      dolomite.liquidatorProxyV2WithExternalLiquidity.address,
-    );
-
-    return dolomite.liquidatorProxyV2WithExternalLiquidity.liquidate(
-      solidAccount.owner,
-      solidAccount.number,
-      liquidAccount.owner,
-      liquidAccount.number,
-      new BigNumber(owedBalance.marketId),
-      new BigNumber(heldBalance.marketId),
-      isExpiring ? (owedBalance.expiresAt ?? null) : null,
-      paraswapCallData,
-      {
-        gasPrice: getGasPriceWei().toFixed(),
-        from: solidAccount.owner,
-        confirmationType: ConfirmationType.Hash,
-      },
-    );
   }
 }
 

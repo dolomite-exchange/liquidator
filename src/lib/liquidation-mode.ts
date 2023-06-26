@@ -1,7 +1,6 @@
 export enum LiquidationMode {
   Simple = 'Simple',
   SellWithInternalLiquidity = 'SellWithInternalLiquidity',
-  SellWithExternalLiquidity = 'SellWithExternalLiquidity',
   Generic = 'Generic',
 }
 

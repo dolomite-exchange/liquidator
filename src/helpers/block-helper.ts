@@ -1,17 +1,20 @@
 import axios from 'axios';
 import { DateTime } from 'luxon';
-import { dolomite } from './web3';
 import Logger from '../lib/logger';
+import { dolomite } from './web3';
 
-const subgraphUrl = process.env.SUBGRAPH_URL ?? '';
-if (!subgraphUrl) {
+const SUBGRAPH_URL = process.env.SUBGRAPH_URL ?? '';
+if (!SUBGRAPH_URL) {
   throw new Error('SUBGRAPH_URL is not defined');
 }
 
 let lastBlockTimestamp: DateTime = DateTime.fromSeconds(0);
 let lastBlockNumber: number = 0;
 
-export async function getSubgraphBlockNumber(): Promise<{blockNumber: number, blockTimestamp: DateTime}> {
+export async function getSubgraphBlockNumber(
+  subgraphUrl: string = SUBGRAPH_URL,
+  defaultBlockNumber: number = lastBlockNumber,
+): Promise<{ blockNumber: number, blockTimestamp: DateTime }> {
   if (!Number.isNaN(Number(process.env.BLOCK_NUMBER))) {
     return Promise.resolve({ blockNumber: Number(process.env.BLOCK_NUMBER), blockTimestamp: lastBlockTimestamp });
   }
@@ -21,7 +24,7 @@ export async function getSubgraphBlockNumber(): Promise<{blockNumber: number, bl
   })
     .then(response => response.data)
     .then((json: any) => Number(json.data._meta.block.number))
-    .catch(() => lastBlockNumber);
+    .catch(() => defaultBlockNumber);
 
   let web3BlockNumber: number;
   try {

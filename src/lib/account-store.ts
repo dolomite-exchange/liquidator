@@ -1,7 +1,4 @@
-import {
-  getExpiredAccounts,
-  getLiquidatableDolomiteAccounts,
-} from '../clients/dolomite';
+import { getExpiredAccounts, getLiquidatableDolomiteAccounts } from '../clients/dolomite';
 import { ApiAccount } from './api-types';
 import { delay } from './delay';
 import Logger from './logger';

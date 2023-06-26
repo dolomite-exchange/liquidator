@@ -6,6 +6,8 @@ if (process.env.ENV_FILENAME) {
   Logger.warn({
     message: 'No ENV_FILENAME specified, using default env variables passed through the environment.',
   });
+  // eslint-disable-next-line
+  require('dotenv').config();
 }
 
 /* eslint-disable */

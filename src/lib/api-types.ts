@@ -1,7 +1,4 @@
-import {
-  address,
-  Integer,
-} from '@dolomite-exchange/dolomite-margin';
+import { address, Integer } from '@dolomite-exchange/dolomite-margin';
 
 export interface ApiBalance {
   marketId: number;
@@ -32,13 +29,6 @@ export interface ApiMarket {
   oraclePrice: Integer
   marginPremium: Integer
   liquidationRewardPremium: Integer
-  isolationModeUnwrapperInfo: ApiUnwrapperInfo | undefined
-  liquidityTokenUnwrapperInfo: ApiUnwrapperInfo | undefined
-}
-
-export interface ApiUnwrapperInfo {
-  unwrapperAddress: address
-  outputMarketId: number
 }
 
 export interface ApiRiskParam {
