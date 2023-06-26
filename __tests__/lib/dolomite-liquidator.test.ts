@@ -345,7 +345,9 @@ function getTestExpiredAccounts(): ApiAccount[] {
 function getTestMarkets(): ApiMarket[] {
   return [
     {
-      id: 0,
+      marketId: 0,
+      symbol: 'WETH',
+      name: 'Wrapped Ether',
       tokenAddress: '0x0234567812345678123456781234567812345678',
       oraclePrice: new BigNumber('173192500000000000000'),
       marginPremium: new BigNumber('0'),
@@ -355,7 +357,9 @@ function getTestMarkets(): ApiMarket[] {
       liquidityTokenUnwrapperInfo: undefined,
     },
     {
-      id: 1,
+      marketId: 1,
+      symbol: 'DAI',
+      name: 'Dai Stablecoin',
       tokenAddress: '0x1234567812345678123456781234567812345678',
       oraclePrice: new BigNumber('985976069960621971'),
       marginPremium: new BigNumber('0'),
@@ -365,7 +369,9 @@ function getTestMarkets(): ApiMarket[] {
       liquidityTokenUnwrapperInfo: undefined,
     },
     {
-      id: 2,
+      marketId: 2,
+      symbol: 'USDC',
+      name: 'USD Coin',
       tokenAddress: '0x2234567812345678123456781234567812345678',
       oraclePrice: new BigNumber('985976069960621971'),
       marginPremium: new BigNumber('0'),
@@ -375,7 +381,9 @@ function getTestMarkets(): ApiMarket[] {
       liquidityTokenUnwrapperInfo: undefined,
     },
     {
-      id: 3,
+      marketId: 3,
+      symbol: 'LINK',
+      name: 'Chainlink Token',
       tokenAddress: '0x3234567812345678123456781234567812345678',
       oraclePrice: new BigNumber('985976069960621971'),
       marginPremium: new BigNumber('0'),

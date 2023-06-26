@@ -10,6 +10,10 @@ export default class LiquidationStore {
     });
   }
 
+  private static _getKey(account: ApiAccount) {
+    return `${account.owner.toLowerCase()}-${account.number}`;
+  }
+
   async add(account: ApiAccount) {
     if (!account) {
       throw new Error('Must specify account');
@@ -24,9 +28,5 @@ export default class LiquidationStore {
     const key = LiquidationStore._getKey(account);
 
     return this.store.get(key);
-  }
-
-  private static _getKey(account: ApiAccount) {
-    return `${account.owner.toLowerCase()}-${account.number}`;
   }
 }

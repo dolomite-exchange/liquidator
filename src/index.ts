@@ -34,6 +34,7 @@ checkLiquidationModeConditionally(
   () => checkPreferences('COLLATERAL_PREFERENCES'),
 );
 checkBigNumber('DOLOMITE_ACCOUNT_NUMBER');
+checkLiquidationModeConditionally(LiquidationMode.Generic, () => checkExists('DOLOMITE_SUBGRAPH_URL'));
 checkExists('ETHEREUM_NODE_URL');
 checkBooleanValue('EXPIRATIONS_ENABLED');
 checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
@@ -78,8 +79,8 @@ async function start() {
 
   await loadAccounts();
 
-  const { blockNumber } = await getSubgraphBlockNumber();
-  const { riskParams } = await getDolomiteRiskParams(blockNumber);
+  const { blockNumber: subgraphBlockNumber } = await getSubgraphBlockNumber();
+  const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
@@ -130,7 +131,7 @@ async function start() {
 
   if (liquidationMode === LiquidationMode.Simple) {
     Logger.info({
-      liquidationMode: liquidationMode,
+      liquidationMode,
       message: 'Simple liquidation variables',
       collateralPreferences: process.env.COLLATERAL_PREFERENCES,
       minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
@@ -141,16 +142,25 @@ async function start() {
     const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true';
     const discountUsedText = revertOnFailToSellCollateral ? '(unused)' : '';
     Logger.info({
-      liquidationMode: liquidationMode,
+      liquidationMode,
       message: 'Sell with internal liquidity variables:',
       revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
       minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
     });
-  } else if (liquidationMode === LiquidationMode.SellWithExternalLiquidity) {
+  } else if (liquidationMode === LiquidationMode.Generic) {
+    const { blockNumber: dolomiteSubgraphBlockNumber } = await getSubgraphBlockNumber(
+      process.env.DOLOMITE_SUBGRAPH_URL,
+      0,
+    );
     Logger.info({
-      liquidationMode: liquidationMode,
-      message: 'Sell with external liquidity variables:',
+      liquidationMode,
+      message: 'Generic liquidation mode variables:',
+      dolomiteSubgraphUrl: process.env.DOLOMITE_SUBGRAPH_URL,
+      subgraphBlockNumber: dolomiteSubgraphBlockNumber,
     });
+    if (dolomiteSubgraphBlockNumber === 0) {
+      throw new Error('Could not get Dolomite subgraph block number');
+    }
   } else {
     throw new Error(`Invalid liquidation mode: ${liquidationMode}`);
   }

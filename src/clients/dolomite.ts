@@ -3,13 +3,7 @@ import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin'
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, ApiUnwrapperInfo, MarketIndex } from '../lib/api-types';
-import {
-  getIsolationModeUnwrapperByMarketId,
-  getIsolationModeUnwrapperMarketIdByMarketId,
-  getLiquidityTokenUnwrapperByMarketId,
-  getLiquidityTokenUnwrapperMarketIdByMarketId, isIsolationModeToken, isLiquidityToken,
-} from '../lib/constants';
+import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, MarketIndex } from '../lib/api-types';
 import {
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
@@ -227,29 +221,15 @@ export async function getDolomiteMarkets(
   const markets: Promise<ApiMarket>[] = result.data.marketRiskInfos.map(async (market, i) => {
     const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
     const marketId = new BigNumber(market.token.marketId)
-    let isolationModeUnwrapperInfo: ApiUnwrapperInfo | undefined;
-    if (isIsolationModeToken(market.token)) {
-      isolationModeUnwrapperInfo = {
-        unwrapperAddress: getIsolationModeUnwrapperByMarketId(marketId),
-        outputMarketId: getIsolationModeUnwrapperMarketIdByMarketId(marketId),
-      };
-    }
-    let liquidityTokenUnwrapperInfo: ApiUnwrapperInfo | undefined;
-    if (isLiquidityToken(market.token)) {
-      liquidityTokenUnwrapperInfo = {
-        unwrapperAddress: getLiquidityTokenUnwrapperByMarketId(marketId),
-        outputMarketId: getLiquidityTokenUnwrapperMarketIdByMarketId(marketId),
-      };
-    }
     const apiMarket: ApiMarket = {
-      id: marketId.toNumber(),
+      marketId: marketId.toNumber(),
       decimals: Number(market.token.decimals),
+      symbol: market.token.symbol,
+      name: market.token.name,
       tokenAddress: market.token.id,
       oraclePrice: new BigNumber(oraclePrice),
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),
       liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
-      isolationModeUnwrapperInfo,
-      liquidityTokenUnwrapperInfo,
     };
     return apiMarket;
   });

@@ -6,19 +6,21 @@ if (process.env.ENV_FILENAME) {
   Logger.warn({
     message: 'No ENV_FILENAME specified, using default env variables passed through the environment.',
   });
+  // eslint-disable-next-line
+  require('dotenv').config();
 }
 
 /* eslint-disable */
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
+import vGlpAbi from '../abis/gmx-vester.json';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../clients/dolomite';
 import { getSubgraphBlockNumber } from '../helpers/block-helper';
 import { dolomite } from '../helpers/web3';
 import Logger from '../lib/logger';
 import MarketStore from '../lib/market-store';
 import Pageable from '../lib/pageable';
-import vGlpAbi from '../abis/gmx-vester.json';
 
 const GLP_MARKET_ID = 6;
 const GLP_TOKEN_ADDRESS = '0x1aDDD80E6039594eE970E5872D247bf0414C8903';
