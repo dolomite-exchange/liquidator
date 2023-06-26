@@ -353,8 +353,6 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
-      isolationModeUnwrapperInfo: undefined,
-      liquidityTokenUnwrapperInfo: undefined,
     },
     {
       marketId: 1,
@@ -365,8 +363,6 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
-      isolationModeUnwrapperInfo: undefined,
-      liquidityTokenUnwrapperInfo: undefined,
     },
     {
       marketId: 2,
@@ -377,8 +373,6 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
-      isolationModeUnwrapperInfo: undefined,
-      liquidityTokenUnwrapperInfo: undefined,
     },
     {
       marketId: 3,
@@ -389,8 +383,6 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
-      isolationModeUnwrapperInfo: undefined,
-      liquidityTokenUnwrapperInfo: undefined,
     },
   ];
 }
