@@ -34,7 +34,6 @@ checkLiquidationModeConditionally(
   () => checkPreferences('COLLATERAL_PREFERENCES'),
 );
 checkBigNumber('DOLOMITE_ACCOUNT_NUMBER');
-checkLiquidationModeConditionally(LiquidationMode.Generic, () => checkExists('DOLOMITE_SUBGRAPH_URL'));
 checkExists('ETHEREUM_NODE_URL');
 checkBooleanValue('EXPIRATIONS_ENABLED');
 checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
@@ -148,19 +147,10 @@ async function start() {
       minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
     });
   } else if (liquidationMode === LiquidationMode.Generic) {
-    const { blockNumber: dolomiteSubgraphBlockNumber } = await getSubgraphBlockNumber(
-      process.env.DOLOMITE_SUBGRAPH_URL,
-      0,
-    );
     Logger.info({
       liquidationMode,
       message: 'Generic liquidation mode variables:',
-      dolomiteSubgraphUrl: process.env.DOLOMITE_SUBGRAPH_URL,
-      subgraphBlockNumber: dolomiteSubgraphBlockNumber,
     });
-    if (dolomiteSubgraphBlockNumber === 0) {
-      throw new Error('Could not get Dolomite subgraph block number');
-    }
   } else {
     throw new Error(`Invalid liquidation mode: ${liquidationMode}`);
   }

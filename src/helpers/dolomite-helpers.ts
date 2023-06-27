@@ -24,7 +24,7 @@ const minValueLiquidatedForExternalSell = new BigNumber(process.env.MIN_VALUE_LI
 const networkId = Number(process.env.NETWORK_ID);
 const zap = new DolomiteZap(
   networkId,
-  process.env.DOLOMITE_SUBGRAPH_URL ?? '',
+  process.env.SUBGRAPH_URL,
   new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, networkId),
 );
 
