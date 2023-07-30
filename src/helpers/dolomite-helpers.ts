@@ -263,13 +263,8 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
           liquidAccount.owner,
           liquidAccount.number,
           outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
-          outputs[i].amountWeisPath.map((p, j) => {
-            if (j === 0 || j === outputs[i].amountWeisPath.length - 1) {
-              return INTEGERS.MAX_UINT;
-            } else {
-              return new BigNumber(p)
-            }
-          }),
+          INTEGERS.MAX_UINT,
+          INTEGERS.MAX_UINT,
           outputs[i].traderParams,
           outputs[i].makerAccounts,
           isExpiring ? (owedBalance.expiresAt ?? null) : null,
