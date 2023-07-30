@@ -415,7 +415,7 @@ async function _liquidateExpiredAccountInternalSimple(
   );
 }
 
-function _getLargestBalanceUSD(
+export function _getLargestBalanceUSD(
   balances: ApiBalance[],
   isOwed: boolean,
   marketMap: { [marketId: string]: ApiMarket },
@@ -444,7 +444,7 @@ function _balanceUSDSorterDesc(
   marketMap: { [marketId: string]: ApiMarket },
 ): number {
   const market1 = marketMap[balance1.marketId];
-  const market2 = marketMap[balance1.marketId];
+  const market2 = marketMap[balance2.marketId];
   const balanceUSD1 = balance1.wei.abs().times(market1.oraclePrice);
   const balanceUSD2 = balance2.wei.abs().times(market2.oraclePrice);
   return balanceUSD1.gt(balanceUSD2) ? -1 : 1;
