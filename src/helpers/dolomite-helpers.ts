@@ -1,6 +1,6 @@
 import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { BigNumber as ZapBigNumber, DolomiteZap } from '@dolomite-exchange/zap-sdk/dist';
+import { BigNumber as ZapBigNumber, DolomiteZap, MinimalApiToken } from '@dolomite-exchange/zap-sdk/dist';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
@@ -200,8 +200,8 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     heldMarket.oraclePrice,
   );
 
-  const hasIsolationModeMarket = zap.getIsolationModeConverterByMarketId(owedMarket.marketId)
-    || zap.getIsolationModeConverterByMarketId(heldMarket.marketId);
+  const hasIsolationModeMarket = zap.getIsolationModeConverterByMarketId(new ZapBigNumber(owedMarket.marketId))
+    || zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId));
   if (!hasIsolationModeMarket && owedBalance.wei.abs()
     .times(owedMarket.oraclePrice)
     .isLessThan(minValueLiquidatedForExternalSell)) {
@@ -246,10 +246,18 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       heldPrice: heldMarket.oraclePrice.toFixed(),
     });
 
+    const heldToken: MinimalApiToken = {
+      marketId: new ZapBigNumber(heldMarket.marketId),
+      symbol: heldMarket.symbol,
+    };
+    const owedToken: MinimalApiToken = {
+      marketId: new ZapBigNumber(owedMarket.marketId),
+      symbol: owedMarket.symbol,
+    };
     const outputs = await zap.getSwapExactTokensForTokensParams(
-      heldMarket,
+      heldToken,
       new ZapBigNumber(heldWei),
-      owedMarket,
+      owedToken,
       new ZapBigNumber(owedWei),
       solidAccount.owner,
     );
