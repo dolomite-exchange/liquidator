@@ -262,7 +262,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       solidAccount.owner,
     );
 
-    let latestError: unknown;
+    let firstError: unknown;
     for (let i = 0; i < outputs.length; i += 1) {
       try {
         return await dolomite.liquidatorProxyV4WithGenericTrader.liquidate(
@@ -283,11 +283,13 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
           },
         );
       } catch (e) {
-        latestError = e;
+        if (!firstError) {
+          firstError = e;
+        }
       }
     }
 
-    return Promise.reject(latestError);
+    return Promise.reject(firstError);
   }
 }
 
