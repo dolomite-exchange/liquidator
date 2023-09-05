@@ -21,11 +21,22 @@ const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split('
 
 const minValueLiquidatedForExternalSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL as string);
 
-const networkId = Number(process.env.NETWORK_ID);
+const NETWORK_ID = Number(process.env.NETWORK_ID);
+const ONE_HOUR = 60 * 60;
+const IS_LIQUIDATION = true;
+const THIRTY_BASIS_POINTS = 0.003;
+const BLOCK_TAG = 'latest';
+const USE_PROXY_SERVER = false;
 const zap = new DolomiteZap(
-  networkId,
+  NETWORK_ID,
   process.env.SUBGRAPH_URL,
-  new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, networkId),
+  new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, NETWORK_ID),
+  ONE_HOUR,
+  IS_LIQUIDATION,
+  THIRTY_BASIS_POINTS,
+  BLOCK_TAG,
+  undefined,
+  USE_PROXY_SERVER,
 );
 
 export function isExpired(
