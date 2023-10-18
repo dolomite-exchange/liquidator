@@ -20,6 +20,15 @@ export interface ApiAccount {
   };
 }
 
+export interface ApiDeposit {
+  id: string;
+  serialId: number;
+  timestamp: number;
+  effectiveUser: string;
+  marketId: number;
+  amountDeltaWei: Integer;
+}
+
 export interface ApiMarket {
   marketId: number
   symbol: string
@@ -35,6 +44,15 @@ export interface ApiRiskParam {
   dolomiteMargin: address;
   liquidationRatio: Integer;
   liquidationReward: Integer;
+}
+
+export interface ApiWithdrawal {
+  id: string;
+  serialId: number;
+  timestamp: number;
+  effectiveUser: string;
+  marketId: number;
+  amountDeltaWei: Integer;
 }
 
 export interface MarketIndex {

@@ -3,16 +3,18 @@ import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin'
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, MarketIndex } from '../lib/api-types';
+import { ApiAccount, ApiBalance, ApiDeposit, ApiMarket, ApiRiskParam, ApiWithdrawal, MarketIndex } from '../lib/api-types';
 import {
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
   GraphqlAmmLiquidityPosition,
   GraphqlAmmPairData,
+  GraphqlDepositsResult,
   GraphqlInterestRate,
   GraphqlMarketResult,
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
+  GraphqlWithdrawalsResult,
 } from '../lib/graphql-types';
 import Pageable from '../lib/pageable';
 
@@ -32,7 +34,7 @@ async function getAccounts(
   marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } },
   query: string,
   blockNumber: number,
-  pageIndex: number = 0,
+  lastId: number = 0,
 ): Promise<{ accounts: ApiAccount[] }> {
   const decimalBase = new BigNumber('1000000000000000000');
   const accounts: ApiAccount[] = await axios.post(
@@ -41,7 +43,7 @@ async function getAccounts(
       query,
       variables: {
         blockNumber,
-        skip: Pageable.MAX_PAGE_SIZE * pageIndex,
+        lastId,
       },
     },
     defaultAxiosConfig,
@@ -76,7 +78,7 @@ async function getAccounts(
       }, {});
       return {
         id: `${account.user.id}-${account.accountNumber}`,
-        owner: account.user.id,
+        owner: account.user.effectiveUser.id.toLowerCase(),
         number: new BigNumber(account.accountNumber),
         balances,
       };
@@ -84,6 +86,62 @@ async function getAccounts(
 
   return { accounts };
 }
+
+export async function getDeposits(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ deposits: ApiDeposit[] }> {
+  const query = `
+  query getDeposits($startBlock: BigInt, $endBlock: Int, $lastId: ID) {
+    deposits(first: 1000, orderBy: serialId where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { serialId_gt: $lastId }]} block: { number: $endBlock }) {
+      id
+      serialId
+      transaction {
+        timestamp
+      }
+      amountDeltaWei
+      token {
+        marketId
+      }
+      effectiveUser {
+        id
+      }
+    }
+  }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlDepositsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const deposits: ApiDeposit[] = result.data.deposits.map(deposit => {
+    return {
+      id: deposit.id,
+      serialId: deposit.serialId,
+      timestamp: deposit.transaction.timestamp,
+      effectiveUser: deposit.effectiveUser.id.toLowerCase(),
+      marketId: new BigNumber(deposit.token.marketId),
+      amountDeltaWei: new BigNumber(deposit.amountDeltaWei),
+    }
+  });
+
+  return { deposits };
+} 
 
 export async function getLiquidatableDolomiteAccounts(
   marketIndexMap: { [marketId: string]: MarketIndex },
@@ -114,17 +172,76 @@ export async function getLiquidatableDolomiteAccounts(
   return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
 }
 
+export async function getWithdrawals(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ withdrawals: ApiWithdrawal[] }> {
+  const query = `
+    query getWithdrawals($startBlock: Int, $endBlock: Int, $lastId: ID) {
+    withdrawals(first: 1000, orderBy: serialId where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { serialId_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        amountDeltaWei
+        token {
+          marketId
+        }
+        effectiveUser {
+          id
+        }
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlWithdrawalsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const withdrawals: ApiWithdrawal[] = result.data.withdrawals.map(withdrawal => {
+    return {
+      id: withdrawal.id,
+      serialId: withdrawal.serialId,
+      timestamp: withdrawal.transaction.timestamp,
+      effectiveUser: withdrawal.effectiveUser.id.toLowerCase(),
+      marketId: new BigNumber(withdrawal.token.marketId),
+      amountDeltaWei: new BigNumber(withdrawal.amountDeltaWei),
+    }
+  });
+
+  return { withdrawals };
+} 
+
 export async function getAllDolomiteAccountsWithSupplyValue(
   marketIndexMap: { [marketId: string]: MarketIndex },
   blockNumber: number,
-  pageIndex: number = 0,
+  lastId: number = 0,
 ): Promise<{ accounts: ApiAccount[] }> {
   const query = `
-            query getActiveMarginAccounts($blockNumber: Int, $skip: Int) {
-                marginAccounts(where: { hasSupplyValue: true } block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE} skip: $skip) {
+            query getActiveMarginAccounts($blockNumber: Int, $lastId: ID) {
+                marginAccounts(first: 1000, orderBy: id where: { and: [{ hasSupplyValue: true }, { id_gt: $lastId }] } block: { number: $blockNumber }) {
                   id
                   user {
                     id
+                    effectiveUser {
+                      id
+                    }
                   }
                   accountNumber
                   tokenValues {
@@ -140,7 +257,7 @@ export async function getAllDolomiteAccountsWithSupplyValue(
                   }
                 }
               }`;
-  return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
+  return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
 
 export async function getExpiredAccounts(

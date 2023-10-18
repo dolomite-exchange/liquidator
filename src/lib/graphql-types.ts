@@ -20,10 +20,55 @@ export interface GraphqlTokenValue {
 export interface GraphqlAccount {
   id: string
   user: {
-    id: string
+    id
+    effectiveUser: {
+      id: string
+    }
   }
   accountNumber: string
   tokenValues: GraphqlTokenValue[]
+}
+
+export interface GraphqlDeposit {
+  id: string
+  serialId: string
+  transaction: {
+    timestamp: string
+  }
+  amountDeltaWei: string
+  effectiveUser: {
+    id: string
+  }
+  token: {
+    marketId: string
+  }
+}
+
+export interface GraphqlDepositsResult {
+  data: {
+    deposits: GraphqlDeposit[]
+  }
+}
+
+export interface GraphqlWithdrawal {
+  id: string
+  serialId: string
+  transaction: {
+    timestamp: string
+  }
+  amountDeltaWei: string
+  effectiveUser: {
+    id: string
+  }
+  token: {
+    marketId: string
+  }
+}
+
+export interface GraphqlWithdrawalsResult {
+  data: {
+    withdrawals: GraphqlWithdrawal[]
+  }
 }
 
 export interface GraphqlMarketResult {
