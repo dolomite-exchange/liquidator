@@ -11,27 +11,24 @@ if (process.env.ENV_FILENAME) {
 }
 
 import v8 from 'v8';
-import { getAllDolomiteAccountsWithSupplyValue, getDeposits, getDolomiteRiskParams, getWithdrawals } from '../clients/dolomite';
-import { getSubgraphBlockNumber } from '../helpers/block-helper';
+import { getAllDolomiteAccountsWithSupplyValue, getDeposits, getDolomiteRiskParams, getLiquidations, getTrades, getTransfers, getWithdrawals } from '../clients/dolomite';
 import { dolomite } from '../helpers/web3';
 /* eslint-disable */
 import Logger from '../lib/logger';
 import MarketStore from '../lib/market-store';
 import Pageable from '../lib/pageable';
-// import { INTEGERS } from '@dolomite-exchange/dolomite-margin';
-import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
-import { BalanceAndRewardPoints, BalanceChangeEvent, parseDeposits, parseWithdrawals } from '../lib/rewards';
+import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BalanceAndRewardPoints, BalanceChangeEvent, getAccountBalancesByMarket, parseDeposits, parseLiquidations, parseTrades, parseTransfers, parseWithdrawals } from '../lib/rewards';
 
-// const WETH_MARKET_ID = 0;
 
 async function start() {
   const marketStore = new MarketStore();
 
-  // Change this to be blockNumber at start of the week / start of reward period
-  const blockRewardStart = 141000000;
-  const blockRewardStartTimestamp = 1697434374;
-  const blockRewardEnd = 141519000;
-  const blockRewardEndTimestamp = 1697581061;
+  const blockRewardStart = 130000000;
+  const blockRewardStartTimestamp = 1694407206;
+  const blockRewardEnd = 141530000;
+  const blockRewardEndTimestamp = 1697585246;
+
   const { riskParams } = await getDolomiteRiskParams(blockRewardStart);
   const networkId = await dolomite.web3.eth.net.getId();
 
@@ -68,40 +65,39 @@ async function start() {
     return accounts;
   });
 
-  // Get account balances
-  console.log('getting account balances');
-  const accountToDolomiteBalanceMap: Record<string, Record<number, BalanceAndRewardPoints>> = {};
-  for (let i = 0; i < accounts.length; i++) {
-    const account = accounts[i];
-    accountToDolomiteBalanceMap[account.owner] = accountToDolomiteBalanceMap[account.owner] ?? {};
-
-    Object.values(account.balances)
-      .forEach((balance) => {
-        if (accountToDolomiteBalanceMap[account.owner][balance.marketId]) {
-          accountToDolomiteBalanceMap[account.owner][balance.marketId].balance.plus(balance.par);
-        }
-        else {
-          accountToDolomiteBalanceMap[account.owner][balance.marketId] = new BalanceAndRewardPoints(blockRewardStartTimestamp, balance.par);
-        }
-      });
-  }
-
+  // Load and parse events
+  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(accounts, blockRewardStartTimestamp);
   const accountToAssetToEventsMap: Record<string, Record<number, BalanceChangeEvent[]>> = {};
 
-  console.log('getting deposits and adding to event mapping');
   const deposits = await Pageable.getPageableValues((async (lastIndex) => {
     const { deposits } = await getDeposits(blockRewardStart, blockRewardEnd, lastIndex);
     return deposits;
-  }), 'serialId');
+  }));
   parseDeposits(accountToAssetToEventsMap, deposits);
 
-
-  console.log('getting withdrawals and adding to event mapping');
   const withdrawals = await Pageable.getPageableValues((async (lastIndex) => {
     const { withdrawals } = await getWithdrawals(blockRewardStart, blockRewardEnd, lastIndex);
     return withdrawals;
-  }), 'serialId');
+  }));
   parseWithdrawals(accountToAssetToEventsMap, withdrawals);
+
+  const transfers = await Pageable.getPageableValues((async (lastIndex) => {
+    const { transfers } = await getTransfers(blockRewardStart, blockRewardEnd, lastIndex);
+    return transfers;
+  }));
+  parseTransfers(accountToAssetToEventsMap, transfers);
+
+  const trades = await Pageable.getPageableValues((async (lastIndex) => {
+    const { trades } = await getTrades(blockRewardStart, blockRewardEnd, lastIndex);
+    return trades;
+  }));
+  parseTrades(accountToAssetToEventsMap, trades);
+
+  const liquidations = await Pageable.getPageableValues((async (lastIndex) => {
+    const { liquidations } = await getLiquidations(blockRewardStart, blockRewardEnd, lastIndex);
+    return liquidations;
+  }));
+  parseLiquidations(accountToAssetToEventsMap, liquidations);
 
   // Sort list and loop through to get point total per user
   let totalPointsPerMarket = {};
@@ -117,16 +113,23 @@ async function start() {
       }
       totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? new BigNumber(0);
 
-      // Sort events
+      // Sort and process events
       accountToAssetToEventsMap[account][market].sort((a,b) => {
         return a.serialId - b.serialId;
-      })
-
-      // Process events
+      });
       const userBalStruct = accountToDolomiteBalanceMap[account][market];
       accountToAssetToEventsMap[account][market].forEach((event) => {
         totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(userBalStruct.processEvent(event));
       });
+    }
+  }
+
+  // Do final loop through all balances to finish reward point calculation
+  for (const account in accountToDolomiteBalanceMap) {
+    for (const market in accountToDolomiteBalanceMap[account]) {
+      totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? new BigNumber(0);
+
+      const userBalStruct = accountToDolomiteBalanceMap[account][market];
       totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(userBalStruct.processEvent({ amount: new BigNumber(0), timestamp: blockRewardEndTimestamp, serialId: 0}));
     }
   }

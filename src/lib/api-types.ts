@@ -29,6 +29,19 @@ export interface ApiDeposit {
   amountDeltaWei: Integer;
 }
 
+export interface ApiLiquidation {
+  id: string;
+  serialId: number;
+  timestamp: number;
+  solidEffectiveUser: string;
+  liquidEffectiveUser: string;
+  heldToken: number;
+  heldTokenAmountDeltaWei: Integer;
+  heldTokenLiquidationRewardWei: Integer;
+  borrowedToken: number;
+  borrowedTokenAmountDeltaWei: Integer;
+}
+
 export interface ApiMarket {
   marketId: number
   symbol: string
@@ -44,6 +57,28 @@ export interface ApiRiskParam {
   dolomiteMargin: address;
   liquidationRatio: Integer;
   liquidationReward: Integer;
+}
+
+export interface ApiTransfer {
+  id: string;
+  serialId: number;
+  timestamp: number;
+  fromEffectiveUser: string;
+  toEffectiveUser: string;
+  marketId: number;
+  amountDeltaWei: Integer;
+}
+
+export interface ApiTrade {
+  id: string;
+  serialId: number;
+  timestamp: number;
+  takerEffectiveUser: string;
+  takerMarketId: number;
+  takerTokenDeltaWei: Integer;
+  makerEffectiveUser: string;
+  makerMarketId: number;
+  makerTokenDeltaWei: Integer;
 }
 
 export interface ApiWithdrawal {

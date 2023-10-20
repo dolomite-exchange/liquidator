@@ -50,6 +50,87 @@ export interface GraphqlDepositsResult {
   }
 }
 
+export interface GraphqlLiquidation {
+  id: string
+  serialId: string
+  transaction: {
+    timestamp: string
+  }
+  solidEffectiveUser: {
+    id: string
+  }
+  liquidEffectiveUser: {
+    id: string
+  }
+  heldToken: {
+    marketId: string
+  }
+  heldTokenAmountDeltaWei
+  heldTokenLiquidationRewardWei
+  borrowedToken: {
+    marketId: string
+  }
+  borrowedTokenAmountDeltaWei
+}
+
+export interface GraphqlLiquidationsResult {
+  data: {
+    liquidations: GraphqlLiquidation[]
+  }
+}
+
+export interface GraphqlTransfer {
+  id: string
+  serialId: string
+  transaction: {
+    timestamp: string
+  }
+  amountDeltaWei: string
+  fromEffectiveUser: {
+    id: string
+  }
+  toEffectiveUser: {
+    id: string
+  }
+  token: {
+    marketId: string
+  }
+}
+
+export interface GraphqlTrade {
+  id: string
+  serialId: string
+  transaction: {
+    timestamp: string
+  }
+  takerEffectiveUser: {
+    id: string
+  }
+  takerToken: {
+    marketId: string
+  }
+  takerTokenDeltaWei: string;
+  makerEffectiveUser: {
+    id: string
+  }
+  makerToken: {
+    marketId: string
+  }
+  makerTokenDeltaWei: string;
+}
+
+export interface GraphqlTradesResult {
+  data: {
+    trades: GraphqlTrade[]
+  }
+}
+
+export interface GraphqlTransfersResult {
+  data: {
+    transfers: GraphqlTransfer[]
+  }
+}
+
 export interface GraphqlWithdrawal {
   id: string
   serialId: string

@@ -3,7 +3,6 @@ export default class Pageable {
 
   public static async getPageableValues<T>(
     getterFn: (lastIndex: number) => Promise<T[]>,
-    indexField: string = 'id'
   ): Promise<T[]> {
     let results: T[] = []
     let queryResults: T[] = []
@@ -11,7 +10,11 @@ export default class Pageable {
     do {
       queryResults = await getterFn(lastIndex)
 
-      lastIndex = queryResults[queryResults.length - 1][indexField];
+      if (queryResults.length == 0) {
+        break;
+      }
+
+      lastIndex = queryResults[queryResults.length - 1]['id'];
       results = results.concat(queryResults);
 
       if (queryResults.length < Pageable.MAX_PAGE_SIZE) {

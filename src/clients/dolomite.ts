@@ -3,7 +3,7 @@ import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin'
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { ApiAccount, ApiBalance, ApiDeposit, ApiMarket, ApiRiskParam, ApiWithdrawal, MarketIndex } from '../lib/api-types';
+import { ApiAccount, ApiBalance, ApiDeposit, ApiLiquidation, ApiMarket, ApiRiskParam, ApiTrade, ApiTransfer, ApiWithdrawal, MarketIndex } from '../lib/api-types';
 import {
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
@@ -11,9 +11,12 @@ import {
   GraphqlAmmPairData,
   GraphqlDepositsResult,
   GraphqlInterestRate,
+  GraphqlLiquidationsResult,
   GraphqlMarketResult,
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
+  GraphqlTradesResult,
+  GraphqlTransfersResult,
   GraphqlWithdrawalsResult,
 } from '../lib/graphql-types';
 import Pageable from '../lib/pageable';
@@ -94,7 +97,7 @@ export async function getDeposits(
 ): Promise<{ deposits: ApiDeposit[] }> {
   const query = `
   query getDeposits($startBlock: BigInt, $endBlock: Int, $lastId: ID) {
-    deposits(first: 1000, orderBy: serialId where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { serialId_gt: $lastId }]} block: { number: $endBlock }) {
+    deposits(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
       id
       serialId
       transaction {
@@ -172,6 +175,203 @@ export async function getLiquidatableDolomiteAccounts(
   return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
 }
 
+export async function getTrades(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ trades: ApiTrade[] }> {
+  const query = `
+    query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      trades(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        takerEffectiveUser {
+          id
+        }
+        takerToken {
+          marketId
+        }
+        takerTokenDeltaWei
+        makerEffectiveUser {
+          id
+        }
+        makerToken {
+          marketId
+        }
+        makerTokenDeltaWei
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlTradesResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const trades: ApiTrade[] = result.data.trades.map(trade => {
+    return {
+      id: trade.id,
+      serialId: trade.serialId,
+      timestamp: trade.transaction.timestamp,
+      takerEffectiveUser: trade.takerEffectiveUser.id.toLowerCase(),
+      takerMarketId: trade.takerToken.marketId,
+      takerAmountDeltaWei: trade.takerTokenDeltaWei,
+      makerEffectiveUser: trade.makerEffectiveUser ? trade.makerEffectiveUser.id.toLowerCase() : null,
+      makerMarketId: trade.makerToken.marketId,
+      makerAmountDeltaWei: trade.makerTokenDeltaWei,
+    }
+  });
+
+  return { trades };
+}
+
+export async function getTransfers(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0
+): Promise<{ transfers: ApiTransfer[] }> {
+  const query = `
+    query getTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      transfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        amountDeltaWei
+        fromEffectiveUser {
+          id
+        }
+        toEffectiveUser {
+          id
+        }
+        token {
+          marketId
+        }
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlTransfersResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const transfers: ApiTransfer[] = result.data.transfers.map(transfer => {
+    return {
+      id: transfer.id,
+      serialId: transfer.serialId,
+      timestamp: transfer.transaction.timestamp,
+      fromEffectiveUser: transfer.fromEffectiveUser.id.toLowerCase(),
+      toEffectiveUser: transfer.toEffectiveUser.id.toLowerCase(),
+      marketId: new BigNumber(transfer.token.marketId),
+      amountDeltaWei: new BigNumber(transfer.amountDeltaWei),
+    }
+  });
+
+  return { transfers };
+}
+
+export async function getLiquidations(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ liquidations: ApiLiquidation[] }> {
+  const query = `
+    query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      liquidations(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        solidEffectiveUser {
+          id
+        }
+        liquidEffectiveUser {
+          id
+        }
+        heldToken {
+          marketId
+        }
+        heldTokenAmountDeltaWei
+        heldTokenLiquidationRewardWei
+        borrowedToken {
+          marketId
+        }
+        borrowedTokenAmountDeltaWei
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidationsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  if (result.data.liquidations.length == 0) {
+    return { liquidations: [] };
+  }
+  const liquidations: ApiLiquidation[] = result.data.liquidations.map(liquidation => {
+    return {
+      id: liquidation.id,
+      serialId: liquidation.serialId,
+      timestamp: liquidation.transaction.timestamp,
+      solidEffectiveUser: liquidation.solidEffectiveUser.id.toLowerCase(),
+      liquidEffectiveUser: liquidation.liquidEffectiveUser.id.toLowerCase(),
+      heldToken: liquidation.heldToken.marketId,
+      heldTokenAmountDeltaWei: liquidation.heldTokenAmountDeltaWei,
+      heldTokenLiquidationRewardWei: liquidation.heldTokenLiquidationRewardWei,
+      borrowedToken: liquidation.borrowedToken.marketId,
+      borrowedTokenAmountDeltaWei: liquidation.borrowedTokenAmountDeltaWei
+    }
+  });
+
+  return { liquidations };
+}
+
 export async function getWithdrawals(
   startBlock: number,
   endBlock: number,
@@ -179,7 +379,7 @@ export async function getWithdrawals(
 ): Promise<{ withdrawals: ApiWithdrawal[] }> {
   const query = `
     query getWithdrawals($startBlock: Int, $endBlock: Int, $lastId: ID) {
-    withdrawals(first: 1000, orderBy: serialId where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { serialId_gt: $lastId }]} block: { number: $endBlock }) {
+    withdrawals(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
         id
         serialId
         transaction {
