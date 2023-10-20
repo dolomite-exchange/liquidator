@@ -80,12 +80,4 @@ describe('rewards', () => {
       expect(user.rewardPoints).toEqual(new BigNumber(250));
     });
   });
-
-  describe('#parseDeposits', () => {
-
-  });
-
-  describe('#parseWithdrawal', () => {
-
-  });
 });
