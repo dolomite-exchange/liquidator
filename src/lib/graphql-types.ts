@@ -50,6 +50,36 @@ export interface GraphqlDepositsResult {
   }
 }
 
+export interface GraphqlAmmLiquidityPosition {
+  id: string
+  effectiveUser: {
+    id: string
+  }
+  liquidityTokenBalance: string
+}
+
+export interface GraphqlAmmLiquidityPositionsResult {
+  data: {
+    ammLiquidityPositions: GraphqlAmmLiquidityPosition[]
+  }
+}
+
+export interface GraphqlAmmLiquidityPositionSnapshot {
+  id: string
+  effectiveUser: {
+    id: string
+  }
+  liquidityTokenBalance: string
+  block: string
+  timestamp: string
+}
+
+export interface GraphqlAmmLiquidityPositionSnapshotsResult {
+  data: {
+    ammLiquidityPositionSnapshots: GraphqlAmmLiquidityPositionSnapshot[]
+  }
+}
+
 export interface GraphqlLiquidation {
   id: string
   serialId: string

@@ -1,5 +1,7 @@
 import { BigNumber } from "@dolomite-exchange/dolomite-margin";
 import { ApiAccount } from "./api-types";
+import Pageable from "./pageable";
+import { getDeposits, getLiquidations, getLiquidityPositions, getLiquiditySnapshots, getTrades, getTransfers, getWithdrawals } from "../clients/dolomite";
 
 const ZERO = new BigNumber('0');
 
@@ -8,6 +10,11 @@ export interface BalanceChangeEvent {
   timestamp: number;
   serialId: number;
   type: string;
+}
+
+export interface LiquiditySnapshot {
+  timestamp: number;
+  balance: number;
 }
 
 export class BalanceAndRewardPoints {
@@ -21,7 +28,7 @@ export class BalanceAndRewardPoints {
     this.lastUpdated = timestamp;
   }
 
-  processEvent(event): BigNumber{
+  processEvent(event): BigNumber {
       let rewardUpdate = new BigNumber(0);
       if(this.balance.gt(0)) {
         if (event.timestamp < this.lastUpdated) {
@@ -32,6 +39,21 @@ export class BalanceAndRewardPoints {
       }
       this.balance = this.balance.plus(event.amount);
       this.lastUpdated = event.timestamp;
+
+      return rewardUpdate;
+  }
+
+  processLiquiditySnapshot(liquiditySnapshot): BigNumber {
+      let rewardUpdate = new BigNumber(0);
+      if(this.balance.gt(0)) {
+        if (liquiditySnapshot.timestamp < this.lastUpdated) {
+          throw new Error('Incorrect Event Order');
+        }
+        rewardUpdate = this.balance.times(liquiditySnapshot.timestamp - this.lastUpdated);
+        this.rewardPoints = this.rewardPoints.plus(rewardUpdate);
+      }
+      this.balance = new BigNumber(liquiditySnapshot.balance);
+      this.lastUpdated = liquiditySnapshot.timestamp;
 
       return rewardUpdate;
   }
@@ -181,6 +203,22 @@ export function parseWithdrawals(accountToAssetToEventsMap, withdrawals) {
   });
 }
 
+export function parseAmmLiquidityPositions(ammLiquidityBalances, ammLiquidityPositions, blockRewardStartTimestamp) {
+  ammLiquidityPositions.forEach((ammLiquidityPosition) => {
+    ammLiquidityBalances[ammLiquidityPosition.effectiveUser] = new BalanceAndRewardPoints(blockRewardStartTimestamp, new BigNumber(ammLiquidityPosition.balance));
+  });
+}
+
+export function parseAmmLiquiditySnapshots(userToLiquiditySnapshots, ammLiquiditySnapshots) {
+  ammLiquiditySnapshots.forEach((snapshot) => {
+    const liquiditySnapshot: LiquiditySnapshot = {
+      timestamp: snapshot.timestamp,
+      balance: snapshot.liquidityTokenBalance
+    }
+    addLiquiditySnapshotToUser(userToLiquiditySnapshots, snapshot.effectiveUser, liquiditySnapshot);
+  });
+}
+
 function addEventToUser(accountToAssetToEventsMap, user, marketId, event) {
       accountToAssetToEventsMap[user] = accountToAssetToEventsMap[user] ?? {};
       if (accountToAssetToEventsMap[user][marketId]) {
@@ -188,4 +226,63 @@ function addEventToUser(accountToAssetToEventsMap, user, marketId, event) {
       } else {
         accountToAssetToEventsMap[user][marketId] = [event];
       }
+}
+
+function addLiquiditySnapshotToUser(userToLiquiditySnapshots, user, liquiditySnapshot) {
+  userToLiquiditySnapshots[user] = userToLiquiditySnapshots[user] ?? [];
+  userToLiquiditySnapshots[user].push(liquiditySnapshot);
+}
+
+export async function getBalanceChangingEvents(accountToAssetToEventsMap, blockRewardStart, blockRewardEnd) {
+  const deposits = await Pageable.getPageableValues((async (lastIndex) => {
+    const { deposits } = await getDeposits(blockRewardStart, blockRewardEnd, lastIndex);
+    return deposits;
+  }));
+  parseDeposits(accountToAssetToEventsMap, deposits);
+
+  const withdrawals = await Pageable.getPageableValues((async (lastIndex) => {
+    const { withdrawals } = await getWithdrawals(blockRewardStart, blockRewardEnd, lastIndex);
+    return withdrawals;
+  }));
+  parseWithdrawals(accountToAssetToEventsMap, withdrawals);
+
+  const transfers = await Pageable.getPageableValues((async (lastIndex) => {
+    const { transfers } = await getTransfers(blockRewardStart, blockRewardEnd, lastIndex);
+    return transfers;
+  }));
+  parseTransfers(accountToAssetToEventsMap, transfers);
+
+  const trades = await Pageable.getPageableValues((async (lastIndex) => {
+    const { trades } = await getTrades(blockRewardStart, blockRewardEnd, lastIndex);
+    return trades;
+  }));
+  parseTrades(accountToAssetToEventsMap, trades);
+
+  const liquidations = await Pageable.getPageableValues((async (lastIndex) => {
+    const { liquidations } = await getLiquidations(blockRewardStart, blockRewardEnd, lastIndex);
+    return liquidations;
+  }));
+  parseLiquidations(accountToAssetToEventsMap, liquidations);
+
+  return accountToAssetToEventsMap;
+}
+
+export async function getLiquidityPositionAndEvents(
+  ammLiquidityBalances,
+  userToLiquiditySnapshots,
+  blockRewardStart,
+  blockRewardEnd,
+  blockRewardStartTimestamp
+) {
+  const ammLiquidityPositions = await Pageable.getPageableValues((async (lastIndex) => {
+    const { ammLiquidityPositions } = await getLiquidityPositions(blockRewardStart, lastIndex);
+    return ammLiquidityPositions;
+  }));
+  parseAmmLiquidityPositions(ammLiquidityBalances, ammLiquidityPositions, blockRewardStartTimestamp);
+
+  const ammLiquiditySnapshots = await Pageable.getPageableValues((async (lastIndex) => {
+    const { snapshots } = await getLiquiditySnapshots(blockRewardStart, blockRewardEnd, lastIndex);
+    return snapshots;
+  }));
+  parseAmmLiquiditySnapshots(userToLiquiditySnapshots, ammLiquiditySnapshots);
 }

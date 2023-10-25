@@ -3,11 +3,12 @@ import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin'
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { ApiAccount, ApiBalance, ApiDeposit, ApiLiquidation, ApiMarket, ApiRiskParam, ApiTrade, ApiTransfer, ApiWithdrawal, MarketIndex } from '../lib/api-types';
+import { ApiAccount, ApiAmmLiquidityPosition, ApiAmmLiquiditySnapshot, ApiBalance, ApiDeposit, ApiLiquidation, ApiMarket, ApiRiskParam, ApiTrade, ApiTransfer, ApiWithdrawal, MarketIndex } from '../lib/api-types';
 import {
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
   GraphqlAmmLiquidityPosition,
+  GraphqlAmmLiquidityPositionsResult,
   GraphqlAmmPairData,
   GraphqlDepositsResult,
   GraphqlInterestRate,
@@ -370,6 +371,101 @@ export async function getLiquidations(
   });
 
   return { liquidations };
+}
+
+export async function getLiquidityPositions(
+  blockNumber: number,
+  lastId: number = 0,
+): Promise<{ ammLiquidityPositions: ApiAmmLiquidityPosition[] }> {
+  const query = `
+    query getLiquidityPositions($blockNumber: Int, $lastId: ID) {
+      ammLiquidityPositions(first: 1000, orderBy: id where: { id_gt: $lastId } block: { number: $blockNumber }) {
+        id
+        effectiveUser {
+          id
+        }
+        liquidityTokenBalance
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        blockNumber,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlAmmLiquidityPositionsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const ammLiquidityPositions: ApiAmmLiquidityPosition[] = result.data.ammLiquidityPositions.map(ammLiquidityPosition => {
+    return {
+      id: ammLiquidityPosition.id,
+      effectiveUser: ammLiquidityPosition.effectiveUser.id.toLowerCase(),
+      balance: ammLiquidityPosition.liquidityTokenBalance,
+    }
+  });
+
+  return { ammLiquidityPositions };
+}
+
+export async function getLiquiditySnapshots(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ snapshots: ApiAmmLiquiditySnapshot[] }> {
+  const query = `
+    query getAmmLiquidityPositionSnapshots($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      ammLiquidityPositionSnapshots(first: 10, orderBy: id where: { and: [{ block_gte:  $startBlock } { block_lt: $endBlock } { id_gt: $lastId }] }) {
+        id
+        effectiveUser {
+          id
+        }
+        liquidityTokenBalance
+        block
+        timestamp
+      }
+    }
+  `;
+
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlWithdrawalsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const snapshots: ApiAmmLiquiditySnapshot[] = result.data.ammLiquidityPositionSnapshots.map(snapshot => {
+    return {
+      id: snapshot.id,
+      effectiveUser: snapshot.effectiveUser.id,
+      block: snapshot.block,
+      timestamp: snapshot.timestamp,
+      liquidityTokenBalance: snapshot.liquidityTokenBalance
+    }
+  });
+
+  return { snapshots };
 }
 
 export async function getWithdrawals(

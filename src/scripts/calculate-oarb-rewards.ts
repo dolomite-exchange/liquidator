@@ -11,23 +11,29 @@ if (process.env.ENV_FILENAME) {
 }
 
 import v8 from 'v8';
-import { getAllDolomiteAccountsWithSupplyValue, getDeposits, getDolomiteRiskParams, getLiquidations, getTrades, getTransfers, getWithdrawals } from '../clients/dolomite';
+import { getAllDolomiteAccountsWithSupplyValue, getDeposits, getDolomiteRiskParams, getLiquidations, getLiquidityPositions, getLiquiditySnapshots, getTrades, getTransfers, getWithdrawals } from '../clients/dolomite';
 import { dolomite } from '../helpers/web3';
 /* eslint-disable */
 import Logger from '../lib/logger';
 import MarketStore from '../lib/market-store';
 import Pageable from '../lib/pageable';
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
-import { BalanceAndRewardPoints, BalanceChangeEvent, getAccountBalancesByMarket, parseDeposits, parseLiquidations, parseTrades, parseTransfers, parseWithdrawals } from '../lib/rewards';
+import { BalanceAndRewardPoints, BalanceChangeEvent, getAccountBalancesByMarket, getBalanceChangingEvents, getLiquidityPositionAndEvents, parseAmmLiquidityPositions, parseAmmLiquiditySnapshots, parseDeposits, parseLiquidations, parseTrades, parseTransfers, parseWithdrawals } from '../lib/rewards';
+import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
+import { MerkleTree } from 'merkletreejs';
 
 
 async function start() {
+
   const marketStore = new MarketStore();
 
   const blockRewardStart = 130000000;
   const blockRewardStartTimestamp = 1694407206;
   const blockRewardEnd = 141530000;
   const blockRewardEndTimestamp = 1697585246;
+
+  const OARB_REWARD_AMOUNT = new BigNumber(10000);
+  const LIQUIDITY_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f';
 
   const { riskParams } = await getDolomiteRiskParams(blockRewardStart);
   const networkId = await dolomite.web3.eth.net.getId();
@@ -68,39 +74,11 @@ async function start() {
   // Load and parse events
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(accounts, blockRewardStartTimestamp);
   const accountToAssetToEventsMap: Record<string, Record<number, BalanceChangeEvent[]>> = {};
-
-  const deposits = await Pageable.getPageableValues((async (lastIndex) => {
-    const { deposits } = await getDeposits(blockRewardStart, blockRewardEnd, lastIndex);
-    return deposits;
-  }));
-  parseDeposits(accountToAssetToEventsMap, deposits);
-
-  const withdrawals = await Pageable.getPageableValues((async (lastIndex) => {
-    const { withdrawals } = await getWithdrawals(blockRewardStart, blockRewardEnd, lastIndex);
-    return withdrawals;
-  }));
-  parseWithdrawals(accountToAssetToEventsMap, withdrawals);
-
-  const transfers = await Pageable.getPageableValues((async (lastIndex) => {
-    const { transfers } = await getTransfers(blockRewardStart, blockRewardEnd, lastIndex);
-    return transfers;
-  }));
-  parseTransfers(accountToAssetToEventsMap, transfers);
-
-  const trades = await Pageable.getPageableValues((async (lastIndex) => {
-    const { trades } = await getTrades(blockRewardStart, blockRewardEnd, lastIndex);
-    return trades;
-  }));
-  parseTrades(accountToAssetToEventsMap, trades);
-
-  const liquidations = await Pageable.getPageableValues((async (lastIndex) => {
-    const { liquidations } = await getLiquidations(blockRewardStart, blockRewardEnd, lastIndex);
-    return liquidations;
-  }));
-  parseLiquidations(accountToAssetToEventsMap, liquidations);
+  await getBalanceChangingEvents(accountToAssetToEventsMap, blockRewardStart, blockRewardEnd);
 
   // Sort list and loop through to get point total per user
   let totalPointsPerMarket = {};
+  let totalPoints = new BigNumber(0);
   for (const account in accountToAssetToEventsMap) {
     for (const market in accountToAssetToEventsMap[account]) {
 
@@ -119,7 +97,9 @@ async function start() {
       });
       const userBalStruct = accountToDolomiteBalanceMap[account][market];
       accountToAssetToEventsMap[account][market].forEach((event) => {
-        totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(userBalStruct.processEvent(event));
+        const rewardUpdate = userBalStruct.processEvent(event);
+        totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
+        totalPoints = totalPoints.plus(rewardUpdate);
       });
     }
   }
@@ -130,12 +110,73 @@ async function start() {
       totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? new BigNumber(0);
 
       const userBalStruct = accountToDolomiteBalanceMap[account][market];
-      totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(userBalStruct.processEvent({ amount: new BigNumber(0), timestamp: blockRewardEndTimestamp, serialId: 0}));
+      const rewardUpdate = userBalStruct.processEvent({ amount: new BigNumber(0), timestamp: blockRewardEndTimestamp, serialId: 0})
+      totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
+      totalPoints = totalPoints.plus(rewardUpdate);
     }
   }
 
-  console.log(accountToDolomiteBalanceMap);
-  console.log(totalPointsPerMarket);
+  // LIQUIDITY POOL
+  const ammLiquidityBalances = {};
+  const userToLiquiditySnapshots = {};
+  getLiquidityPositionAndEvents(ammLiquidityBalances, userToLiquiditySnapshots, blockRewardStart, blockRewardEnd, blockRewardStartTimestamp);
+
+  let totalLiquidityPoints = new BigNumber(0);
+  for (const account in userToLiquiditySnapshots) {
+      userToLiquiditySnapshots[account].sort((a,b) => {
+        return a.timestamp - b.timestamp;
+      });
+      ammLiquidityBalances[account] = ammLiquidityBalances[account] ?? new BalanceAndRewardPoints(blockRewardStartTimestamp, new BigNumber(0));
+
+      userToLiquiditySnapshots[account].forEach((liquiditySnapshot) => {
+        totalLiquidityPoints = totalLiquidityPoints.plus(ammLiquidityBalances[account].processLiquiditySnapshot(liquiditySnapshot));
+      });
+  }
+
+  for (const account in ammLiquidityBalances) {
+    const user = ammLiquidityBalances[account];
+    const rewardUpdate = user.balance.times(blockRewardEndTimestamp - user.lastUpdated);
+
+    totalLiquidityPoints = totalLiquidityPoints.plus(rewardUpdate);
+    user.rewardPoints = user.rewardPoints.plus(rewardUpdate);
+    user.lastUpdated = blockRewardEndTimestamp;
+  }
+
+  // Final calculations
+  const userToOarbRewards = {};
+  for (const account in accountToDolomiteBalanceMap) {
+    userToOarbRewards[account] = userToOarbRewards[account] ?? new BigNumber(0);
+    for (const market in accountToDolomiteBalanceMap[account]) {
+      const user = accountToDolomiteBalanceMap[account];
+      const oarbReward = OARB_REWARD_AMOUNT.times(user[market].rewardPoints).dividedBy(totalPoints);
+
+      userToOarbRewards[account] = userToOarbRewards[account].plus(oarbReward);
+    }
+  }
+
+  // Distribute liquidity pool rewards
+  for (const account in ammLiquidityBalances) {
+    userToOarbRewards[account] = userToOarbRewards[account] ?? new BigNumber(0);
+    const user = ammLiquidityBalances[account];
+    const rewardAmount = userToOarbRewards[LIQUIDITY_POOL].times(user.rewardPoints).dividedBy(totalLiquidityPoints);
+
+    userToOarbRewards[account] = userToOarbRewards[account].plus(rewardAmount);
+    userToOarbRewards[LIQUIDITY_POOL] = userToOarbRewards[LIQUIDITY_POOL].minus(rewardAmount);
+  }
+
+  // // @follow-up Why is this not zero
+  // console.log(userToOarbRewards[LIQUIDITY_POOL]);
+
+  // Create merkle root
+  const leaves: string[] = [];
+  for (const account in userToOarbRewards) {
+    leaves.push(keccak256(defaultAbiCoder.encode(['address', 'uint256'], [account, parseEther(userToOarbRewards[account].toFixed(18))])));
+  }
+
+  const tree = new MerkleTree(leaves, keccak256, { sort: true });
+  const root = tree.getHexRoot();
+  console.log(root);
+
   return true;
 }
 

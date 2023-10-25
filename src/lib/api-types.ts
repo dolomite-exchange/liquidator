@@ -29,6 +29,20 @@ export interface ApiDeposit {
   amountDeltaWei: Integer;
 }
 
+export interface ApiAmmLiquidityPosition {
+  id: string;
+  effectiveUser: string;
+  balance: number;
+}
+
+export interface ApiAmmLiquiditySnapshot {
+  id: string;
+  effectiveUser: string;
+  liquidityTokenBalance: string;
+  block: string;
+  timestamp: string;
+}
+
 export interface ApiLiquidation {
   id: string;
   serialId: number;
