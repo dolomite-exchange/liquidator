@@ -125,7 +125,9 @@ export function parseLiquidityMiningVestingPositions(accountToDolomiteBalanceMap
     if (accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID]) {
       accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID].balance = accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID].balance.plus(liquidityMiningVestingPosition.amount);
     }
-    accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID] = new BalanceAndRewardPoints(0, new BigNumber(liquidityMiningVestingPosition.amount));
+    else {
+      accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID] = new BalanceAndRewardPoints(0, new BigNumber(liquidityMiningVestingPosition.amount));
+    }
   });
 }
 

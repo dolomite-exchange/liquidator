@@ -1,5 +1,6 @@
 import { BigNumber } from "@dolomite-exchange/dolomite-margin";
-import { parseDeposits, parseLiquidations, parseTrades, parseTransfers, parseVestingPositionTransfers } from "../../src/lib/event-parser";
+import { parseDeposits, parseLiquidations, parseLiquidityMiningVestingPositions, parseTrades, parseTransfers, parseVestingPositionTransfers } from "../../src/lib/event-parser";
+import { BalanceAndRewardPoints } from "../../src/lib/rewards";
 
 const address1 = '0x44f6ccf0d09ef0d4991eb74d8c26d77a52a1ba9e';
 const address2 = '0x668035c440606da01e788991bfbba5c0d24133ab';
@@ -166,6 +167,27 @@ describe('event-parser', () => {
       expect(accountToAssetToEventsMap[address2]['2'][0].amount).toEqual("607");
     });
   })
+
+  describe('parseLiquidityMiningVestingPositions', () => {
+    it('should work normally', async () => {
+      const accountToDolomiteBalanceMap = {
+        '0x44f6ccf0d09ef0d4991eb74d8c26d77a52a1ba9e': {
+          '7': new BalanceAndRewardPoints(1694407206, new BigNumber('1000')) 
+        }
+      };
+
+      const liquidityMiningVestingPositions = [
+        {
+          id: '0x4d5d9d8a6c6f9e9b1f3f3f8a0b3a9d1d2a0f8a7d1b8a0a5b5a4c5a3b2a1a0a9a8-12',
+          effectiveUser: address1,
+          amount: 5
+        }
+      ]
+
+      parseLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, liquidityMiningVestingPositions);
+      expect(accountToDolomiteBalanceMap[address1][ARB_MARKET_ID].balance).toEqual(new BigNumber(1005));
+    });
+  });
 
   describe('parseVestingPositionTransfers', () => {
     it('should work normally', async () => {

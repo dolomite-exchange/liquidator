@@ -461,7 +461,7 @@ export async function getLiquidityMiningVestingPositions(
 ): Promise<{ liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] }> {
   const query = `
     query getLiquidityMiningVestingPositions($blockNumber: Int, $lastId: ID) {
-      ammLiquidityPositions(first: 1000, orderBy: id where: { id_gt: $lastId } block: { number: $blockNumber }) {
+      liquidityMiningVestingPositions(first: 1000, orderBy: id where: { id_gt: $lastId } block: { number: $blockNumber }) {
         id
         owner {
           id
@@ -488,7 +488,7 @@ export async function getLiquidityMiningVestingPositions(
     return Promise.reject(result.errors[0]);
   }
 
-  const liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] = result.data.ammLiquidityPositions.map(liquidityMiningVestingPosition => {
+  const liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] = result.data.liquidityMiningVestingPositions.map(liquidityMiningVestingPosition => {
     return {
       id: liquidityMiningVestingPosition.id,
       effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
