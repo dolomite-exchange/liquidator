@@ -3,7 +3,22 @@ import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin'
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { ApiAccount, ApiAmmLiquidityPosition, ApiAmmLiquiditySnapshot, ApiBalance, ApiDeposit, ApiLiquidation, ApiMarket, ApiRiskParam, ApiTrade, ApiTransfer, ApiWithdrawal, MarketIndex } from '../lib/api-types';
+import { 
+  ApiAccount,
+  ApiAmmLiquidityPosition,
+  ApiAmmLiquiditySnapshot,
+  ApiBalance,
+  ApiDeposit,
+  ApiLiquidation,
+  ApiLiquidityMiningVestingPosition,
+  ApiMarket,
+  ApiRiskParam,
+  ApiTrade,
+  ApiTransfer,
+  ApiVestingPositionTransfer,
+  ApiWithdrawal,
+  MarketIndex
+} from '../lib/api-types';
 import {
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
@@ -13,11 +28,13 @@ import {
   GraphqlDepositsResult,
   GraphqlInterestRate,
   GraphqlLiquidationsResult,
+  GraphqlLiquidityMiningVestingPositionsResult,
   GraphqlMarketResult,
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
   GraphqlTradesResult,
   GraphqlTransfersResult,
+  GraphqlVestingPositionTransfersResult,
   GraphqlWithdrawalsResult,
 } from '../lib/graphql-types';
 import Pageable from '../lib/pageable';
@@ -104,7 +121,7 @@ export async function getDeposits(
       transaction {
         timestamp
       }
-      amountDeltaWei
+      amountDeltaPar
       token {
         marketId
       }
@@ -140,7 +157,7 @@ export async function getDeposits(
       timestamp: deposit.transaction.timestamp,
       effectiveUser: deposit.effectiveUser.id.toLowerCase(),
       marketId: new BigNumber(deposit.token.marketId),
-      amountDeltaWei: new BigNumber(deposit.amountDeltaWei),
+      amountDeltaPar: new BigNumber(deposit.amountDeltaPar),
     }
   });
 
@@ -195,14 +212,14 @@ export async function getTrades(
         takerToken {
           marketId
         }
-        takerTokenDeltaWei
+        takerInputTokenDeltaPar
+        takerOutputTokenDeltaPar
         makerEffectiveUser {
           id
         }
         makerToken {
           marketId
         }
-        makerTokenDeltaWei
       }
     }
   `;
@@ -232,10 +249,10 @@ export async function getTrades(
       timestamp: trade.transaction.timestamp,
       takerEffectiveUser: trade.takerEffectiveUser.id.toLowerCase(),
       takerMarketId: trade.takerToken.marketId,
-      takerAmountDeltaWei: trade.takerTokenDeltaWei,
+      takerInputTokenDeltaPar: trade.takerInputTokenDeltaPar,
+      takerOutputTokenDeltaPar: trade.takerOutputTokenDeltaPar,
       makerEffectiveUser: trade.makerEffectiveUser ? trade.makerEffectiveUser.id.toLowerCase() : null,
       makerMarketId: trade.makerToken.marketId,
-      makerAmountDeltaWei: trade.makerTokenDeltaWei,
     }
   });
 
@@ -255,7 +272,8 @@ export async function getTransfers(
         transaction {
           timestamp
         }
-        amountDeltaWei
+        fromAmountDeltaPar
+        toAmountDeltaPar
         fromEffectiveUser {
           id
         }
@@ -295,7 +313,8 @@ export async function getTransfers(
       fromEffectiveUser: transfer.fromEffectiveUser.id.toLowerCase(),
       toEffectiveUser: transfer.toEffectiveUser.id.toLowerCase(),
       marketId: new BigNumber(transfer.token.marketId),
-      amountDeltaWei: new BigNumber(transfer.amountDeltaWei),
+      fromAmountDeltaPar: new BigNumber(transfer.fromAmountDeltaPar),
+      toAmountDeltaPar: new BigNumber(transfer.toAmountDeltaPar),
     }
   });
 
@@ -330,6 +349,10 @@ export async function getLiquidations(
           marketId
         }
         borrowedTokenAmountDeltaWei
+        solidHeldTokenAmountDeltaPar
+        liquidHeldTokenAmountDeltaPar
+        solidBorrowedTokenAmountDeltaPar
+        liquidBorrowedTokenAmountDeltaPar
       }
     }
   `;
@@ -363,14 +386,117 @@ export async function getLiquidations(
       solidEffectiveUser: liquidation.solidEffectiveUser.id.toLowerCase(),
       liquidEffectiveUser: liquidation.liquidEffectiveUser.id.toLowerCase(),
       heldToken: liquidation.heldToken.marketId,
-      heldTokenAmountDeltaWei: liquidation.heldTokenAmountDeltaWei,
-      heldTokenLiquidationRewardWei: liquidation.heldTokenLiquidationRewardWei,
       borrowedToken: liquidation.borrowedToken.marketId,
-      borrowedTokenAmountDeltaWei: liquidation.borrowedTokenAmountDeltaWei
+      solidHeldTokenAmountDeltaPar: liquidation.solidHeldTokenAmountDeltaPar,
+      liquidHeldTokenAmountDeltaPar: liquidation.liquidHeldTokenAmountDeltaPar,
+      solidBorrowedTokenAmountDeltaPar: liquidation.solidBorrowedTokenAmountDeltaPar,
+      liquidBorrowedTokenAmountDeltaPar: liquidation.liquidBorrowedTokenAmountDeltaPar,
     }
   });
 
   return { liquidations };
+}
+
+export async function getVestingPositionTransfers(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ vestingPositionTransfers: ApiVestingPositionTransfer[] }> {
+  const query = `
+    query getLiquidityMiningVestingPositionTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      vestingPositionTransfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        fromUser {
+          id
+        }
+        toUser {
+          id
+        }
+        vestingPosition {
+          arbAmountPar
+        }
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlVestingPositionTransfersResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const vestingPositionTransfers: ApiVestingPositionTransfer[] = result.data.vestingPositionTransfers.map(vestingPositionTransfer => {
+    return {
+      id: vestingPositionTransfer.id,
+      serialId: vestingPositionTransfer.serialId,
+      timestamp: vestingPositionTransfer.transaction.timestamp,
+      fromEffectiveUser: vestingPositionTransfer.fromUser.id.toLowerCase(),
+      toEffectiveUser: vestingPositionTransfer.toUser.id.toLowerCase(),
+      amount: vestingPositionTransfer.arbAmountPar,
+    }
+  });
+
+  return { vestingPositionTransfers };
+}
+
+export async function getLiquidityMiningVestingPositions(
+  blockNumber: number,
+  lastId: number = 0,
+): Promise<{ liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] }> {
+  const query = `
+    query getLiquidityMiningVestingPositions($blockNumber: Int, $lastId: ID) {
+      ammLiquidityPositions(first: 1000, orderBy: id where: { id_gt: $lastId } block: { number: $blockNumber }) {
+        id
+        owner {
+          id
+        }
+        arbAmountPar
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        blockNumber,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidityMiningVestingPositionsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] = result.data.ammLiquidityPositions.map(liquidityMiningVestingPosition => {
+    return {
+      id: liquidityMiningVestingPosition.id,
+      effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
+      amount: liquidityMiningVestingPosition.arbAmountPar,
+    }
+  });
+
+  return { liquidityMiningVestingPositions };
 }
 
 export async function getLiquidityPositions(
@@ -481,7 +607,7 @@ export async function getWithdrawals(
         transaction {
           timestamp
         }
-        amountDeltaWei
+        amountDeltaPar
         token {
           marketId
         }
@@ -517,7 +643,7 @@ export async function getWithdrawals(
       timestamp: withdrawal.transaction.timestamp,
       effectiveUser: withdrawal.effectiveUser.id.toLowerCase(),
       marketId: new BigNumber(withdrawal.token.marketId),
-      amountDeltaWei: new BigNumber(withdrawal.amountDeltaWei),
+      amountDeltaPar: new BigNumber(withdrawal.amountDeltaPar),
     }
   });
 

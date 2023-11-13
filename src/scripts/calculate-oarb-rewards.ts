@@ -18,7 +18,7 @@ import Logger from '../lib/logger';
 import MarketStore from '../lib/market-store';
 import Pageable from '../lib/pageable';
 import { calculateFinalRewards, calculateLiquidityPoints, calculateRewardPoints } from '../lib/rewards';
-import { BalanceChangeEvent, getAccountBalancesByMarket, getBalanceChangingEvents, getLiquidityPositionAndEvents } from '../lib/event-parser';
+import { addLiquidityMiningVestingPositions, getAccountBalancesByMarket, getBalanceChangingEvents, getLiquidityPositionAndEvents } from '../lib/event-parser';
 import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
 
@@ -62,25 +62,21 @@ async function start() {
   const marketMap = marketStore.getMarketMap();
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
-  // Get accounts with supply value
   const accounts = await Pageable.getPageableValues(async (lastIndex) => {
     const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockRewardStart, lastIndex);
     return accounts;
   });
 
-  // Load and parse events
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(accounts, blockRewardStartTimestamp);
+  await addLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, blockRewardStart);
+
   const accountToAssetToEventsMap = await getBalanceChangingEvents(blockRewardStart, blockRewardEnd);
 
-  // Sort list and loop through to get point total per user
   const totalPointsPerMarket = calculateRewardPoints(accountToDolomiteBalanceMap, accountToAssetToEventsMap, blockRewardStartTimestamp, blockRewardEndTimestamp);
 
-  // LIQUIDITY POOL
   const { ammLiquidityBalances, userToLiquiditySnapshots } = await getLiquidityPositionAndEvents(blockRewardStart, blockRewardEnd, blockRewardStartTimestamp);
-
   const totalLiquidityPoints = calculateLiquidityPoints(ammLiquidityBalances, userToLiquiditySnapshots, blockRewardStartTimestamp, blockRewardEndTimestamp);
 
-  // Final calculations
   const userToOarbRewards = calculateFinalRewards(accountToDolomiteBalanceMap, ammLiquidityBalances, totalPointsPerMarket, totalLiquidityPoints);
 
   const leaves: string[] = [];

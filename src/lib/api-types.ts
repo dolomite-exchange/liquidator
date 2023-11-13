@@ -26,7 +26,7 @@ export interface ApiDeposit {
   timestamp: number;
   effectiveUser: string;
   marketId: number;
-  amountDeltaWei: Integer;
+  amountDeltaPar: Integer;
 }
 
 export interface ApiAmmLiquidityPosition {
@@ -50,10 +50,11 @@ export interface ApiLiquidation {
   solidEffectiveUser: string;
   liquidEffectiveUser: string;
   heldToken: number;
-  heldTokenAmountDeltaWei: Integer;
-  heldTokenLiquidationRewardWei: Integer;
   borrowedToken: number;
-  borrowedTokenAmountDeltaWei: Integer;
+  solidHeldTokenAmountDeltaPar: Integer;
+  liquidHeldTokenAmountDeltaPar: Integer;
+  solidBorrowedTokenAmountDeltaPar: Integer;
+  liquidBorrowedTokenAmountDeltaPar: Integer;
 }
 
 export interface ApiMarket {
@@ -80,7 +81,8 @@ export interface ApiTransfer {
   fromEffectiveUser: string;
   toEffectiveUser: string;
   marketId: number;
-  amountDeltaWei: Integer;
+  fromAmountDeltaPar: Integer;
+  toAmountDeltaPar: Integer;
 }
 
 export interface ApiTrade {
@@ -90,9 +92,26 @@ export interface ApiTrade {
   takerEffectiveUser: string;
   takerMarketId: number;
   takerTokenDeltaWei: Integer;
+  takerInputTokenDeltaPar: Integer;
+  takerOutputTokenDeltaPar: Integer;
   makerEffectiveUser: string;
   makerMarketId: number;
   makerTokenDeltaWei: Integer;
+}
+
+export interface ApiVestingPositionTransfer {
+  id: string;
+  serialId: number;
+  timestamp: number;
+  fromEffectiveUser: string;
+  toEffectiveUser: string;
+  amount: Integer;
+}
+
+export interface ApiLiquidityMiningVestingPosition {
+  id: string;
+  effectiveUser: string;
+  amount: string;
 }
 
 export interface ApiWithdrawal {
@@ -101,7 +120,7 @@ export interface ApiWithdrawal {
   timestamp: number;
   effectiveUser: string;
   marketId: number;
-  amountDeltaWei: Integer;
+  amountDeltaPar: Integer;
 }
 
 export interface MarketIndex {

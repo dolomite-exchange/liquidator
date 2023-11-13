@@ -35,7 +35,7 @@ export interface GraphqlDeposit {
   transaction: {
     timestamp: string
   }
-  amountDeltaWei: string
+  amountDeltaPar: string
   effectiveUser: {
     id: string
   }
@@ -101,29 +101,15 @@ export interface GraphqlLiquidation {
     marketId: string
   }
   borrowedTokenAmountDeltaWei
+  solidHeldTokenAmountDeltaPar: string
+  liquidHeldTokenAmountDeltaPar: string
+  solidBorrowedTokenAmountDeltaPar: string
+  liquidBorrowedTokenAmountDeltaPar: string
 }
 
 export interface GraphqlLiquidationsResult {
   data: {
     liquidations: GraphqlLiquidation[]
-  }
-}
-
-export interface GraphqlTransfer {
-  id: string
-  serialId: string
-  transaction: {
-    timestamp: string
-  }
-  amountDeltaWei: string
-  fromEffectiveUser: {
-    id: string
-  }
-  toEffectiveUser: {
-    id: string
-  }
-  token: {
-    marketId: string
   }
 }
 
@@ -140,6 +126,8 @@ export interface GraphqlTrade {
     marketId: string
   }
   takerTokenDeltaWei: string;
+  takerInputTokenDeltaPar: string;
+  takerOutputTokenDeltaPar: string;
   makerEffectiveUser: {
     id: string
   }
@@ -155,9 +143,42 @@ export interface GraphqlTradesResult {
   }
 }
 
+export interface GraphqlTransfer {
+  id: string
+  serialId: string
+  transaction: {
+    timestamp: string
+  }
+  fromAmountDeltaPar: string
+  toAmountDeltaPar: string
+  fromEffectiveUser: {
+    id: string
+  }
+  toEffectiveUser: {
+    id: string
+  }
+  token: {
+    marketId: string
+  }
+}
+
 export interface GraphqlTransfersResult {
   data: {
     transfers: GraphqlTransfer[]
+  }
+}
+
+export interface GraphqlLiquidityMiningVestingPosition {
+  id: string
+  owner: {
+    id: string
+  }
+  oARBAmount: string
+}
+
+export interface GraphqlLiquidityMiningVestingPositionsResult {
+  data: {
+    liquidityMiningVestingPositions: GraphqlLiquidityMiningVestingPosition[]
   }
 }
 
@@ -167,7 +188,7 @@ export interface GraphqlWithdrawal {
   transaction: {
     timestamp: string
   }
-  amountDeltaWei: string
+  amountDeltaPar: string
   effectiveUser: {
     id: string
   }
@@ -244,4 +265,27 @@ type GraphqlAmmDataForUserResultSubResult = GraphqlAmmPairData | GraphqlInterest
 
 export interface GraphqlAmmDataForUserResult {
   data: Record<string, GraphqlAmmDataForUserResultSubResult[]>
+}
+
+export interface GraphqlVestingPositionTransfer {
+  id: string
+  serialId: string
+  transaction: {
+    timestamp: string
+  }
+  fromUser: {
+    id: string
+  }
+  toUser: {
+    id: string
+  }
+  vestingPosition: {
+    arbAmountPar: string
+  }
+}
+
+export interface GraphqlVestingPositionTransfersResult {
+  data: {
+    vestingPositionTransfers: GraphqlVestingPositionTransfer[]
+  }
 }

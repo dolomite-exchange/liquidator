@@ -1,10 +1,11 @@
 import { BigNumber } from "@dolomite-exchange/dolomite-margin";
-import { getDeposits, getLiquidations, getLiquidityPositions, getLiquiditySnapshots, getTrades, getTransfers, getWithdrawals } from "../clients/dolomite";
+import { getDeposits, getLiquidations, getLiquidityMiningVestingPositions, getLiquidityPositions, getLiquiditySnapshots, getTrades, getTransfers, getVestingPositionTransfers, getWithdrawals } from "../clients/dolomite";
 import Pageable from "./pageable";
 import { BalanceAndRewardPoints, LiquiditySnapshot } from "./rewards";
 import { ApiAccount } from "./api-types";
 
 const ZERO = new BigNumber('0');
+const ARB_MARKET_ID = '7';
 
 export interface BalanceChangeEvent {
   amount: BigNumber;
@@ -30,6 +31,15 @@ export function getAccountBalancesByMarket(accounts: ApiAccount[], blockRewardSt
       });
   }
   return accountToDolomiteBalanceMap;
+}
+
+export async function addLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, blockRewardStart: number) {
+  const liquidityMiningVestingPositions = await Pageable.getPageableValues((async (lastIndex) => {
+    const { liquidityMiningVestingPositions } = await getLiquidityMiningVestingPositions(blockRewardStart, lastIndex);
+    return liquidityMiningVestingPositions;
+  }));
+
+  parseLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, liquidityMiningVestingPositions);
 }
 
 export async function getBalanceChangingEvents(blockRewardStart, blockRewardEnd) {
@@ -58,6 +68,12 @@ export async function getBalanceChangingEvents(blockRewardStart, blockRewardEnd)
     return trades;
   }));
   parseTrades(accountToAssetToEventsMap, trades);
+
+  const vestingPositionTransfers = await Pageable.getPageableValues((async (lastIndex) => {
+    const { vestingPositionTransfers } = await getVestingPositionTransfers(blockRewardStart, blockRewardEnd, lastIndex);
+    return vestingPositionTransfers;
+  }));
+  parseVestingPositionTransfers(accountToAssetToEventsMap, vestingPositionTransfers);
 
   const liquidations = await Pageable.getPageableValues((async (lastIndex) => {
     const { liquidations } = await getLiquidations(blockRewardStart, blockRewardEnd, lastIndex);
@@ -93,7 +109,7 @@ export async function getLiquidityPositionAndEvents(
 export function parseDeposits(accountToAssetToEventsMap, deposits) {
   deposits.forEach((deposit) => {
     const event: BalanceChangeEvent = {
-      amount: deposit.amountDeltaWei,
+      amount: deposit.amountDeltaPar,
       timestamp: deposit.timestamp,
       serialId: deposit.serialId,
       type: 'deposit'
@@ -102,10 +118,21 @@ export function parseDeposits(accountToAssetToEventsMap, deposits) {
   })
 }
 
+export function parseLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, liquidityMiningVestingPositions) {
+  liquidityMiningVestingPositions.forEach((liquidityMiningVestingPosition) => {
+    accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser] = accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser] ?? {};
+
+    if (accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID]) {
+      accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID].balance = accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID].balance.plus(liquidityMiningVestingPosition.amount);
+    }
+    accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser][ARB_MARKET_ID] = new BalanceAndRewardPoints(0, new BigNumber(liquidityMiningVestingPosition.amount));
+  });
+}
+
 export function parseWithdrawals(accountToAssetToEventsMap, withdrawals) {
   withdrawals.forEach((withdrawal) => {
     const event: BalanceChangeEvent = {
-      amount: ZERO.minus(withdrawal.amountDeltaWei),
+      amount: withdrawal.amountDeltaPar,
       timestamp: withdrawal.timestamp,
       serialId: withdrawal.serialId,
       type: 'withdrawal'
@@ -120,7 +147,7 @@ export function parseTransfers(accountToAssetToEventsMap, transfers) {
       return;
     }
     const fromEvent: BalanceChangeEvent = {
-      amount: ZERO.minus(transfer.amountDeltaWei),
+      amount: transfer.fromAmountDeltaPar,
       timestamp: transfer.timestamp,
       serialId: transfer.serialId,
       type: 'transfer'
@@ -128,7 +155,7 @@ export function parseTransfers(accountToAssetToEventsMap, transfers) {
     addEventToUser(accountToAssetToEventsMap, transfer.fromEffectiveUser, transfer.marketId, fromEvent);
 
     const toEvent: BalanceChangeEvent = {
-      amount: transfer.amountDeltaWei,
+      amount: transfer.toAmountDeltaPar,
       timestamp: transfer.timestamp,
       serialId: transfer.serialId,
       type: 'transfer'
@@ -143,14 +170,14 @@ export function parseTrades(accountToAssetToEventsMap, trades) {
 
     // Taker events
     const takerEventMinus: BalanceChangeEvent = {
-        amount: ZERO.minus(trade.takerAmountDeltaWei),
+        amount: trade.takerInputTokenDeltaPar,
         timestamp: trade.timestamp,
         serialId: trade.serialId,
         type: 'trade'
     };
     addEventToUser(accountToAssetToEventsMap, trade.takerEffectiveUser, trade.takerMarketId, takerEventMinus);
     const takerEventPlus: BalanceChangeEvent = {
-        amount: trade.makerAmountDeltaWei,
+        amount: trade.takerOutputTokenDeltaPar,
         timestamp: trade.timestamp,
         serialId: trade.serialId,
         type: 'trade'
@@ -162,7 +189,7 @@ export function parseTrades(accountToAssetToEventsMap, trades) {
       return;
     }
     const makerEventMinus: BalanceChangeEvent = {
-        amount: ZERO.minus(trade.makerAmountDeltaWei),
+        amount: ZERO.minus(trade.takerOutputTokenDeltaPar),
         timestamp: trade.timestamp,
         serialId: trade.serialId,
         type: 'trade'
@@ -170,7 +197,7 @@ export function parseTrades(accountToAssetToEventsMap, trades) {
 
     addEventToUser(accountToAssetToEventsMap, trade.makerEffectiveUser, trade.makerMarketId, makerEventMinus);
     const makerEventPlus: BalanceChangeEvent = {
-        amount: trade.takerAmountDeltaWei,
+        amount: ZERO.minus(trade.takerInputTokenDeltaPar),
         timestamp: trade.timestamp,
         serialId: trade.serialId,
         type: 'trade'
@@ -182,7 +209,7 @@ export function parseTrades(accountToAssetToEventsMap, trades) {
 export function parseLiquidations(accountToAssetToEventsMap, liquidations) {
   liquidations.forEach((liquidation) => {
     const liquidUserCollateralEvent: BalanceChangeEvent = {
-      amount: ZERO.minus(liquidation.heldTokenAmountDeltaWei),
+      amount: liquidation.liquidHeldTokenAmountDeltaPar,
       timestamp: liquidation.timestamp,
       serialId: liquidation.serialId,
       type: 'liquidation'
@@ -190,7 +217,7 @@ export function parseLiquidations(accountToAssetToEventsMap, liquidations) {
     addEventToUser(accountToAssetToEventsMap, liquidation.liquidEffectiveUser, liquidation.heldToken, liquidUserCollateralEvent);
 
     const liquidUserDebtEvent: BalanceChangeEvent = {
-      amount: liquidation.borrowedTokenAmountDeltaWei,
+      amount: liquidation.liquidBorrowedTokenAmountDeltaPar,
       timestamp: liquidation.timestamp,
       serialId: liquidation.serialId,
       type: 'liquidation'
@@ -198,7 +225,7 @@ export function parseLiquidations(accountToAssetToEventsMap, liquidations) {
     addEventToUser(accountToAssetToEventsMap, liquidation.liquidEffectiveUser, liquidation.borrowedToken, liquidUserDebtEvent);
 
     const solidUserCollateralEvent: BalanceChangeEvent = {
-      amount: liquidation.heldTokenLiquidationRewardWei,
+      amount: liquidation.solidHeldTokenAmountDeltaPar,
       timestamp: liquidation.timestamp,
       serialId: liquidation.serialId,
       type: 'liquidation'
@@ -206,12 +233,34 @@ export function parseLiquidations(accountToAssetToEventsMap, liquidations) {
     addEventToUser(accountToAssetToEventsMap, liquidation.solidEffectiveUser, liquidation.heldToken, solidUserCollateralEvent);
 
     const solidUserDebtEvent: BalanceChangeEvent = {
-      amount: ZERO.minus(liquidation.borrowedTokenAmountDeltaWei),
+      amount: liquidation.solidBorrowedTokenAmountDeltaPar,
       timestamp: liquidation.timestamp,
       serialId: liquidation.serialId,
       type: 'liquidation'
     }
     addEventToUser(accountToAssetToEventsMap, liquidation.solidEffectiveUser, liquidation.borrowedToken, solidUserDebtEvent);
+  });
+}
+
+export function parseVestingPositionTransfers(accountToAssetToEventsMap, vestingPositionTransfers) {
+  vestingPositionTransfers.forEach((vestingPositionTransfer) => {
+    if (vestingPositionTransfer.fromEffectiveUser == vestingPositionTransfer.toEffectiveUser) {
+      return;
+    }
+    const fromEvent: BalanceChangeEvent = {
+      amount: ZERO.minus(vestingPositionTransfer.amount),
+      serialId: vestingPositionTransfer.serialId,
+      timestamp: vestingPositionTransfer.timestamp,
+      type: 'vesting_position_transfer'
+    };
+    const toEvent: BalanceChangeEvent = {
+      amount: vestingPositionTransfer.amount,
+      serialId: vestingPositionTransfer.serialId,
+      timestamp: vestingPositionTransfer.timestamp,
+      type: 'vesting_position_transfer'
+    };
+    addEventToUser(accountToAssetToEventsMap, vestingPositionTransfer.fromEffectiveUser, ARB_MARKET_ID, fromEvent);
+    addEventToUser(accountToAssetToEventsMap, vestingPositionTransfer.toEffectiveUser, ARB_MARKET_ID, toEvent);
   });
 }
 

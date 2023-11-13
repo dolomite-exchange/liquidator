@@ -1,6 +1,7 @@
 import { BigNumber } from "@dolomite-exchange/dolomite-margin";
 import { BalanceAndRewardPoints, calculateFinalRewards, calculateLiquidityPoints, calculateRewardPoints } from "../../src/lib/rewards";
-import { parseEther } from "ethers/lib/utils";
+import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
+import { MerkleTree } from 'merkletreejs';
 
 const DEPOSIT_EVENT = {
   amount: new BigNumber(20),
@@ -199,6 +200,17 @@ describe('rewards', () => {
       totalOarbRewards = totalOarbRewards.plus(userToOarbRewards[account].toFixed(18));
     }
     expect(totalOarbRewards).toEqual(new BigNumber("20000"));
+
+    const leaves: string[] = [];
+    for (const account in userToOarbRewards) {
+      leaves.push(keccak256(defaultAbiCoder.encode(['address', 'uint256'], [account, parseEther(userToOarbRewards[account].toFixed(18))])));
+    }
+
+    const tree = new MerkleTree(leaves, keccak256, { sort: true });
+    const root = tree.getHexRoot();
+    console.log(root);
+    console.log(tree.getHexProof(leaves[0]));
+    console.log(tree.getHexProof(leaves[1]));
   });
 });
 
