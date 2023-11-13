@@ -1,8 +1,9 @@
 import { BigNumber } from "@dolomite-exchange/dolomite-margin";
-import { parseDeposits, parseLiquidations, parseTrades, parseTransfers } from "../../src/lib/event-parser";
+import { parseDeposits, parseLiquidations, parseTrades, parseTransfers, parseVestingPositionTransfers } from "../../src/lib/event-parser";
 
 const address1 = '0x44f6ccf0d09ef0d4991eb74d8c26d77a52a1ba9e';
 const address2 = '0x668035c440606da01e788991bfbba5c0d24133ab';
+const ARB_MARKET_ID = '7';
 
 describe('event-parser', () => {
   describe('parseDeposit', () => {
@@ -165,4 +166,25 @@ describe('event-parser', () => {
       expect(accountToAssetToEventsMap[address2]['2'][0].amount).toEqual("607");
     });
   })
-});
+
+  describe('parseVestingPositionTransfers', () => {
+    it('should work normally', async () => {
+      const accountToAssetToEventsMap = {};
+      const vestingPositionTransfers = [
+        {
+          id: '0x4d5d9d8a6c6f9e9b1f3f3f8a0b3a9d1d2a0f8a7d1b8a0a5b5a4c5a3b2a1a0a9a8-12',
+          serialId: '95109',
+          timestamp: '1696057612',
+          fromEffectiveUser: address1,
+          toEffectiveUser: address2,
+          amount: 5
+        },
+      ];
+      parseVestingPositionTransfers(accountToAssetToEventsMap, vestingPositionTransfers);
+      expect(accountToAssetToEventsMap[address1][ARB_MARKET_ID].length).toEqual(1);
+      expect(accountToAssetToEventsMap[address1][ARB_MARKET_ID][0].amount).toEqual(new BigNumber(-5));
+      expect(accountToAssetToEventsMap[address2][ARB_MARKET_ID].length).toEqual(1);
+      expect(accountToAssetToEventsMap[address2][ARB_MARKET_ID][0].amount).toEqual(5);
+    });
+  });
+})
