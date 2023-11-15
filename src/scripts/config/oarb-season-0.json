@@ -1,0 +1,18 @@
+{
+  "epochs": {
+    "0": {
+      "epoch": 0,
+      "startTimestamp": 1699488000,
+      "endTimestamp": 1700092800,
+      "oArbAmount": 90000,
+      "weights": {
+        "USDC": 36000,
+        "WETH": 22500,
+        "WBTC": 22500,
+        "ARB": 6300,
+        "LINK": 2700
+      }
+    }
+  },
+  "seasonEndTimestamp": 1708041600
+}
