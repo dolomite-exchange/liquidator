@@ -2,15 +2,19 @@ export default class Pageable {
   public static MAX_PAGE_SIZE = 1000
 
   public static async getPageableValues<T>(
-    getterFn: (pageIndex: number) => Promise<T[]>,
+    getterFn: (lastIndex: number) => Promise<T[]>,
   ): Promise<T[]> {
     let results: T[] = []
     let queryResults: T[] = []
-    let pageIndex: number = 0;
+    let lastIndex: number = 0;
     do {
-      queryResults = await getterFn(pageIndex)
+      queryResults = await getterFn(lastIndex)
 
-      pageIndex += 1;
+      if (queryResults.length == 0) {
+        break;
+      }
+
+      lastIndex = queryResults[queryResults.length - 1]['id'];
       results = results.concat(queryResults);
 
       if (queryResults.length < Pageable.MAX_PAGE_SIZE) {

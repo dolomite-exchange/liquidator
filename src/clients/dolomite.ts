@@ -3,16 +3,39 @@ import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin'
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam, MarketIndex } from '../lib/api-types';
+import { 
+  ApiAccount,
+  ApiAmmLiquidityPosition,
+  ApiAmmLiquiditySnapshot,
+  ApiBalance,
+  ApiDeposit,
+  ApiLiquidation,
+  ApiLiquidityMiningVestingPosition,
+  ApiMarket,
+  ApiRiskParam,
+  ApiTrade,
+  ApiTransfer,
+  ApiVestingPositionTransfer,
+  ApiWithdrawal,
+  MarketIndex
+} from '../lib/api-types';
 import {
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
   GraphqlAmmLiquidityPosition,
+  GraphqlAmmLiquidityPositionsResult,
   GraphqlAmmPairData,
+  GraphqlDepositsResult,
   GraphqlInterestRate,
+  GraphqlLiquidationsResult,
+  GraphqlLiquidityMiningVestingPositionsResult,
   GraphqlMarketResult,
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
+  GraphqlTradesResult,
+  GraphqlTransfersResult,
+  GraphqlVestingPositionTransfersResult,
+  GraphqlWithdrawalsResult,
 } from '../lib/graphql-types';
 import Pageable from '../lib/pageable';
 
@@ -32,7 +55,7 @@ async function getAccounts(
   marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } },
   query: string,
   blockNumber: number,
-  pageIndex: number = 0,
+  lastId: number = 0,
 ): Promise<{ accounts: ApiAccount[] }> {
   const decimalBase = new BigNumber('1000000000000000000');
   const accounts: ApiAccount[] = await axios.post(
@@ -41,7 +64,7 @@ async function getAccounts(
       query,
       variables: {
         blockNumber,
-        skip: Pageable.MAX_PAGE_SIZE * pageIndex,
+        lastId,
       },
     },
     defaultAxiosConfig,
@@ -76,7 +99,7 @@ async function getAccounts(
       }, {});
       return {
         id: `${account.user.id}-${account.accountNumber}`,
-        owner: account.user.id,
+        owner: account.user.effectiveUser.id.toLowerCase(),
         number: new BigNumber(account.accountNumber),
         balances,
       };
@@ -84,6 +107,62 @@ async function getAccounts(
 
   return { accounts };
 }
+
+export async function getDeposits(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ deposits: ApiDeposit[] }> {
+  const query = `
+  query getDeposits($startBlock: BigInt, $endBlock: Int, $lastId: ID) {
+    deposits(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+      id
+      serialId
+      transaction {
+        timestamp
+      }
+      amountDeltaPar
+      token {
+        marketId
+      }
+      effectiveUser {
+        id
+      }
+    }
+  }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlDepositsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const deposits: ApiDeposit[] = result.data.deposits.map(deposit => {
+    return {
+      id: deposit.id,
+      serialId: deposit.serialId,
+      timestamp: deposit.transaction.timestamp,
+      effectiveUser: deposit.effectiveUser.id.toLowerCase(),
+      marketId: new BigNumber(deposit.token.marketId),
+      amountDeltaPar: new BigNumber(deposit.amountDeltaPar),
+    }
+  });
+
+  return { deposits };
+} 
 
 export async function getLiquidatableDolomiteAccounts(
   marketIndexMap: { [marketId: string]: MarketIndex },
@@ -114,17 +193,478 @@ export async function getLiquidatableDolomiteAccounts(
   return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
 }
 
+export async function getLiquidations(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ liquidations: ApiLiquidation[] }> {
+  const query = `
+    query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      liquidations(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        solidEffectiveUser {
+          id
+        }
+        liquidEffectiveUser {
+          id
+        }
+        heldToken {
+          marketId
+        }
+        heldTokenAmountDeltaWei
+        heldTokenLiquidationRewardWei
+        borrowedToken {
+          marketId
+        }
+        borrowedTokenAmountDeltaWei
+        solidHeldTokenAmountDeltaPar
+        liquidHeldTokenAmountDeltaPar
+        solidBorrowedTokenAmountDeltaPar
+        liquidBorrowedTokenAmountDeltaPar
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidationsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  if (result.data.liquidations.length == 0) {
+    return { liquidations: [] };
+  }
+  const liquidations: ApiLiquidation[] = result.data.liquidations.map(liquidation => {
+    return {
+      id: liquidation.id,
+      serialId: liquidation.serialId,
+      timestamp: liquidation.transaction.timestamp,
+      solidEffectiveUser: liquidation.solidEffectiveUser.id.toLowerCase(),
+      liquidEffectiveUser: liquidation.liquidEffectiveUser.id.toLowerCase(),
+      heldToken: liquidation.heldToken.marketId,
+      borrowedToken: liquidation.borrowedToken.marketId,
+      solidHeldTokenAmountDeltaPar: liquidation.solidHeldTokenAmountDeltaPar,
+      liquidHeldTokenAmountDeltaPar: liquidation.liquidHeldTokenAmountDeltaPar,
+      solidBorrowedTokenAmountDeltaPar: liquidation.solidBorrowedTokenAmountDeltaPar,
+      liquidBorrowedTokenAmountDeltaPar: liquidation.liquidBorrowedTokenAmountDeltaPar,
+    }
+  });
+
+  return { liquidations };
+}
+
+export async function getLiquidityMiningVestingPositions(
+  blockNumber: number,
+  lastId: number = 0,
+): Promise<{ liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] }> {
+  const query = `
+    query getLiquidityMiningVestingPositions($blockNumber: Int, $lastId: ID) {
+      liquidityMiningVestingPositions(first: 1000, orderBy: id where: { id_gt: $lastId } block: { number: $blockNumber }) {
+        id
+        owner {
+          id
+        }
+        arbAmountPar
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        blockNumber,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidityMiningVestingPositionsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] = result.data.liquidityMiningVestingPositions.map(liquidityMiningVestingPosition => {
+    return {
+      id: liquidityMiningVestingPosition.id,
+      effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
+      amount: liquidityMiningVestingPosition.arbAmountPar,
+    }
+  });
+
+  return { liquidityMiningVestingPositions };
+}
+
+export async function getLiquidityPositions(
+  blockNumber: number,
+  lastId: number = 0,
+): Promise<{ ammLiquidityPositions: ApiAmmLiquidityPosition[] }> {
+  const query = `
+    query getLiquidityPositions($blockNumber: Int, $lastId: ID) {
+      ammLiquidityPositions(first: 1000, orderBy: id where: { id_gt: $lastId } block: { number: $blockNumber }) {
+        id
+        effectiveUser {
+          id
+        }
+        liquidityTokenBalance
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        blockNumber,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlAmmLiquidityPositionsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const ammLiquidityPositions: ApiAmmLiquidityPosition[] = result.data.ammLiquidityPositions.map(ammLiquidityPosition => {
+    return {
+      id: ammLiquidityPosition.id,
+      effectiveUser: ammLiquidityPosition.effectiveUser.id.toLowerCase(),
+      balance: ammLiquidityPosition.liquidityTokenBalance,
+    }
+  });
+
+  return { ammLiquidityPositions };
+}
+
+export async function getLiquiditySnapshots(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ snapshots: ApiAmmLiquiditySnapshot[] }> {
+  const query = `
+    query getAmmLiquidityPositionSnapshots($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      ammLiquidityPositionSnapshots(first: 10, orderBy: id where: { and: [{ block_gte:  $startBlock } { block_lt: $endBlock } { id_gt: $lastId }] }) {
+        id
+        effectiveUser {
+          id
+        }
+        liquidityTokenBalance
+        block
+        timestamp
+      }
+    }
+  `;
+
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlWithdrawalsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const snapshots: ApiAmmLiquiditySnapshot[] = result.data.ammLiquidityPositionSnapshots.map(snapshot => {
+    return {
+      id: snapshot.id,
+      effectiveUser: snapshot.effectiveUser.id,
+      block: snapshot.block,
+      timestamp: snapshot.timestamp,
+      liquidityTokenBalance: snapshot.liquidityTokenBalance
+    }
+  });
+
+  return { snapshots };
+}
+
+export async function getTrades(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ trades: ApiTrade[] }> {
+  const query = `
+    query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      trades(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        takerEffectiveUser {
+          id
+        }
+        takerToken {
+          marketId
+        }
+        takerInputTokenDeltaPar
+        takerOutputTokenDeltaPar
+        makerEffectiveUser {
+          id
+        }
+        makerToken {
+          marketId
+        }
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlTradesResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const trades: ApiTrade[] = result.data.trades.map(trade => {
+    return {
+      id: trade.id,
+      serialId: trade.serialId,
+      timestamp: trade.transaction.timestamp,
+      takerEffectiveUser: trade.takerEffectiveUser.id.toLowerCase(),
+      takerMarketId: trade.takerToken.marketId,
+      takerInputTokenDeltaPar: trade.takerInputTokenDeltaPar,
+      takerOutputTokenDeltaPar: trade.takerOutputTokenDeltaPar,
+      makerEffectiveUser: trade.makerEffectiveUser ? trade.makerEffectiveUser.id.toLowerCase() : null,
+      makerMarketId: trade.makerToken.marketId,
+    }
+  });
+
+  return { trades };
+}
+
+export async function getTransfers(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0
+): Promise<{ transfers: ApiTransfer[] }> {
+  const query = `
+    query getTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      transfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        fromAmountDeltaPar
+        toAmountDeltaPar
+        fromEffectiveUser {
+          id
+        }
+        toEffectiveUser {
+          id
+        }
+        token {
+          marketId
+        }
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlTransfersResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const transfers: ApiTransfer[] = result.data.transfers.map(transfer => {
+    return {
+      id: transfer.id,
+      serialId: transfer.serialId,
+      timestamp: transfer.transaction.timestamp,
+      fromEffectiveUser: transfer.fromEffectiveUser.id.toLowerCase(),
+      toEffectiveUser: transfer.toEffectiveUser.id.toLowerCase(),
+      marketId: new BigNumber(transfer.token.marketId),
+      fromAmountDeltaPar: new BigNumber(transfer.fromAmountDeltaPar),
+      toAmountDeltaPar: new BigNumber(transfer.toAmountDeltaPar),
+    }
+  });
+
+  return { transfers };
+}
+
+
+export async function getVestingPositionTransfers(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ vestingPositionTransfers: ApiVestingPositionTransfer[] }> {
+  const query = `
+    query getLiquidityMiningVestingPositionTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      vestingPositionTransfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        fromUser {
+          id
+        }
+        toUser {
+          id
+        }
+        vestingPosition {
+          arbAmountPar
+        }
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlVestingPositionTransfersResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const vestingPositionTransfers: ApiVestingPositionTransfer[] = result.data.vestingPositionTransfers.map(vestingPositionTransfer => {
+    return {
+      id: vestingPositionTransfer.id,
+      serialId: vestingPositionTransfer.serialId,
+      timestamp: vestingPositionTransfer.transaction.timestamp,
+      fromEffectiveUser: vestingPositionTransfer.fromUser.id.toLowerCase(),
+      toEffectiveUser: vestingPositionTransfer.toUser.id.toLowerCase(),
+      amount: vestingPositionTransfer.arbAmountPar,
+    }
+  });
+
+  return { vestingPositionTransfers };
+}
+
+export async function getWithdrawals(
+  startBlock: number,
+  endBlock: number,
+  lastId: number = 0,
+): Promise<{ withdrawals: ApiWithdrawal[] }> {
+  const query = `
+    query getWithdrawals($startBlock: Int, $endBlock: Int, $lastId: ID) {
+    withdrawals(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+        id
+        serialId
+        transaction {
+          timestamp
+        }
+        amountDeltaPar
+        token {
+          marketId
+        }
+        effectiveUser {
+          id
+        }
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    `${process.env.SUBGRAPH_URL}`,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlWithdrawalsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const withdrawals: ApiWithdrawal[] = result.data.withdrawals.map(withdrawal => {
+    return {
+      id: withdrawal.id,
+      serialId: withdrawal.serialId,
+      timestamp: withdrawal.transaction.timestamp,
+      effectiveUser: withdrawal.effectiveUser.id.toLowerCase(),
+      marketId: new BigNumber(withdrawal.token.marketId),
+      amountDeltaPar: new BigNumber(withdrawal.amountDeltaPar),
+    }
+  });
+
+  return { withdrawals };
+} 
+
 export async function getAllDolomiteAccountsWithSupplyValue(
   marketIndexMap: { [marketId: string]: MarketIndex },
   blockNumber: number,
-  pageIndex: number = 0,
+  lastId: number = 0,
 ): Promise<{ accounts: ApiAccount[] }> {
   const query = `
-            query getActiveMarginAccounts($blockNumber: Int, $skip: Int) {
-                marginAccounts(where: { hasSupplyValue: true } block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE} skip: $skip) {
+            query getActiveMarginAccounts($blockNumber: Int, $lastId: ID) {
+                marginAccounts(first: 1000, orderBy: id where: { and: [{ hasSupplyValue: true }, { id_gt: $lastId }] } block: { number: $blockNumber }) {
                   id
                   user {
                     id
+                    effectiveUser {
+                      id
+                    }
                   }
                   accountNumber
                   tokenValues {
@@ -140,7 +680,7 @@ export async function getAllDolomiteAccountsWithSupplyValue(
                   }
                 }
               }`;
-  return getAccounts(marketIndexMap, query, blockNumber, pageIndex);
+  return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
 
 export async function getExpiredAccounts(

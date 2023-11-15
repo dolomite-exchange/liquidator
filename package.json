@@ -12,6 +12,7 @@
     "compose-clean": "docker-compose rm -f",
     "migrate": "echo 'Nothing to migrate'",
     "seed": "echo 'Nothing to seed'",
+    "calculate-oarb-rewards": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=.env.local npx ts-node src/scripts/calculate-oarb-rewards.ts",
     "get-lp-yield": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node src/scripts/get-lp-yield.ts",
     "get-total-active-users": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node src/scripts/get-total-active-users.ts",
     "verify-bad-debt": "ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node src/scripts/verify-bad-debt.ts",
