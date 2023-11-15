@@ -10,21 +10,25 @@ if (process.env.ENV_FILENAME) {
   require('dotenv').config();
 }
 
+/* eslint-disable */
+import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
+import { MerkleTree } from 'merkletreejs';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../clients/dolomite';
 import { dolomite } from '../helpers/web3';
-/* eslint-disable */
+import {
+  addLiquidityMiningVestingPositions,
+  getAccountBalancesByMarket,
+  getBalanceChangingEvents,
+  getLiquidityPositionAndEvents,
+} from '../lib/event-parser';
 import Logger from '../lib/logger';
 import MarketStore from '../lib/market-store';
 import Pageable from '../lib/pageable';
 import { calculateFinalRewards, calculateLiquidityPoints, calculateRewardPoints } from '../lib/rewards';
-import { addLiquidityMiningVestingPositions, getAccountBalancesByMarket, getBalanceChangingEvents, getLiquidityPositionAndEvents } from '../lib/event-parser';
-import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
-import { MerkleTree } from 'merkletreejs';
-
+/* eslint-enable */
 
 async function start() {
-
   const marketStore = new MarketStore();
 
   const blockRewardStart = 130000000;
@@ -63,8 +67,8 @@ async function start() {
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
   const accounts = await Pageable.getPageableValues(async (lastIndex) => {
-    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockRewardStart, lastIndex);
-    return accounts;
+    const result = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockRewardStart, lastIndex);
+    return result.accounts;
   });
 
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(accounts, blockRewardStartTimestamp);
@@ -72,16 +76,38 @@ async function start() {
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(blockRewardStart, blockRewardEnd);
 
-  const totalPointsPerMarket = calculateRewardPoints(accountToDolomiteBalanceMap, accountToAssetToEventsMap, blockRewardStartTimestamp, blockRewardEndTimestamp);
+  const totalPointsPerMarket = calculateRewardPoints(
+    accountToDolomiteBalanceMap,
+    accountToAssetToEventsMap,
+    blockRewardStartTimestamp,
+    blockRewardEndTimestamp,
+  );
 
-  const { ammLiquidityBalances, userToLiquiditySnapshots } = await getLiquidityPositionAndEvents(blockRewardStart, blockRewardEnd, blockRewardStartTimestamp);
-  const totalLiquidityPoints = calculateLiquidityPoints(ammLiquidityBalances, userToLiquiditySnapshots, blockRewardStartTimestamp, blockRewardEndTimestamp);
+  const { ammLiquidityBalances, userToLiquiditySnapshots } = await getLiquidityPositionAndEvents(
+    blockRewardStart,
+    blockRewardEnd,
+    blockRewardStartTimestamp,
+  );
+  const totalLiquidityPoints = calculateLiquidityPoints(
+    ammLiquidityBalances,
+    userToLiquiditySnapshots,
+    blockRewardStartTimestamp,
+    blockRewardEndTimestamp,
+  );
 
-  const userToOarbRewards = calculateFinalRewards(accountToDolomiteBalanceMap, ammLiquidityBalances, totalPointsPerMarket, totalLiquidityPoints);
+  const userToOarbRewards = calculateFinalRewards(
+    accountToDolomiteBalanceMap,
+    ammLiquidityBalances,
+    totalPointsPerMarket,
+    totalLiquidityPoints,
+  );
 
   const leaves: string[] = [];
   for (const account in userToOarbRewards) {
-    leaves.push(keccak256(defaultAbiCoder.encode(['address', 'uint256'], [account, parseEther(userToOarbRewards[account].toFixed(18))])));
+    leaves.push(keccak256(defaultAbiCoder.encode(
+      ['address', 'uint256'],
+      [account, parseEther(userToOarbRewards[account].toFixed(18))],
+    )));
   }
 
   const tree = new MerkleTree(leaves, keccak256, { sort: true });
