@@ -236,6 +236,7 @@ function getTestLiquidatableAccounts(): ApiAccount[] {
     {
       id: '0x78F4529554137A9015dC653758aB600aBC2ffD48-0',
       owner: '0x78F4529554137A9015dC653758aB600aBC2ffD48',
+      effectiveUser: '0x78F4529554137A9015dC653758aB600aBC2ffD48',
       number: new BigNumber('0'),
       balances: {
         0: {
@@ -263,6 +264,7 @@ function getTestLiquidatableAccounts(): ApiAccount[] {
     {
       id: '0x78F4529554137A9015dC653758aB600aBC2ffD48-1',
       owner: '0x78F4529554137A9015dC653758aB600aBC2ffD48',
+      effectiveUser: '0x78F4529554137A9015dC653758aB600aBC2ffD48',
       number: new BigNumber('1'),
       balances: {
         0: {
@@ -295,6 +297,7 @@ function getTestExpiredAccounts(): ApiAccount[] {
     {
       id: '0x78F4529554137A9015dC653758aB600aBC2ffD48-22',
       owner: '0x78F4529554137A9015dC653758aB600aBC2ffD48',
+      effectiveUser: '0x78F4529554137A9015dC653758aB600aBC2ffD48',
       number: new BigNumber('22'),
       balances: {
         0: {

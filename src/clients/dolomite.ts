@@ -3,7 +3,7 @@ import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin'
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { dolomite } from '../helpers/web3';
-import { 
+import {
   ApiAccount,
   ApiAmmLiquidityPosition,
   ApiAmmLiquiditySnapshot,
@@ -17,7 +17,7 @@ import {
   ApiTransfer,
   ApiVestingPositionTransfer,
   ApiWithdrawal,
-  MarketIndex
+  MarketIndex,
 } from '../lib/api-types';
 import {
   GraphqlAccountResult,
@@ -87,6 +87,7 @@ async function getAccounts(
           marketId: Number(value.token.marketId),
           tokenName: value.token.name,
           tokenSymbol: value.token.symbol,
+          tokenDecimals: Number.parseInt(value.token.decimals, 10),
           tokenAddress: value.token.id,
           par: valuePar,
           wei: new BigNumber(valuePar).times(index)
@@ -99,8 +100,9 @@ async function getAccounts(
       }, {});
       return {
         id: `${account.user.id}-${account.accountNumber}`,
-        owner: account.user.effectiveUser.id.toLowerCase(),
+        owner: account.user.effectiveUser?.id.toLowerCase(),
         number: new BigNumber(account.accountNumber),
+        effectiveUser: account.user.effectiveUser?.id.toLowerCase(),
         balances,
       };
     }));
@@ -115,7 +117,7 @@ export async function getDeposits(
 ): Promise<{ deposits: ApiDeposit[] }> {
   const query = `
   query getDeposits($startBlock: BigInt, $endBlock: Int, $lastId: ID) {
-    deposits(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+    deposits(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
       id
       serialId
       transaction {
@@ -124,6 +126,12 @@ export async function getDeposits(
       amountDeltaPar
       token {
         marketId
+      }
+      marginAccount {
+        user {
+          id
+        }
+        accountNumber
       }
       effectiveUser {
         id
@@ -155,6 +163,10 @@ export async function getDeposits(
       id: deposit.id,
       serialId: deposit.serialId,
       timestamp: deposit.transaction.timestamp,
+      marginAccount: {
+        user: deposit.marginAccount.user.id.toLowerCase(),
+        accountNumber: deposit.marginAccount.accountNumber,
+      },
       effectiveUser: deposit.effectiveUser.id.toLowerCase(),
       marketId: new BigNumber(deposit.token.marketId),
       amountDeltaPar: new BigNumber(deposit.amountDeltaPar),
@@ -162,7 +174,7 @@ export async function getDeposits(
   });
 
   return { deposits };
-} 
+}
 
 export async function getLiquidatableDolomiteAccounts(
   marketIndexMap: { [marketId: string]: MarketIndex },
@@ -200,7 +212,7 @@ export async function getLiquidations(
 ): Promise<{ liquidations: ApiLiquidation[] }> {
   const query = `
     query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      liquidations(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+      liquidations(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
         id
         serialId
         transaction {
@@ -211,6 +223,18 @@ export async function getLiquidations(
         }
         liquidEffectiveUser {
           id
+        }
+        solidMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
+        liquidMarginAccount {
+          user {
+            id
+          }
+          accountNumber
         }
         heldToken {
           marketId
@@ -247,7 +271,7 @@ export async function getLiquidations(
     return Promise.reject(result.errors[0]);
   }
 
-  if (result.data.liquidations.length == 0) {
+  if (result.data.liquidations.length === 0) {
     return { liquidations: [] };
   }
   const liquidations: ApiLiquidation[] = result.data.liquidations.map(liquidation => {
@@ -256,7 +280,15 @@ export async function getLiquidations(
       serialId: liquidation.serialId,
       timestamp: liquidation.transaction.timestamp,
       solidEffectiveUser: liquidation.solidEffectiveUser.id.toLowerCase(),
+      solidMarginAccount: {
+        user: liquidation.solidMarginAccount.user.id.toLowerCase(),
+        accountNumber: liquidation.solidMarginAccount.accountNumber,
+      },
       liquidEffectiveUser: liquidation.liquidEffectiveUser.id.toLowerCase(),
+      liquidMarginAccount: {
+        user: liquidation.liquidMarginAccount.user.id.toLowerCase(),
+        accountNumber: liquidation.liquidMarginAccount.accountNumber,
+      },
       heldToken: liquidation.heldToken.marketId,
       borrowedToken: liquidation.borrowedToken.marketId,
       solidHeldTokenAmountDeltaPar: liquidation.solidHeldTokenAmountDeltaPar,
@@ -302,13 +334,15 @@ export async function getLiquidityMiningVestingPositions(
     return Promise.reject(result.errors[0]);
   }
 
-  const liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] = result.data.liquidityMiningVestingPositions.map(liquidityMiningVestingPosition => {
-    return {
-      id: liquidityMiningVestingPosition.id,
-      effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
-      amount: liquidityMiningVestingPosition.arbAmountPar,
-    }
-  });
+  const liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] = result.data.liquidityMiningVestingPositions.map(
+    liquidityMiningVestingPosition => {
+      return {
+        id: liquidityMiningVestingPosition.id,
+        effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
+        amount: liquidityMiningVestingPosition.arbAmountPar,
+      }
+    },
+  );
 
   return { liquidityMiningVestingPositions };
 }
@@ -401,7 +435,7 @@ export async function getLiquiditySnapshots(
       effectiveUser: snapshot.effectiveUser.id,
       block: snapshot.block,
       timestamp: snapshot.timestamp,
-      liquidityTokenBalance: snapshot.liquidityTokenBalance
+      liquidityTokenBalance: snapshot.liquidityTokenBalance,
     }
   });
 
@@ -415,7 +449,7 @@ export async function getTrades(
 ): Promise<{ trades: ApiTrade[] }> {
   const query = `
     query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      trades(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+      trades(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
         id
         serialId
         transaction {
@@ -424,6 +458,12 @@ export async function getTrades(
         takerEffectiveUser {
           id
         }
+        takerMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
         takerToken {
           marketId
         }
@@ -431,6 +471,12 @@ export async function getTrades(
         takerOutputTokenDeltaPar
         makerEffectiveUser {
           id
+        }
+        makerMarginAccount {
+          user {
+            id
+          }
+          accountNumber
         }
         makerToken {
           marketId
@@ -463,10 +509,18 @@ export async function getTrades(
       serialId: trade.serialId,
       timestamp: trade.transaction.timestamp,
       takerEffectiveUser: trade.takerEffectiveUser.id.toLowerCase(),
+      takerMarginAccount: {
+        user: trade.takerMarginAccount.user.id.toLowerCase(),
+        accountNumber: trade.takerMarginAccount.accountNumber,
+      },
       takerMarketId: trade.takerToken.marketId,
       takerInputTokenDeltaPar: trade.takerInputTokenDeltaPar,
       takerOutputTokenDeltaPar: trade.takerOutputTokenDeltaPar,
       makerEffectiveUser: trade.makerEffectiveUser ? trade.makerEffectiveUser.id.toLowerCase() : null,
+      makerMarginAccount: trade.makerMarginAccount ? {
+        user: trade.makerMarginAccount.user.id.toLowerCase(),
+        accountNumber: trade.makerMarginAccount.accountNumber,
+      } : null,
       makerMarketId: trade.makerToken.marketId,
     }
   });
@@ -477,11 +531,11 @@ export async function getTrades(
 export async function getTransfers(
   startBlock: number,
   endBlock: number,
-  lastId: number = 0
+  lastId: number = 0,
 ): Promise<{ transfers: ApiTransfer[] }> {
   const query = `
     query getTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      transfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+      transfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
         id
         serialId
         transaction {
@@ -494,6 +548,18 @@ export async function getTransfers(
         }
         toEffectiveUser {
           id
+        }
+        fromMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
+        toMarginAccount {
+          user {
+            id
+          }
+          accountNumber
         }
         token {
           marketId
@@ -526,7 +592,15 @@ export async function getTransfers(
       serialId: transfer.serialId,
       timestamp: transfer.transaction.timestamp,
       fromEffectiveUser: transfer.fromEffectiveUser.id.toLowerCase(),
+      fromMarginAccount: {
+        user: transfer.fromMarginAccount.user.id.toLowerCase(),
+        accountNumber: transfer.fromMarginAccount.accountNumber,
+      },
       toEffectiveUser: transfer.toEffectiveUser.id.toLowerCase(),
+      toMarginAccount: {
+        user: transfer.toMarginAccount.user.id.toLowerCase(),
+        accountNumber: transfer.toMarginAccount.accountNumber,
+      },
       marketId: new BigNumber(transfer.token.marketId),
       fromAmountDeltaPar: new BigNumber(transfer.fromAmountDeltaPar),
       toAmountDeltaPar: new BigNumber(transfer.toAmountDeltaPar),
@@ -536,7 +610,6 @@ export async function getTransfers(
   return { transfers };
 }
 
-
 export async function getVestingPositionTransfers(
   startBlock: number,
   endBlock: number,
@@ -544,7 +617,7 @@ export async function getVestingPositionTransfers(
 ): Promise<{ vestingPositionTransfers: ApiVestingPositionTransfer[] }> {
   const query = `
     query getLiquidityMiningVestingPositionTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      vestingPositionTransfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+      vestingPositionTransfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
         id
         serialId
         transaction {
@@ -581,16 +654,18 @@ export async function getVestingPositionTransfers(
     return Promise.reject(result.errors[0]);
   }
 
-  const vestingPositionTransfers: ApiVestingPositionTransfer[] = result.data.vestingPositionTransfers.map(vestingPositionTransfer => {
-    return {
-      id: vestingPositionTransfer.id,
-      serialId: vestingPositionTransfer.serialId,
-      timestamp: vestingPositionTransfer.transaction.timestamp,
-      fromEffectiveUser: vestingPositionTransfer.fromUser.id.toLowerCase(),
-      toEffectiveUser: vestingPositionTransfer.toUser.id.toLowerCase(),
-      amount: vestingPositionTransfer.arbAmountPar,
-    }
-  });
+  const vestingPositionTransfers: ApiVestingPositionTransfer[] = result.data.vestingPositionTransfers.map(
+    vestingPositionTransfer => {
+      return {
+        id: vestingPositionTransfer.id,
+        serialId: vestingPositionTransfer.serialId,
+        timestamp: vestingPositionTransfer.transaction.timestamp,
+        fromEffectiveUser: vestingPositionTransfer.fromUser.id.toLowerCase(),
+        toEffectiveUser: vestingPositionTransfer.toUser.id.toLowerCase(),
+        amount: vestingPositionTransfer.arbAmountPar,
+      }
+    },
+  );
 
   return { vestingPositionTransfers };
 }
@@ -602,7 +677,7 @@ export async function getWithdrawals(
 ): Promise<{ withdrawals: ApiWithdrawal[] }> {
   const query = `
     query getWithdrawals($startBlock: Int, $endBlock: Int, $lastId: ID) {
-    withdrawals(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock }} { id_gt: $lastId }]} block: { number: $endBlock }) {
+    withdrawals(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
         id
         serialId
         transaction {
@@ -611,6 +686,12 @@ export async function getWithdrawals(
         amountDeltaPar
         token {
           marketId
+        }
+        marginAccount {
+          user {
+            id
+          }
+          accountNumber
         }
         effectiveUser {
           id
@@ -643,13 +724,17 @@ export async function getWithdrawals(
       serialId: withdrawal.serialId,
       timestamp: withdrawal.transaction.timestamp,
       effectiveUser: withdrawal.effectiveUser.id.toLowerCase(),
+      marginAccount: {
+        user: withdrawal.marginAccount.user.id.toLowerCase(),
+        accountNumber: withdrawal.marginAccount.accountNumber,
+      },
       marketId: new BigNumber(withdrawal.token.marketId),
       amountDeltaPar: new BigNumber(withdrawal.amountDeltaPar),
     }
   });
 
   return { withdrawals };
-} 
+}
 
 export async function getAllDolomiteAccountsWithSupplyValue(
   marketIndexMap: { [marketId: string]: MarketIndex },

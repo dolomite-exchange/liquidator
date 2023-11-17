@@ -1,7 +1,13 @@
 import { address, Integer } from '@dolomite-exchange/dolomite-margin';
 
+interface ApiMarginAccount {
+  user: string;
+  accountNumber: string;
+}
+
 export interface ApiBalance {
   marketId: number;
+  tokenDecimals: number;
   tokenAddress: string
   tokenName: string
   tokenSymbol: string
@@ -15,6 +21,7 @@ export interface ApiAccount {
   id: string;
   owner: string;
   number: Integer;
+  effectiveUser: string;
   balances: {
     [marketNumber: string]: ApiBalance;
   };
@@ -25,6 +32,7 @@ export interface ApiDeposit {
   serialId: number;
   timestamp: number;
   effectiveUser: string;
+  marginAccount: ApiMarginAccount;
   marketId: number;
   amountDeltaPar: Integer;
 }
@@ -49,6 +57,8 @@ export interface ApiLiquidation {
   timestamp: number;
   solidEffectiveUser: string;
   liquidEffectiveUser: string;
+  solidMarginAccount: ApiMarginAccount;
+  liquidMarginAccount: ApiMarginAccount;
   heldToken: number;
   borrowedToken: number;
   solidHeldTokenAmountDeltaPar: Integer;
@@ -80,6 +90,8 @@ export interface ApiTransfer {
   timestamp: number;
   fromEffectiveUser: string;
   toEffectiveUser: string;
+  fromMarginAccount: ApiMarginAccount;
+  toMarginAccount: ApiMarginAccount;
   marketId: number;
   fromAmountDeltaPar: Integer;
   toAmountDeltaPar: Integer;
@@ -90,13 +102,13 @@ export interface ApiTrade {
   serialId: number;
   timestamp: number;
   takerEffectiveUser: string;
+  takerMarginAccount: ApiMarginAccount;
   takerMarketId: number;
-  takerTokenDeltaWei: Integer;
   takerInputTokenDeltaPar: Integer;
   takerOutputTokenDeltaPar: Integer;
-  makerEffectiveUser: string;
+  makerEffectiveUser: string | undefined;
+  makerMarginAccount: ApiMarginAccount | undefined;
   makerMarketId: number;
-  makerTokenDeltaWei: Integer;
 }
 
 export interface ApiVestingPositionTransfer {
@@ -119,6 +131,7 @@ export interface ApiWithdrawal {
   serialId: number;
   timestamp: number;
   effectiveUser: string;
+  marginAccount: ApiMarginAccount;
   marketId: number;
   amountDeltaPar: Integer;
 }

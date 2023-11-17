@@ -29,7 +29,7 @@ const BLOCK_TAG = 'latest';
 const USE_PROXY_SERVER = false;
 const zap = new DolomiteZap(
   NETWORK_ID,
-  process.env.SUBGRAPH_URL,
+  process.env.SUBGRAPH_URL!,
   new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, NETWORK_ID),
   ONE_HOUR,
   IS_LIQUIDATION,
