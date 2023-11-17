@@ -25,3 +25,5 @@ output.log
 
 .env.production
 *.production.env
+
+output

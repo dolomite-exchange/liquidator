@@ -4,13 +4,15 @@
       "epoch": 0,
       "startTimestamp": 1699488000,
       "endTimestamp": 1700092800,
-      "oArbAmount": 90000,
-      "weights": {
-        "USDC": 36000,
-        "WETH": 22500,
-        "WBTC": 22500,
-        "ARB": 6300,
-        "LINK": 2700
+      "startBlockNumber": 148514486,
+      "endBlockNumber": 150811015,
+      "oArbAmount": "90000",
+      "rewardWeights": {
+        "17": "36000",
+        "0": "22500",
+        "4": "22500",
+        "7": "6300",
+        "3": "2700"
       }
     }
   },

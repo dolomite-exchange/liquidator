@@ -1,67 +1,83 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { ethers } from 'ethers';
 
 const LIQUIDITY_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f';
-const blacklistedAddresses = [
-  '0x1234493a4950cad1b049e222d62bce14ff423c00',
-];
+const blacklistedAddresses = process.env.BLACKLIST_ADDRESSES?.split(',') ?? []
 const blacklistedAddressMap: Record<string, boolean> = blacklistedAddresses.reduce((map, address) => {
+  if (!ethers.utils.isAddress(address)) {
+    throw new Error(`Invalid address: ${address}`);
+  }
   map[address.toLowerCase()] = true;
   return map;
 }, {})
 
-const OARB_REWARD_AMOUNT = {
-  '0': new BigNumber(10000),
-  '1': new BigNumber(10000),
-  '2': new BigNumber(10000),
-  '3': new BigNumber(10000),
-  '4': new BigNumber(10000),
-  '5': new BigNumber(10000),
-  '6': new BigNumber(10000),
-  '7': new BigNumber(10000),
-  '8': new BigNumber(10000),
-  '9': new BigNumber(10000),
-  '10': new BigNumber(10000),
-  '11': new BigNumber(10000),
-  '12': new BigNumber(10000),
-  '13': new BigNumber(10000),
-  '14': new BigNumber(10000),
-  '15': new BigNumber(10000),
-  '16': new BigNumber(10000),
-  '17': new BigNumber(10000),
+export enum BalanceChangeType {
+  DEPOSIT = 'deposit',
+  WITHDRAW = 'withdraw',
+  TRADE = 'trade',
+  TRANSFER = 'transfer',
+  VESTING_POSITION_TRANSFER = 'vesting_position_transfer',
+  LIQUIDATION = 'liquidation',
+  INITIALIZE = 'initialize',
+}
+
+export interface BalanceChangeEvent {
+  amountDeltaPar: BigNumber;
+  timestamp: number;
+  serialId: number;
+  effectiveUser: string;
+  type: BalanceChangeType;
 }
 
 export interface LiquiditySnapshot {
   timestamp: number;
-  balance: number;
+  balance: BigNumber;
 }
 
+export interface OArbFinalAmount {
+  amount: string;
+  proofs: string[];
+}
+
+// eslint-disable-next-line max-len
+export type AccountSubAccountToMarketToBalanceMap = Record<string, Record<string, Record<string, BalanceAndRewardPoints | undefined> | undefined> | undefined>;
+// eslint-disable-next-line max-len
+export type AccountToSubAccountMarketToBalanceChangeMap = Record<string, Record<string, Record<string, BalanceChangeEvent[] | undefined> | undefined> | undefined>;
+export type AccountToAmmLiquidityBalanceMap = Record<string, BalanceAndRewardPoints | undefined>;
+export type AccountToAmmLiquiditySnapshotsMap = Record<string, LiquiditySnapshot[] | undefined>;
+
+// const REWARD_MULTIPLIER = new BigNumber(10).pow(18);
+const REWARD_MULTIPLIER = new BigNumber(1);
+
 export class BalanceAndRewardPoints {
+  effectiveUser: string;
   balance: BigNumber;
   rewardPoints: BigNumber;
   lastUpdated: number;
 
-  constructor(timestamp: number, balance: BigNumber = new BigNumber(0)) {
+  constructor(timestamp: number, effectiveUser: string, balance: BigNumber = new BigNumber(0)) {
+    this.effectiveUser = effectiveUser;
     this.balance = balance;
     this.rewardPoints = new BigNumber(0);
     this.lastUpdated = timestamp;
   }
 
-  processEvent(event): BigNumber {
-    let rewardUpdate = new BigNumber(0);
+  processEvent(event: BalanceChangeEvent): BigNumber {
+    let pointsUpdate = new BigNumber(0);
     if (this.balance.gt(0)) {
       if (event.timestamp < this.lastUpdated) {
         throw new Error('Incorrect Event Order');
       }
-      rewardUpdate = this.balance.times(event.timestamp - this.lastUpdated);
-      this.rewardPoints = this.rewardPoints.plus(rewardUpdate);
+      pointsUpdate = this.balance.times(new BigNumber(event.timestamp - this.lastUpdated).times(REWARD_MULTIPLIER));
+      this.rewardPoints = this.rewardPoints.plus(pointsUpdate);
     }
-    this.balance = this.balance.plus(event.amount);
+    this.balance = this.balance.plus(event.amountDeltaPar);
     this.lastUpdated = event.timestamp;
 
-    return rewardUpdate;
+    return pointsUpdate;
   }
 
-  processLiquiditySnapshot(liquiditySnapshot): BigNumber {
+  processLiquiditySnapshot(liquiditySnapshot: LiquiditySnapshot): BigNumber {
     let rewardUpdate = new BigNumber(0);
     if (this.balance.gt(0)) {
       if (liquiditySnapshot.timestamp < this.lastUpdated) {
@@ -77,122 +93,156 @@ export class BalanceAndRewardPoints {
   }
 }
 
-export function calculateRewardPoints(
-  accountToDolomiteBalanceMap,
-  accountToAssetToEventsMap,
-  blockRewardStartTimestamp,
-  blockRewardEndTimestamp,
-) {
-  let totalPointsPerMarket = {};
-  for (const account in accountToAssetToEventsMap) {
+export function calculateTotalRewardPoints(
+  accountInfoToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
+  accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap,
+  blockRewardStartTimestamp: number,
+  blockRewardEndTimestamp: number,
+): Record<number, BigNumber> {
+  const totalPointsPerMarket: Record<number, BigNumber> = {};
+  Object.keys(accountToAssetToEventsMap).forEach(account => {
     if (!blacklistedAddressMap[account.toLowerCase()]) {
-      for (const market in accountToAssetToEventsMap[account]) {
-        // Make sure user => market => balance record exists
-        if (!accountToDolomiteBalanceMap[account]) {
-          accountToDolomiteBalanceMap[account] = {};
+      Object.keys(accountToAssetToEventsMap[account]!).forEach(subAccount => {
+        // Make sure user => subAccount ==> market => balance record exists
+        if (!accountInfoToDolomiteBalanceMap[account]) {
+          accountInfoToDolomiteBalanceMap[account] = {};
         }
-        if (!accountToDolomiteBalanceMap[account][market]) {
-          accountToDolomiteBalanceMap[account][market] = new BalanceAndRewardPoints(blockRewardStartTimestamp);
+        if (!accountInfoToDolomiteBalanceMap[account]![subAccount]) {
+          accountInfoToDolomiteBalanceMap[account]![subAccount] = {};
         }
-        totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? new BigNumber(0);
+        Object.keys(accountToAssetToEventsMap[account]![subAccount]!).forEach(market => {
+          if (!accountInfoToDolomiteBalanceMap[account]![subAccount]![market]) {
+            accountInfoToDolomiteBalanceMap[account]![subAccount]![market] = new BalanceAndRewardPoints(
+              blockRewardStartTimestamp,
+              accountToAssetToEventsMap[account]![subAccount]![market]![0]?.effectiveUser,
+            );
+          }
+          totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? new BigNumber(0);
 
-        // Sort and process events
-        accountToAssetToEventsMap[account][market].sort((a, b) => {
-          return a.serialId - b.serialId;
+          // Sort and process events
+          accountToAssetToEventsMap[account]![subAccount]![market]!.sort((a, b) => {
+            return a.serialId - b.serialId;
+          });
+          const userBalanceStruct = accountInfoToDolomiteBalanceMap[account]![subAccount]![market]!;
+          accountToAssetToEventsMap[account]![subAccount]![market]!.forEach(event => {
+            if (userBalanceStruct.effectiveUser !== event.effectiveUser) {
+              throw new Error('Effective user mismatch!');
+            }
+            const rewardUpdate = userBalanceStruct.processEvent(event);
+            totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
+          });
+          if (userBalanceStruct.balance.eq(0) && userBalanceStruct.rewardPoints.eq(0)) {
+            delete accountInfoToDolomiteBalanceMap[account]![subAccount]![market];
+          }
         });
-        const userBalStruct = accountToDolomiteBalanceMap[account][market];
-        accountToAssetToEventsMap[account][market].forEach((event) => {
-          const rewardUpdate = userBalStruct.processEvent(event);
-          totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
-        });
+        if (Object.keys(accountInfoToDolomiteBalanceMap[account]![subAccount]!).length === 0) {
+          delete accountInfoToDolomiteBalanceMap[account]![subAccount];
+        }
+      });
+      if (Object.keys(accountInfoToDolomiteBalanceMap[account]!).length === 0) {
+        delete accountInfoToDolomiteBalanceMap[account];
       }
     }
-  }
+  });
 
   // Do final loop through all balances to finish reward point calculation
-  for (const account in Object.keys(accountToDolomiteBalanceMap)) {
+  Object.keys(accountInfoToDolomiteBalanceMap).forEach(account => {
     if (!blacklistedAddressMap[account.toLowerCase()]) {
-      for (const market in accountToDolomiteBalanceMap[account]) {
-        totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? new BigNumber(0);
+      Object.keys(accountInfoToDolomiteBalanceMap[account]!).forEach(subAccount => {
+        Object.keys(accountInfoToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
+          totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? new BigNumber(0);
 
-        const userBalStruct = accountToDolomiteBalanceMap[account][market];
-        const rewardUpdate = userBalStruct.processEvent({
-          amount: new BigNumber(0),
-          timestamp: blockRewardEndTimestamp,
-          serialId: 0,
-        })
-        totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
-      }
+          const userBalanceStruct = accountInfoToDolomiteBalanceMap[account]![subAccount]![market]!;
+          const rewardUpdate = userBalanceStruct.processEvent({
+            amountDeltaPar: new BigNumber(0),
+            timestamp: blockRewardEndTimestamp,
+            serialId: 0,
+            effectiveUser: userBalanceStruct.effectiveUser,
+            type: BalanceChangeType.INITIALIZE,
+          })
+          totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
+        });
+      });
     }
-  }
+  });
 
   return totalPointsPerMarket;
 }
 
 export function calculateLiquidityPoints(
-  ammLiquidityBalances,
-  userToLiquiditySnapshots,
-  blockRewardStartTimestamp,
-  blockRewardEndTimestamp,
-) {
+  ammLiquidityBalances: AccountToAmmLiquidityBalanceMap,
+  userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap,
+  blockRewardStartTimestamp: number,
+  blockRewardEndTimestamp: number,
+): BigNumber {
   let totalLiquidityPoints = new BigNumber(0);
-  for (const account in userToLiquiditySnapshots) {
-    userToLiquiditySnapshots[account].sort((a, b) => {
+  Object.keys(userToLiquiditySnapshots).forEach(account => {
+    userToLiquiditySnapshots[account]!.sort((a, b) => {
       return a.timestamp - b.timestamp;
     });
     ammLiquidityBalances[account] = ammLiquidityBalances[account] ?? new BalanceAndRewardPoints(
       blockRewardStartTimestamp,
+      account,
       new BigNumber(0),
     );
 
-    userToLiquiditySnapshots[account].forEach((liquiditySnapshot) => {
-      totalLiquidityPoints = totalLiquidityPoints.plus(ammLiquidityBalances[account].processLiquiditySnapshot(
-        liquiditySnapshot));
+    userToLiquiditySnapshots[account]!.forEach((liquiditySnapshot) => {
+      totalLiquidityPoints = totalLiquidityPoints.plus(
+        ammLiquidityBalances[account]!.processLiquiditySnapshot(liquiditySnapshot),
+      );
     });
-  }
+  });
 
-  for (const account in ammLiquidityBalances) {
-    const user = ammLiquidityBalances[account];
-    const rewardUpdate = user.balance.times(blockRewardEndTimestamp - user.lastUpdated);
+  Object.keys(ammLiquidityBalances).forEach(account => {
+    const balanceStruct = ammLiquidityBalances[account]!;
+    const rewardUpdate = balanceStruct.balance.times(blockRewardEndTimestamp - balanceStruct.lastUpdated);
 
     totalLiquidityPoints = totalLiquidityPoints.plus(rewardUpdate);
-    user.rewardPoints = user.rewardPoints.plus(rewardUpdate);
-    user.lastUpdated = blockRewardEndTimestamp;
-  }
+    balanceStruct.rewardPoints = balanceStruct.rewardPoints.plus(rewardUpdate);
+    balanceStruct.lastUpdated = blockRewardEndTimestamp;
+  });
 
   return totalLiquidityPoints;
 }
 
 export function calculateFinalRewards(
-  accountToDolomiteBalanceMap,
-  ammLiquidityBalances,
-  totalPointsPerMarket,
-  totalLiquidityPoints,
+  accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
+  ammLiquidityBalances: AccountToAmmLiquidityBalanceMap,
+  totalPointsPerMarket: Record<number, BigNumber>,
+  totalLiquidityPoints: BigNumber,
+  oArbRewardMap: Record<number, BigNumber | undefined>,
 ): Record<string, BigNumber> {
-  const userToOarbRewards: Record<string, BigNumber> = {};
-  const accounts = Object.keys(accountToDolomiteBalanceMap);
-  for (const account in accounts) {
-    userToOarbRewards[account] = userToOarbRewards[account] ?? new BigNumber(0);
-    const markets = Object.keys(accountToDolomiteBalanceMap[account])
-    for (const market in markets) {
-      const user = accountToDolomiteBalanceMap[account];
-      const oarbReward = OARB_REWARD_AMOUNT[market].times(user[market].rewardPoints)
-        .dividedBy(totalPointsPerMarket[market]);
+  const effectiveUserToOarbRewards: Record<string, BigNumber> = {};
+  Object.keys(accountToDolomiteBalanceMap).forEach(account => {
+    Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
+      Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
+        const rewards = oArbRewardMap[market];
+        if (rewards) {
+          const points = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
+          const oarbReward = rewards.times(points.rewardPoints).dividedBy(totalPointsPerMarket[market]);
 
-      userToOarbRewards[account] = userToOarbRewards[account].plus(oarbReward);
-    }
-  }
+          if (!effectiveUserToOarbRewards[points.effectiveUser]) {
+            effectiveUserToOarbRewards[points.effectiveUser] = new BigNumber(0);
+          }
+          effectiveUserToOarbRewards[points.effectiveUser] = effectiveUserToOarbRewards[points.effectiveUser].plus(
+            oarbReward,
+          );
+        }
+      });
+    });
+  });
 
   // Distribute liquidity pool rewards
-  const liquidityPoolReward = userToOarbRewards[LIQUIDITY_POOL];
-  for (const account in ammLiquidityBalances) {
-    userToOarbRewards[account] = userToOarbRewards[account] ?? new BigNumber(0);
-    const rewardAmount = liquidityPoolReward.times(ammLiquidityBalances[account].rewardPoints.dividedBy(
-      totalLiquidityPoints));
+  const liquidityPoolReward = effectiveUserToOarbRewards[LIQUIDITY_POOL];
+  Object.keys(ammLiquidityBalances).forEach(account => {
+    effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account] ?? new BigNumber(0);
+    const rewardAmount = liquidityPoolReward.times(ammLiquidityBalances[account]!.rewardPoints.dividedBy(
+      totalLiquidityPoints,
+    ));
 
-    userToOarbRewards[account] = userToOarbRewards[account].plus(rewardAmount);
-    userToOarbRewards[LIQUIDITY_POOL] = userToOarbRewards[LIQUIDITY_POOL].minus(rewardAmount);
-  }
+    effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account].plus(rewardAmount);
+    effectiveUserToOarbRewards[LIQUIDITY_POOL] = effectiveUserToOarbRewards[LIQUIDITY_POOL].minus(rewardAmount);
+  });
 
-  return userToOarbRewards;
+  return effectiveUserToOarbRewards;
 }
