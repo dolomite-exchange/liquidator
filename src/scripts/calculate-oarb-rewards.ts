@@ -149,13 +149,14 @@ async function start() {
     finalData.proofs = tree.getHexProof(finalData.proofs[0]);
   });
 
-  const dataToWrite = readOutputFile();
+  const fileName = `${__dirname}/output/oarb-season-0-epoch-${epoch}-output.json`
+  const dataToWrite = readOutputFile(fileName);
   dataToWrite.epochs[epoch] = walletAddressToFinalDataMap;
   dataToWrite.metadata[epoch] = {
     merkleRoot,
     isFinalized: true,
   }
-  writeOutputFile(dataToWrite);
+  writeOutputFile(fileName, dataToWrite);
 
   return true;
 }
@@ -177,11 +178,9 @@ interface OutputFile {
   }
 }
 
-const FILE_NAME = `${__dirname}/output/oarb-season-0-output.json`;
-
-function readOutputFile(): OutputFile {
+function readOutputFile(fileName: string): OutputFile {
   try {
-    return JSON.parse(fs.readFileSync(FILE_NAME, 'utf8')) as OutputFile
+    return JSON.parse(fs.readFileSync(fileName, 'utf8')) as OutputFile
   } catch (e) {
     return {
       epochs: {},
@@ -191,11 +190,12 @@ function readOutputFile(): OutputFile {
 }
 
 function writeOutputFile(
+  fileName: string,
   fileContent: OutputFile,
 ): void {
   fs.writeFileSync(
-    FILE_NAME,
-    JSON.stringify(fileContent, null, 2),
+    fileName,
+    JSON.stringify(fileContent),
     { encoding: 'utf8', flag: 'w' },
   );
 }
