@@ -188,7 +188,10 @@ function writeOutputFile(
   );
 }
 
-function rectifyRewardsForEpoch0IfNecessary(epoch: number, walletAddressToLeavesMap: Record<string, OArbFinalAmount>): void {
+function rectifyRewardsForEpoch0IfNecessary(
+  epoch: number,
+  walletAddressToLeavesMap: Record<string, OArbFinalAmount>,
+): void {
   if (epoch !== 0) {
     return;
   }
@@ -196,14 +199,17 @@ function rectifyRewardsForEpoch0IfNecessary(epoch: number, walletAddressToLeaves
   const oldFile = `${__dirname}/finalized/oarb-season-0-epoch-${epoch}-output.json`;
   const oldWalletAddressToFinalDataMap = readOutputFile(oldFile).epochs[epoch];
 
+  let cumulative = new BigNumber(0);
   const deltasMap = Object.keys(walletAddressToLeavesMap).reduce<Record<string, BigNumber>>((map, wallet) => {
     const oldAmount = new BigNumber(oldWalletAddressToFinalDataMap[wallet.toLowerCase()]?.amount ?? '0');
     const newAmount = new BigNumber(walletAddressToLeavesMap[wallet.toLowerCase()].amount);
     if (newAmount.gt(oldAmount)) {
       map[wallet] = newAmount.minus(oldAmount);
+      cumulative = cumulative.plus(map[wallet]);
     }
     return map;
   }, {});
+  console.log('Cumulative amount for fix (in wei):', cumulative.toString());
   const deltasMerkleRootAndProofs = calculateMerkleRootAndProofs(deltasMap);
 
   const rectifiedEpochNumber = '999';
