@@ -1,5 +1,4 @@
 import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
-import { AccountOperation } from '@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation';
 import { DateTime } from 'luxon';
 import { dolomite } from '../../src/helpers/web3';
 import AccountStore from '../../src/lib/account-store';
@@ -47,22 +46,11 @@ describe('dolomite-liquidator', () => {
       riskParamsStore.getDolomiteRiskParams = jest.fn().mockImplementation(() => riskParams);
       dolomite.getters.isAccountLiquidatable = jest.fn().mockImplementation(() => true);
 
-      let commitCount = 0;
       const liquidations: any[] = [];
       const liquidatableExpiredAccounts: any[] = [];
-      (
-        AccountOperation as any
-      ).mockImplementation(() => (
-        {
-          fullyLiquidateExpiredAccount: (...args) => {
-            liquidatableExpiredAccounts.push(args);
-          },
-          commit: () => {
-            commitCount += 1;
-            return true;
-          },
-        }
-      ));
+      dolomite.expiryProxy.expire = jest.fn().mockImplementation((...args) => {
+        liquidatableExpiredAccounts.push(args);
+      });
       dolomite.liquidatorProxyV1.liquidate = jest.fn().mockImplementation((...args) => {
         liquidations.push(args);
         return { gas: 1 };
@@ -72,8 +60,6 @@ describe('dolomite-liquidator', () => {
 
       expect(liquidations.length)
         .toBe(liquidatableAccounts.length);
-      expect(commitCount)
-        .toBe(liquidatableExpiredAccounts.length);
       expect(liquidatableExpiredAccounts.length)
         .toBe(1);
 
@@ -343,8 +329,8 @@ function getTestExpiredAccounts(): ApiAccount[] {
           tokenAddress: '0x0000000000000000000000000000000000000003',
           tokenName: 'Chainlink Token',
           tokenSymbol: 'LINK',
-          par: new BigNumber('-1010101010101010010101010010101010101001010'),
-          wei: new BigNumber('-2010101010101010010101010010101010101001010'),
+          par: new BigNumber('1010101010101010010101010010101010101001010'),
+          wei: new BigNumber('2010101010101010010101010010101010101001010'),
           expiresAt: null,
           expiryAddress: null,
         },

@@ -419,6 +419,9 @@ async function _liquidateExpiredAccountInternalSimple(
   if (!owedBalance?.expiresAt) {
     throw new Error('Could not find an expired balance');
   }
+  if (!heldBalance) {
+    throw new Error('Could not find a held balance: ' + JSON.stringify(preferredBalances, null, 2));
+  }
 
   return dolomite.expiryProxy.expire(
     solidAccount.owner,

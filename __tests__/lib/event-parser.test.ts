@@ -110,7 +110,7 @@ describe('event-parser', () => {
         .toEqual(new BigNumber('19'));
     });
 
-    it('should skip if fromEffectiveUser equals toEffectiveUser', async () => {
+    it('should not skip if fromEffectiveUser equals toEffectiveUser', async () => {
       const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
       const transfers: ApiTransfer[] = [
         {
@@ -133,7 +133,12 @@ describe('event-parser', () => {
         },
       ];
       parseTransfers(accountToAssetToEventsMap, transfers);
-      expect(accountToAssetToEventsMap).toEqual({});
+      expect(accountToAssetToEventsMap[address1]?.[subAccount1]?.['2']?.length).toEqual(1);
+      expect(accountToAssetToEventsMap[address1]?.[subAccount1]?.['2']?.[0].amountDeltaPar)
+        .toEqual(new BigNumber('-19'));
+      expect(accountToAssetToEventsMap[address1]?.[subAccount2]?.['2']?.length).toEqual(1);
+      expect(accountToAssetToEventsMap[address1]?.[subAccount2]?.['2']?.[0].amountDeltaPar)
+        .toEqual(new BigNumber('19'));
     });
   })
 

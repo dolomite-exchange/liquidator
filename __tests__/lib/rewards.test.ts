@@ -1,4 +1,5 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { ethers } from 'ethers';
 import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
 import {
@@ -240,12 +241,14 @@ describe('rewards', () => {
       acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
       return acc;
     }, {});
+    const minimumOArbAmount = new BigNumber(ethers.utils.parseEther('1').toString());
     const userToOarbRewards = calculateFinalRewards(
       accountToDolomiteBalanceMap,
       ammLiquidityBalances,
       totalPointsPerMarket,
       totalLiquidityPoints,
       oArbRewardMap,
+      minimumOArbAmount,
     );
 
     expect(userToOarbRewards[user1]).toEqual(new BigNumber(parseEther('3600').toString()));

@@ -1,5 +1,7 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
+import { defaultAbiCoder, keccak256 } from 'ethers/lib/utils';
+import { MerkleTree } from 'merkletreejs';
 
 const LIQUIDITY_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f';
 const blacklistedAddresses = process.env.BLACKLIST_ADDRESSES?.split(',') ?? []
@@ -211,6 +213,7 @@ export function calculateFinalRewards(
   totalPointsPerMarket: Record<number, BigNumber>,
   totalLiquidityPoints: BigNumber,
   oArbRewardMap: Record<number, BigNumber | undefined>,
+  minimumOArbAmount: BigNumber,
 ): Record<string, BigNumber> {
   const effectiveUserToOarbRewards: Record<string, BigNumber> = {};
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
@@ -244,5 +247,52 @@ export function calculateFinalRewards(
     effectiveUserToOarbRewards[LIQUIDITY_POOL] = effectiveUserToOarbRewards[LIQUIDITY_POOL].minus(rewardAmount);
   });
 
-  return effectiveUserToOarbRewards;
+  let filteredAmount = new BigNumber(0);
+  const finalizedRewardsMap = Object.keys(effectiveUserToOarbRewards).reduce<Record<string, BigNumber>>((map, account) => {
+    if (effectiveUserToOarbRewards[account].gte(minimumOArbAmount)) {
+      map[account] = effectiveUserToOarbRewards[account];
+    } else {
+      filteredAmount = filteredAmount.plus(effectiveUserToOarbRewards[account]);
+    }
+    return map;
+  }, {});
+
+  console.log('OARB amount filtered out:', filteredAmount.dividedBy('1000000000000000000').toFixed(2));
+
+  return finalizedRewardsMap;
+}
+
+export interface MerkleRootAndProofs {
+  merkleRoot: string;
+  walletAddressToLeavesMap: Record<string, OArbFinalAmount>; // wallet ==> proofs + amounts
+}
+
+export function calculateMerkleRootAndProofs(userToOArbRewards: Record<string, BigNumber>): MerkleRootAndProofs {
+  const walletAddressToFinalDataMap: Record<string, OArbFinalAmount> = {};
+  const leaves: string[] = [];
+  const userAccounts = Object.keys(userToOArbRewards);
+  userAccounts.forEach(account => {
+    const amount = userToOArbRewards[account].toFixed(0);
+    const leaf = keccak256(
+      defaultAbiCoder.encode(
+        ['address', 'uint256'],
+        [account, amount],
+      ),
+    );
+    walletAddressToFinalDataMap[account.toLowerCase()] = {
+      amount,
+      proofs: [leaf], // this will get overwritten once the tree is created
+    };
+    leaves.push(leaf);
+  });
+
+  const tree = new MerkleTree(leaves, keccak256, { sort: true });
+  const merkleRoot = tree.getHexRoot();
+
+  userAccounts.forEach(account => {
+    const finalData = walletAddressToFinalDataMap[account.toLowerCase()];
+    finalData.proofs = tree.getHexProof(finalData.proofs[0]);
+  });
+
+  return { merkleRoot, walletAddressToLeavesMap: walletAddressToFinalDataMap };
 }

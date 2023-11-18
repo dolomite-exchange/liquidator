@@ -12,9 +12,9 @@ if (process.env.ENV_FILENAME) {
 
 /* eslint-disable */
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
-import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
+import { ethers } from 'ethers';
+import { parseEther } from 'ethers/lib/utils';
 import fs from 'fs';
-import { MerkleTree } from 'merkletreejs';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../clients/dolomite';
 import { dolomite } from '../helpers/web3';
@@ -30,6 +30,7 @@ import Pageable from '../lib/pageable';
 import {
   calculateFinalRewards,
   calculateLiquidityPoints,
+  calculateMerkleRootAndProofs,
   calculateTotalRewardPoints,
   OArbFinalAmount,
 } from '../lib/rewards';
@@ -37,10 +38,31 @@ import liquidityMiningConfig from './config/oarb-season-0.json';
 
 /* eslint-enable */
 
+interface OutputFile {
+  epochs: {
+    [epoch: string]: {
+      [walletAddressLowercase: string]: {
+        amount: string // big int
+        proofs: string[]
+      }
+    }
+  };
+  metadata: {
+    [epoch: string]: {
+      isFinalized: boolean
+      merkleRoot: string
+    }
+  };
+}
+
+const FOLDER_NAME = `${__dirname}/output`;
+
+const MINIMUM_OARB_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.1').toString());
+
 async function start() {
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
-    return Promise.reject(new Error(`Invalid epoch, found: ${epoch}`));
+    return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
 
   const marketStore = new MarketStore();
@@ -51,7 +73,7 @@ async function start() {
   const blockRewardEndTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
 
   const rewardWeights = liquidityMiningConfig.epochs[epoch].rewardWeights as Record<string, string>;
-  const oArbRewardMap = Object.keys(rewardWeights).reduce<Record<string, BigNumber>>((acc, key) => {
+  const oArbRewardWeiMap = Object.keys(rewardWeights).reduce<Record<string, BigNumber>>((acc, key) => {
     acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
     return acc;
   }, {});
@@ -59,7 +81,7 @@ async function start() {
   const { riskParams } = await getDolomiteRiskParams(blockRewardStart);
   const networkId = await dolomite.web3.eth.net.getId();
 
-  const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
+  const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
     const message = `Invalid dolomite margin address found!\n
     { network: ${riskParams.dolomiteMargin} library: ${libraryDolomiteMargin} }`;
@@ -115,77 +137,39 @@ async function start() {
     blockRewardEndTimestamp,
   );
 
-  const userToOarbRewards = calculateFinalRewards(
+  const userToOArbRewards = calculateFinalRewards(
     accountToDolomiteBalanceMap,
     ammLiquidityBalances,
     totalPointsPerMarket,
     totalLiquidityPoints,
-    oArbRewardMap,
+    oArbRewardWeiMap,
+    MINIMUM_OARB_AMOUNT_WEI,
   );
 
-  const walletAddressToFinalDataMap: Record<string, OArbFinalAmount> = {}
-  const leaves: string[] = [];
-  const userAccounts = Object.keys(userToOarbRewards);
-  userAccounts.forEach(account => {
-    const amount = userToOarbRewards[account].toFixed(0);
-    const leaf = keccak256(
-      defaultAbiCoder.encode(
-        ['address', 'uint256'],
-        [account, amount],
-      ),
-    );
-    walletAddressToFinalDataMap[account.toLowerCase()] = {
-      amount,
-      proofs: [leaf], // this will get overwritten once the tree is created
-    }
-    leaves.push(leaf);
-  })
+  const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOArbRewards);
 
-  const tree = new MerkleTree(leaves, keccak256, { sort: true });
-  const merkleRoot = tree.getHexRoot();
-
-  userAccounts.forEach(account => {
-    const finalData = walletAddressToFinalDataMap[account.toLowerCase()];
-    finalData.proofs = tree.getHexProof(finalData.proofs[0]);
-  });
-
-  const fileName = `${__dirname}/output/oarb-season-0-epoch-${epoch}-output.json`
+  const fileName = `${FOLDER_NAME}/oarb-season-0-epoch-${epoch}-output.json`;
   const dataToWrite = readOutputFile(fileName);
-  dataToWrite.epochs[epoch] = walletAddressToFinalDataMap;
+  dataToWrite.epochs[epoch] = walletAddressToLeavesMap;
   dataToWrite.metadata[epoch] = {
     merkleRoot,
     isFinalized: true,
-  }
+  };
   writeOutputFile(fileName, dataToWrite);
+
+  rectifyRewardsForEpoch0IfNecessary(epoch, dataToWrite.epochs[epoch]);
 
   return true;
 }
 
-interface OutputFile {
-  epochs: {
-    [epoch: string]: {
-      [walletAddressLowercase: string]: {
-        amount: string // big int
-        proofs: string[]
-      }
-    }
-  }
-  metadata: {
-    [epoch: string]: {
-      isFinalized: boolean
-      merkleRoot: string
-    }
-  }
-}
-
 function readOutputFile(fileName: string): OutputFile {
   try {
-    return JSON.parse(fs.readFileSync(fileName, 'utf8')) as OutputFile
+    return JSON.parse(fs.readFileSync(fileName, 'utf8')) as OutputFile;
   } catch (e) {
     return {
       epochs: {},
       metadata: {},
-    }
+    };
   }
 }
 
@@ -193,6 +177,10 @@ function writeOutputFile(
   fileName: string,
   fileContent: OutputFile,
 ): void {
+  if (!fs.existsSync(FOLDER_NAME)) {
+    fs.mkdirSync(FOLDER_NAME);
+  }
+
   fs.writeFileSync(
     fileName,
     JSON.stringify(fileContent),
@@ -200,7 +188,46 @@ function writeOutputFile(
   );
 }
 
-start().catch(error => {
-  console.error(`Found error while starting: ${error.toString()}`, error);
-  process.exit(1)
-});
+function rectifyRewardsForEpoch0IfNecessary(epoch: number, walletAddressToLeavesMap: Record<string, OArbFinalAmount>): void {
+  if (epoch !== 0) {
+    return;
+  }
+
+  const oldFile = `${__dirname}/finalized/oarb-season-0-epoch-${epoch}-output.json`;
+  const oldWalletAddressToFinalDataMap = readOutputFile(oldFile).epochs[epoch];
+
+  const deltasMap = Object.keys(walletAddressToLeavesMap).reduce<Record<string, BigNumber>>((map, wallet) => {
+    const oldAmount = new BigNumber(oldWalletAddressToFinalDataMap[wallet.toLowerCase()]?.amount ?? '0');
+    const newAmount = new BigNumber(walletAddressToLeavesMap[wallet.toLowerCase()].amount);
+    if (newAmount.gt(oldAmount)) {
+      map[wallet] = newAmount.minus(oldAmount);
+    }
+    return map;
+  }, {});
+  const deltasMerkleRootAndProofs = calculateMerkleRootAndProofs(deltasMap);
+
+  const rectifiedEpochNumber = '999';
+  writeOutputFile(
+    `${FOLDER_NAME}/oarb-season-0-epoch-${rectifiedEpochNumber}-deltas-output.json`,
+    {
+      epochs: {
+        [rectifiedEpochNumber]: deltasMerkleRootAndProofs.walletAddressToLeavesMap,
+      },
+      metadata: {
+        [rectifiedEpochNumber]: {
+          isFinalized: true,
+          merkleRoot: deltasMerkleRootAndProofs.merkleRoot,
+        },
+      },
+    },
+  );
+}
+
+start()
+  .then(() => {
+    console.log('Finished executing script!');
+  })
+  .catch(error => {
+    console.error(`Found error while starting: ${error.toString()}`, error);
+    process.exit(1);
+  });

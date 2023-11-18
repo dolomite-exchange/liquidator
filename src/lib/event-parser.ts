@@ -54,7 +54,7 @@ export function getAccountBalancesByMarket(
       accountToDolomiteBalanceMap[accountOwner]![accountNumber]![balance.marketId] = new BalanceAndRewardPoints(
         blockRewardStartTimestamp,
         account.effectiveUser,
-        balance.par.dividedToIntegerBy(new BigNumber(10).pow(balance.tokenDecimals)),
+        balance.par.dividedBy(new BigNumber(10).pow(balance.tokenDecimals)),
       );
     });
   });
@@ -120,7 +120,7 @@ export async function getBalanceChangingEvents(
 
 export interface LiquidityPositionsAndEvents {
   userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap;
-  ammLiquidityBalances: AccountToAmmLiquidityBalanceMap
+  ammLiquidityBalances: AccountToAmmLiquidityBalanceMap;
 }
 
 export async function getLiquidityPositionAndEvents(
@@ -142,7 +142,7 @@ export async function getLiquidityPositionAndEvents(
   }));
   parseAmmLiquiditySnapshots(userToLiquiditySnapshots, ammLiquiditySnapshots);
 
-  return { ammLiquidityBalances, userToLiquiditySnapshots }
+  return { ammLiquidityBalances, userToLiquiditySnapshots };
 }
 
 export function parseLiquidityMiningVestingPositions(
@@ -181,7 +181,7 @@ export function parseDeposits(
       serialId: deposit.serialId,
       effectiveUser: deposit.effectiveUser,
       type: BalanceChangeType.DEPOSIT,
-    }
+    };
     addEventToUser(
       accountToAssetToEventsMap,
       deposit.marginAccount.user,
@@ -189,7 +189,7 @@ export function parseDeposits(
       deposit.marketId,
       event,
     );
-  })
+  });
 }
 
 export function parseWithdrawals(
@@ -203,7 +203,7 @@ export function parseWithdrawals(
       serialId: withdrawal.serialId,
       effectiveUser: withdrawal.effectiveUser,
       type: BalanceChangeType.WITHDRAW,
-    }
+    };
     addEventToUser(
       accountToAssetToEventsMap,
       withdrawal.marginAccount.user,
@@ -365,7 +365,7 @@ export function parseLiquidations(
       serialId: liquidation.serialId,
       effectiveUser: liquidation.solidEffectiveUser,
       type: BalanceChangeType.LIQUIDATION,
-    }
+    };
     addEventToUser(
       accountToAssetToEventsMap,
       liquidation.solidMarginAccount.user,
@@ -380,7 +380,7 @@ export function parseLiquidations(
       serialId: liquidation.serialId,
       effectiveUser: liquidation.solidEffectiveUser,
       type: BalanceChangeType.LIQUIDATION,
-    }
+    };
     addEventToUser(
       accountToAssetToEventsMap,
       liquidation.solidMarginAccount.user,
@@ -452,7 +452,7 @@ export function parseAmmLiquiditySnapshots(
     const liquiditySnapshot: LiquiditySnapshot = {
       timestamp: Number(snapshot.timestamp),
       balance: new BigNumber(snapshot.liquidityTokenBalance),
-    }
+    };
     addLiquiditySnapshotToUser(userToLiquiditySnapshots, snapshot.effectiveUser, liquiditySnapshot);
   });
 }
@@ -476,7 +476,7 @@ function addEventToUser(
   accountToAssetToEventsMap[user] = accountToAssetToEventsMap[user] ?? {};
   accountToAssetToEventsMap[user]![accountNumber] = accountToAssetToEventsMap[user]![accountNumber] ?? {};
   if (accountToAssetToEventsMap[user]![accountNumber]![marketId]) {
-    accountToAssetToEventsMap[user]![accountNumber]![marketId]!.push(event)
+    accountToAssetToEventsMap[user]![accountNumber]![marketId]!.push(event);
   } else {
     accountToAssetToEventsMap[user]![accountNumber]![marketId] = [event];
   }
