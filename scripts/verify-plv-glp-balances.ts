@@ -60,8 +60,8 @@ async function start() {
   const marketMap = marketStore.getMarketMap();
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
-  const accounts = await Pageable.getPageableValues(async (pageIndex) => {
-    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockNumber, pageIndex);
+  const accounts = await Pageable.getPageableValues(async (lastId) => {
+    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockNumber, lastId);
     return accounts;
   });
 

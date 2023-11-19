@@ -65,8 +65,8 @@ async function start() {
     acc[account.owner] = true;
     return acc;
   }, {});
-  const supplyAccounts = await Pageable.getPageableValues(async (pageIndex) => {
-    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockNumber, pageIndex);
+  const supplyAccounts = await Pageable.getPageableValues(async (lastId) => {
+    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockNumber, lastId);
     return accounts;
   });
   const supplyAccountsTallied = supplyAccounts.reduce((acc, account) => {

@@ -70,12 +70,12 @@ export default class AccountStore {
     const marketMap = this.marketStore.getMarketMap();
     const marketIndexMap = await this.marketStore.getMarketIndexMap(marketMap);
 
-    const nextLiquidatableDolomiteAccounts = await Pageable.getPageableValues(async (pageIndex) => {
-      const { accounts } = await getLiquidatableDolomiteAccounts(marketIndexMap, blockNumber, pageIndex);
+    const nextLiquidatableDolomiteAccounts = await Pageable.getPageableValues(async (lastId) => {
+      const { accounts } = await getLiquidatableDolomiteAccounts(marketIndexMap, blockNumber, lastId);
       return accounts;
     });
-    const nextExpirableAccounts = await Pageable.getPageableValues(async (pageIndex) => {
-      const { accounts } = await getExpiredAccounts(marketIndexMap, blockNumber, pageIndex);
+    const nextExpirableAccounts = await Pageable.getPageableValues(async (lastId) => {
+      const { accounts } = await getExpiredAccounts(marketIndexMap, blockNumber, lastId);
       return accounts;
     });
 
