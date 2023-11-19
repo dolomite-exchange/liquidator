@@ -1,12 +1,13 @@
 module.exports = {
   globalSetup: './__tests__/helpers/setup.ts',
   roots: [
+    '<rootDir>/__script_tests__',
     '<rootDir>/__tests__',
   ],
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
-  testRegex: '__tests__\\/.*\\.test\\.ts$',
+  testRegex: '(__tests__|__script_tests__)\\/.*\\.test\\.ts$',
   moduleFileExtensions: [
     'ts',
     'js',
