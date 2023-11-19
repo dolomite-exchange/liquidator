@@ -14,13 +14,13 @@ if (process.env.ENV_FILENAME) {
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
-import vGlpAbi from '../abis/gmx-vester.json';
-import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../clients/dolomite';
-import { getSubgraphBlockNumber } from '../helpers/block-helper';
-import { dolomite } from '../helpers/web3';
-import Logger from '../lib/logger';
-import MarketStore from '../lib/market-store';
-import Pageable from '../lib/pageable';
+import vGlpAbi from './abis/gmx-vester.json';
+import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
+import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
+import { dolomite } from '../src/helpers/web3';
+import Logger from '../src/lib/logger';
+import MarketStore from '../src/lib/market-store';
+import Pageable from '../src/lib/pageable';
 
 const GLP_MARKET_ID = 6;
 const GLP_TOKEN_ADDRESS = '0x1aDDD80E6039594eE970E5872D247bf0414C8903';

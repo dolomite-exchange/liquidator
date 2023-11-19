@@ -9,7 +9,7 @@ import {
   getTransfers,
   getVestingPositionTransfers,
   getWithdrawals,
-} from '../clients/dolomite';
+} from '../../src/clients/dolomite';
 import {
   ApiAccount,
   ApiAmmLiquidityPosition,
@@ -21,8 +21,8 @@ import {
   ApiTransfer,
   ApiVestingPositionTransfer,
   ApiWithdrawal,
-} from './api-types';
-import Pageable from './pageable';
+} from '../../src/lib/api-types';
+import Pageable from '../../src/lib/pageable';
 import {
   AccountSubAccountToMarketToBalanceMap,
   AccountToAmmLiquidityBalanceMap,

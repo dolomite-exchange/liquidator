@@ -16,24 +16,24 @@ import { ethers } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
 import fs from 'fs';
 import v8 from 'v8';
-import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../clients/dolomite';
-import { dolomite } from '../helpers/web3';
+import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
+import { dolomite } from '../src/helpers/web3';
 import {
   addLiquidityMiningVestingPositions,
   getAccountBalancesByMarket,
   getBalanceChangingEvents,
   getLiquidityPositionAndEvents,
-} from '../lib/event-parser';
-import Logger from '../lib/logger';
-import MarketStore from '../lib/market-store';
-import Pageable from '../lib/pageable';
+} from './lib/event-parser';
+import Logger from '../src/lib/logger';
+import MarketStore from '../src/lib/market-store';
+import Pageable from '../src/lib/pageable';
 import {
   calculateFinalRewards,
   calculateLiquidityPoints,
   calculateMerkleRootAndProofs,
   calculateTotalRewardPoints,
   OArbFinalAmount,
-} from '../lib/rewards';
+} from './lib/rewards';
 import liquidityMiningConfig from './config/oarb-season-0.json';
 
 /* eslint-enable */

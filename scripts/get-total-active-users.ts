@@ -16,12 +16,12 @@ import {
   getAllDolomiteAccountsWithSupplyValue,
   getDolomiteRiskParams,
   getLiquidatableDolomiteAccounts,
-} from '../clients/dolomite';
-import { getSubgraphBlockNumber } from '../helpers/block-helper';
-import { dolomite } from '../helpers/web3';
-import Logger from '../lib/logger';
-import MarketStore from '../lib/market-store';
-import Pageable from '../lib/pageable';
+} from '../src/clients/dolomite';
+import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
+import { dolomite } from '../src/helpers/web3';
+import Logger from '../src/lib/logger';
+import MarketStore from '../src/lib/market-store';
+import Pageable from '../src/lib/pageable';
 
 async function start() {
   const marketStore = new MarketStore();

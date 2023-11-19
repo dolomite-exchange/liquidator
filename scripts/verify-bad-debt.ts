@@ -14,12 +14,12 @@ if (process.env.ENV_FILENAME) {
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
-import { getDolomiteRiskParams } from '../clients/dolomite';
-import { getSubgraphBlockNumber } from '../helpers/block-helper';
-import { dolomite } from '../helpers/web3';
-import AccountStore from '../lib/account-store';
-import Logger from '../lib/logger';
-import MarketStore from '../lib/market-store';
+import { getDolomiteRiskParams } from '../src/clients/dolomite';
+import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
+import { dolomite } from '../src/helpers/web3';
+import AccountStore from '../src/lib/account-store';
+import Logger from '../src/lib/logger';
+import MarketStore from '../src/lib/market-store';
 
 async function start() {
   const marketStore = new MarketStore();

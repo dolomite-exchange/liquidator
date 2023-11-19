@@ -13,8 +13,8 @@ if (process.env.ENV_FILENAME) {
 /* eslint-disable */
 import { address, BigNumber } from '@dolomite-exchange/dolomite-margin';
 import v8 from 'v8';
-import { getTimestampToBlockNumberMap, getTotalAmmPairYield } from '../clients/dolomite';
-import Logger from '../lib/logger';
+import { getTimestampToBlockNumberMap, getTotalAmmPairYield } from '../src/clients/dolomite';
+import Logger from '../src/lib/logger';
 
 async function start() {
   let userAddress: address;
