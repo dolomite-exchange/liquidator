@@ -183,7 +183,12 @@ export async function getLiquidatableDolomiteAccounts(
 ): Promise<{ accounts: ApiAccount[] }> {
   const query = `
             query getActiveMarginAccounts($blockNumber: Int, $lastId: ID) {
-                marginAccounts(where: { hasBorrowValue: true id_gt: $lastId  } orderBy: id block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE}) {
+                marginAccounts(
+                  where: { hasBorrowValue: true id_gt: $lastId  }
+                  block: { number: $blockNumber }
+                  orderBy: id
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                ) {
                   id
                   user {
                     id
@@ -743,7 +748,12 @@ export async function getAllDolomiteAccountsWithSupplyValue(
 ): Promise<{ accounts: ApiAccount[] }> {
   const query = `
             query getActiveMarginAccounts($blockNumber: Int, $lastId: ID) {
-                marginAccounts(first: 1000, orderBy: id where: { hasBorrowValue: true id_gt: $lastId } block: { number: $blockNumber }) {
+                marginAccounts(
+                  where: { hasSupplyValue: true id_gt: $lastId }
+                  block: { number: $blockNumber }
+                  orderBy: id
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                ) {
                   id
                   user {
                     id
@@ -775,7 +785,12 @@ export async function getExpiredAccounts(
 ): Promise<{ accounts: ApiAccount[] }> {
   const query = `
             query getActiveMarginAccounts($blockNumber: Int, $lastId: ID) {
-                marginAccounts(where: { hasBorrowValue: true hasExpiration: true id_gt: $lastId } orderBy: id block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE}) {
+                marginAccounts(
+                  where: { hasBorrowValue: true hasExpiration: true id_gt: $lastId }
+                  block: { number: $blockNumber }
+                  orderBy: id
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                ) {
                   id
                   user {
                     id

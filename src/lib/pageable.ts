@@ -10,17 +10,13 @@ export default class Pageable {
     do {
       queryResults = await getterFn(lastValue)
 
-      if (queryResults.length == 0) {
+      if (queryResults.length === 0) {
         break;
       }
 
       lastValue = queryResults[queryResults.length - 1]['id'];
       results = results.concat(queryResults);
-
-      if (queryResults.length < Pageable.MAX_PAGE_SIZE) {
-        break;
-      }
-    } while (queryResults.length !== 0);
+    } while (queryResults.length !== 0 && queryResults.length === Pageable.MAX_PAGE_SIZE);
 
     return results
   }
