@@ -7,7 +7,7 @@
     "test": "NODE_ENV=test jest --runInBand",
     "coverage": "NODE_ENV=test jest --coverage --runInBand --forceExit --coverageReporters=text-lcov | node_modules/.bin/coveralls",
     "build": "rm -rf build/ && node_modules/.bin/tsc",
-    "start": "node build/src/index.js",
+    "start": "node --max-old-space-size=4096 build/src/index.js",
     "lint": "eslint . --ext .js --ignore-path .gitignore",
     "compose-clean": "docker-compose rm -f",
     "migrate": "echo 'Nothing to migrate'",
