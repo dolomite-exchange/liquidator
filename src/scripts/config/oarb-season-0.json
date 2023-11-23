@@ -14,6 +14,21 @@
         "7": "6300",
         "3": "2700"
       }
+    },
+    "1": {
+      "epoch": 1,
+      "startTimestamp": 1700092800,
+      "endTimestamp": 1700697600,
+      "startBlockNumber": 150811015,
+      "endBlockNumber": 153095992,
+      "oArbAmount": "90000",
+      "rewardWeights": {
+        "17": "36000",
+        "0": "22500",
+        "4": "22500",
+        "7": "6300",
+        "3": "2700"
+      }
     }
   },
   "seasonEndTimestamp": 1708041600

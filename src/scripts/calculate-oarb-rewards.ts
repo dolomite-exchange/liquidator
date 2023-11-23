@@ -72,6 +72,7 @@ async function start() {
   const blockRewardEnd = liquidityMiningConfig.epochs[epoch].endBlockNumber;
   const blockRewardEndTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
 
+  const oArbAmount = liquidityMiningConfig.epochs[epoch].oArbAmount;
   const rewardWeights = liquidityMiningConfig.epochs[epoch].rewardWeights as Record<string, string>;
   const oArbRewardWeiMap = Object.keys(rewardWeights).reduce<Record<string, BigNumber>>((acc, key) => {
     acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
@@ -96,10 +97,16 @@ async function start() {
 
   Logger.info({
     message: 'DolomiteMargin data',
+    blockRewardStart,
+    blockRewardStartTimestamp,
+    blockRewardEnd,
+    blockRewardEndTimestamp,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     networkId,
+    oArbAmount,
+    rewardWeights,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
@@ -193,6 +200,7 @@ function rectifyRewardsForEpoch0IfNecessary(
   walletAddressToLeavesMap: Record<string, OArbFinalAmount>,
 ): void {
   if (epoch !== 0) {
+    console.log('Skipping rectifying amounts...');
     return;
   }
 
