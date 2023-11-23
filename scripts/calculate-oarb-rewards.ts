@@ -61,6 +61,7 @@ async function start() {
     const blockRewardStartTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
     const blockRewardEnd = liquidityMiningConfig.epochs[epoch].endBlockNumber;
     const blockRewardEndTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
+    const oArbAmount = liquidityMiningConfig.epochs[epoch].oArbAmount;
 
     const rewardWeights = liquidityMiningConfig.epochs[epoch].rewardWeights as Record<string, string>;
     const oArbRewardWeiMap = Object.keys(rewardWeights).reduce<Record<string, BigNumber>>((acc, key) => {
@@ -86,10 +87,16 @@ async function start() {
 
     Logger.info({
         message: 'DolomiteMargin data',
+        blockRewardStart,
+        blockRewardStartTimestamp,
+        blockRewardEnd,
+        blockRewardEndTimestamp,
         dolomiteMargin: libraryDolomiteMargin,
         ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
         heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
         networkId,
+        oArbAmount,
+        rewardWeights,
         subgraphUrl: process.env.SUBGRAPH_URL,
     });
 
