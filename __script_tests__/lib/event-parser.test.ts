@@ -16,12 +16,12 @@ import {
   parseTransfers,
   parseVestingPositionTransfers,
   VESTING_ACCOUNT_NUMBER,
-} from '../../src/lib/event-parser';
+} from '../../scripts/lib/event-parser';
 import {
   AccountSubAccountToMarketToBalanceMap,
   AccountToSubAccountMarketToBalanceChangeMap,
   BalanceAndRewardPoints,
-} from '../../src/lib/rewards';
+} from '../../scripts/lib/rewards';
 
 const address1 = '0x44f6ccf0d09ef0d4991eb74d8c26d77a52a1ba9e';
 const address2 = '0x668035c440606da01e788991bfbba5c0d24133ab';

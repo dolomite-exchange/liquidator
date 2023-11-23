@@ -6,6 +6,7 @@ import { dolomite } from '../helpers/web3';
 import { ApiMarket, MarketIndex } from './api-types';
 import { delay } from './delay';
 import Logger from './logger';
+import Pageable from './pageable';
 
 export default class MarketStore {
   private blockNumber: number;
@@ -88,15 +89,10 @@ export default class MarketStore {
 
     const { blockNumber, blockTimestamp } = await getSubgraphBlockNumber();
 
-    let nextDolomiteMarkets: ApiMarket[] = [];
-    let queryDolomiteMarkets: ApiMarket[] = [];
-    let pageIndex = 0;
-    do {
-      const { markets } = await getDolomiteMarkets(blockNumber, pageIndex);
-      nextDolomiteMarkets = nextDolomiteMarkets.concat(markets);
-      queryDolomiteMarkets = markets;
-      pageIndex += 1;
-    } while (queryDolomiteMarkets.length !== 0)
+    const nextDolomiteMarkets = await Pageable.getPageableValues(async (lastId) => {
+      const result = await getDolomiteMarkets(blockNumber, lastId);
+      return result.markets
+    });
 
     this.blockNumber = blockNumber;
     this.blockTimestamp = blockTimestamp;

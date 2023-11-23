@@ -11,8 +11,8 @@ import {
   calculateFinalRewards,
   calculateLiquidityPoints,
   calculateTotalRewardPoints,
-} from '../../src/lib/rewards';
-import liquidityMiningConfig from '../../src/scripts/config/oarb-season-0.json';
+} from '../../scripts/lib/rewards';
+import liquidityMiningConfig from '../../scripts/config/oarb-season-0.json';
 
 const blockRewardStartTimestamp = 1697000000;
 const blockRewardEndTimestamp = 1698000000;

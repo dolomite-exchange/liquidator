@@ -9,7 +9,7 @@ const provider: any = new Web3.providers.HttpProvider(process.env.ETHEREUM_NODE_
 
 const networkId = Number(process.env.NETWORK_ID);
 if (Object.keys(ChainId).indexOf(networkId.toString()) === -1) {
-  throw new Error(`Invalid networkId ${networkId}`)
+  throw new Error(`Invalid networkId ${process.env.NETWORK_ID}`)
 }
 
 export const dolomite = new DolomiteMargin(
