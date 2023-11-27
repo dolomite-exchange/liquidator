@@ -1,0 +1,1068 @@
+[
+  {
+    "inputs": [],
+    "name": "BORROW_POSITION_PROXY",
+    "outputs": [
+      {
+        "internalType": "contract IBorrowPositionProxyV2",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_MARGIN",
+    "outputs": [
+      {
+        "internalType": "contract IDolomiteMargin",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "OWNER",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "UNDERLYING_TOKEN",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "VAULT_FACTORY",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_sender",
+        "type": "address"
+      }
+    ],
+    "name": "acceptFullAccountTransfer",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_fromAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "_marketIdsPath",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_inputAmountWei",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_minOutputAmountWei",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "enum IGenericTraderBase.TraderType",
+            "name": "traderType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "makerAccountIndex",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "trader",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes",
+            "name": "tradeData",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct IGenericTraderBase.TraderParam[]",
+        "name": "_tradersPath",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "number",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.AccountInfo[]",
+        "name": "_makerAccounts",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+            "name": "balanceCheckFlag",
+            "type": "uint8"
+          }
+        ],
+        "internalType": "struct IGenericTraderProxyV1.UserConfig",
+        "name": "_userConfig",
+        "type": "tuple"
+      }
+    ],
+    "name": "addCollateralAndSwapExactInputForOutput",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_toAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "_collateralMarketIds",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "closeBorrowPositionWithOtherTokens",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_toAccountNumber",
+        "type": "uint256"
+      }
+    ],
+    "name": "closeBorrowPositionWithUnderlyingVaultToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_toAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amountWei",
+        "type": "uint256"
+      }
+    ],
+    "name": "depositIntoVaultForDolomiteMargin",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "dolomiteRegistry",
+    "outputs": [
+      {
+        "internalType": "contract IDolomiteRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "esGmx",
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "esGmxBalanceOf",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_from",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "executeDepositIntoVault",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "executeWithdrawalFromVault",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_esGmxAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "getGlpAmountNeededForEsGmxVesting",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_esGmxAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "getGmxAmountNeededForEsGmxVesting",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "gmx",
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "gmxBalanceOf",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "gmxRewardsRouter",
+    "outputs": [
+      {
+        "internalType": "contract IGmxRewardRouterV2",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "_shouldClaimGmx",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldStakeGmx",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldClaimEsGmx",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldStakeEsGmx",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldStakeMultiplierPoints",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldClaimWeth",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldDepositWethIntoDolomite",
+        "type": "bool"
+      }
+    ],
+    "name": "handleRewards",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "_shouldClaimGmx",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldStakeGmx",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldClaimEsGmx",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldStakeEsGmx",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldStakeMultiplierPoints",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldClaimWeth",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_shouldDepositWethIntoDolomite",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_depositAccountNumberForWeth",
+        "type": "uint256"
+      }
+    ],
+    "name": "handleRewardsWithSpecificDepositAccountNumber",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "hasAcceptedFullAccountTransfer",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "isAcceptingFullAccountTransfer",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "marketId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_fromAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_toAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amountWei",
+        "type": "uint256"
+      }
+    ],
+    "name": "openBorrowPosition",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "registry",
+    "outputs": [
+      {
+        "internalType": "contract IGmxRegistryV1",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_fromAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+        "name": "_balanceCheckFlag",
+        "type": "uint8"
+      }
+    ],
+    "name": "repayAllForBorrowPosition",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "sGlp",
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "sGmx",
+    "outputs": [
+      {
+        "internalType": "contract ISGMX",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "stakeEsGmx",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "stakeGmx",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_tradeAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "_marketIdsPath",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_inputAmountWei",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_minOutputAmountWei",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "enum IGenericTraderBase.TraderType",
+            "name": "traderType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "makerAccountIndex",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "trader",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes",
+            "name": "tradeData",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct IGenericTraderBase.TraderParam[]",
+        "name": "_tradersPath",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "number",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.AccountInfo[]",
+        "name": "_makerAccounts",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+            "name": "balanceCheckFlag",
+            "type": "uint8"
+          }
+        ],
+        "internalType": "struct IGenericTraderProxyV1.UserConfig",
+        "name": "_userConfig",
+        "type": "tuple"
+      }
+    ],
+    "name": "swapExactInputForOutput",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_toAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "_marketIdsPath",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_inputAmountWei",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_minOutputAmountWei",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "enum IGenericTraderBase.TraderType",
+            "name": "traderType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "makerAccountIndex",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "trader",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes",
+            "name": "tradeData",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct IGenericTraderBase.TraderParam[]",
+        "name": "_tradersPath",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "number",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.AccountInfo[]",
+        "name": "_makerAccounts",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+            "name": "balanceCheckFlag",
+            "type": "uint8"
+          }
+        ],
+        "internalType": "struct IGenericTraderProxyV1.UserConfig",
+        "name": "_userConfig",
+        "type": "tuple"
+      }
+    ],
+    "name": "swapExactInputForOutputAndRemoveCollateral",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_toAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amountWei",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+        "name": "_balanceCheckFlag",
+        "type": "uint8"
+      }
+    ],
+    "name": "transferFromPositionWithOtherToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_toAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amountWei",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferFromPositionWithUnderlyingToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_fromAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amountWei",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+        "name": "_balanceCheckFlag",
+        "type": "uint8"
+      }
+    ],
+    "name": "transferIntoPositionWithOtherToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_fromAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_borrowAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amountWei",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferIntoPositionWithUnderlyingToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "underlyingBalanceOf",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "unstakeEsGmx",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "unstakeGmx",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "_shouldStakeGmx",
+        "type": "bool"
+      }
+    ],
+    "name": "unvestGlp",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "_shouldStakeGmx",
+        "type": "bool"
+      }
+    ],
+    "name": "unvestGmx",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "vGlp",
+    "outputs": [
+      {
+        "internalType": "contract IGmxVester",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "vGmx",
+    "outputs": [
+      {
+        "internalType": "contract IGmxVester",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_esGmxAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "vestGlp",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_esGmxAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "vestGmx",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_fromAccountNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amountWei",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawFromVaultForDolomiteMargin",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

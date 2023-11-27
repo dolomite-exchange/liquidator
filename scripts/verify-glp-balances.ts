@@ -5,6 +5,7 @@ import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
 import vGlpAbi from './abis/gmx-vester.json';
+import GlpIsolationModeVaultAbi from './abis/glp-isolation-mode-vault.json';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
@@ -61,7 +62,6 @@ async function start() {
         const dolomiteBalance = Object.values(account.balances)
             .reduce((memo, balance) => {
                 if (balance.marketId === GLP_MARKET_ID) {
-                    // increase the borrow size by the premium
                     memo = memo.plus(balance.par);
                 }
                 return memo;
@@ -73,16 +73,25 @@ async function start() {
     const vGlpToken = new dolomite.web3.eth.Contract(vGlpAbi, V_GLP_TOKEN_ADDRESS);
 
     let invalidBalanceCount = 0;
+    let totalGmxBalances = new BigNumber(0);
     const accountOwners = Object.keys(accountToDolomiteBalanceMap);
     for (let i = 0; i < accountOwners.length; i++) {
         const dolomiteBalance = accountToDolomiteBalanceMap[accountOwners[i]];
         if (dolomiteBalance.gt(INTEGERS.ZERO)) {
-            let actualBalance = await dolomite.token.getBalance(GLP_TOKEN_ADDRESS, accountOwners[i], {blockNumber});
-            const vGlpBalanceString = await dolomite.contracts.callConstantContractFunction(
+            const glpIsolationModeVault = new dolomite.web3.eth.Contract(GlpIsolationModeVaultAbi, accountOwners[i]);
+            const [nakedBalance, vGlpBalanceString, gmxBalanceString] = await Promise.all([
+              dolomite.token.getBalance(GLP_TOKEN_ADDRESS, accountOwners[i], {blockNumber}),
+              dolomite.contracts.callConstantContractFunction(
                 vGlpToken.methods['pairAmounts'](accountOwners[i]),
                 {blockNumber},
-            );
-            actualBalance = actualBalance.plus(vGlpBalanceString);
+              ),
+              dolomite.contracts.callConstantContractFunction(
+                glpIsolationModeVault.methods['gmxBalanceOf'](),
+                {blockNumber},
+              ),
+            ]);
+            const actualBalance = nakedBalance.plus(vGlpBalanceString);
+            totalGmxBalances = totalGmxBalances.plus(gmxBalanceString);
 
             if (!dolomiteBalance.eq(actualBalance)) {
                 invalidBalanceCount += 1;
@@ -97,6 +106,7 @@ async function start() {
         }
     }
 
+    Logger.info(`Total GMX: ${totalGmxBalances.div(1e18).toFixed()}`);
     Logger.info(`Number of invalid balances found ${invalidBalanceCount}`);
     return true
 }
