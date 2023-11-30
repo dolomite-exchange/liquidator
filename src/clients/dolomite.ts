@@ -113,7 +113,7 @@ async function getAccounts(
 export async function getDeposits(
   startBlock: number,
   endBlock: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ deposits: ApiDeposit[] }> {
   const query = `
   query getDeposits($startBlock: BigInt, $endBlock: Int, $lastId: ID) {
@@ -213,7 +213,7 @@ export async function getLiquidatableDolomiteAccounts(
 export async function getLiquidations(
   startBlock: number,
   endBlock: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ liquidations: ApiLiquidation[] }> {
   const query = `
     query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID) {
@@ -308,7 +308,7 @@ export async function getLiquidations(
 
 export async function getLiquidityMiningVestingPositions(
   blockNumber: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] }> {
   const query = `
     query getLiquidityMiningVestingPositions($blockNumber: Int, $lastId: ID) {
@@ -354,7 +354,7 @@ export async function getLiquidityMiningVestingPositions(
 
 export async function getLiquidityPositions(
   blockNumber: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ ammLiquidityPositions: ApiAmmLiquidityPosition[] }> {
   const query = `
     query getLiquidityPositions($blockNumber: Int, $lastId: ID) {
@@ -399,7 +399,7 @@ export async function getLiquidityPositions(
 export async function getLiquiditySnapshots(
   startBlock: number,
   endBlock: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ snapshots: ApiAmmLiquiditySnapshot[] }> {
   const query = `
     query getAmmLiquidityPositionSnapshots($startBlock: Int, $endBlock: Int, $lastId: ID) {
@@ -450,7 +450,7 @@ export async function getLiquiditySnapshots(
 export async function getTrades(
   startBlock: number,
   endBlock: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ trades: ApiTrade[] }> {
   const query = `
     query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID) {
@@ -536,7 +536,7 @@ export async function getTrades(
 export async function getTransfers(
   startBlock: number,
   endBlock: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ transfers: ApiTransfer[] }> {
   const query = `
     query getTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
@@ -618,7 +618,7 @@ export async function getTransfers(
 export async function getVestingPositionTransfers(
   startBlock: number,
   endBlock: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ vestingPositionTransfers: ApiVestingPositionTransfer[] }> {
   const query = `
     query getLiquidityMiningVestingPositionTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
@@ -678,7 +678,7 @@ export async function getVestingPositionTransfers(
 export async function getWithdrawals(
   startBlock: number,
   endBlock: number,
-  lastId: number = 0,
+  lastId: string,
 ): Promise<{ withdrawals: ApiWithdrawal[] }> {
   const query = `
     query getWithdrawals($startBlock: Int, $endBlock: Int, $lastId: ID) {

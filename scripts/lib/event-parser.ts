@@ -79,38 +79,38 @@ export async function getBalanceChangingEvents(
 ): Promise<AccountToSubAccountMarketToBalanceChangeMap> {
   const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
 
-  const deposits = await Pageable.getPageableValues((async (lastIndex) => {
-    const results = await getDeposits(rewardsStartBlockNumber, rewardsEndBlockNumber, lastIndex);
+  const deposits = await Pageable.getPageableValues((async (lastId) => {
+    const results = await getDeposits(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
     return results.deposits;
   }));
   parseDeposits(accountToAssetToEventsMap, deposits);
 
-  const withdrawals = await Pageable.getPageableValues((async (lastIndex) => {
-    const results = await getWithdrawals(rewardsStartBlockNumber, rewardsEndBlockNumber, lastIndex);
+  const withdrawals = await Pageable.getPageableValues((async (lastId) => {
+    const results = await getWithdrawals(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
     return results.withdrawals;
   }));
   parseWithdrawals(accountToAssetToEventsMap, withdrawals);
 
-  const transfers = await Pageable.getPageableValues((async (lastIndex) => {
-    const results = await getTransfers(rewardsStartBlockNumber, rewardsEndBlockNumber, lastIndex);
+  const transfers = await Pageable.getPageableValues((async (lastId) => {
+    const results = await getTransfers(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
     return results.transfers;
   }));
   parseTransfers(accountToAssetToEventsMap, transfers);
 
-  const trades = await Pageable.getPageableValues((async (lastIndex) => {
-    const results = await getTrades(rewardsStartBlockNumber, rewardsEndBlockNumber, lastIndex);
+  const trades = await Pageable.getPageableValues((async (lastId) => {
+    const results = await getTrades(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
     return results.trades;
   }));
   parseTrades(accountToAssetToEventsMap, trades);
 
-  const vestingPositionTransfers = await Pageable.getPageableValues((async (lastIndex) => {
-    const results = await getVestingPositionTransfers(rewardsStartBlockNumber, rewardsEndBlockNumber, lastIndex);
+  const vestingPositionTransfers = await Pageable.getPageableValues((async (lastId) => {
+    const results = await getVestingPositionTransfers(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
     return results.vestingPositionTransfers;
   }));
   parseVestingPositionTransfers(accountToAssetToEventsMap, vestingPositionTransfers);
 
-  const liquidations = await Pageable.getPageableValues((async (lastIndex) => {
-    const results = await getLiquidations(rewardsStartBlockNumber, rewardsEndBlockNumber, lastIndex);
+  const liquidations = await Pageable.getPageableValues((async (lastId) => {
+    const results = await getLiquidations(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
     return results.liquidations;
   }));
   parseLiquidations(accountToAssetToEventsMap, liquidations);
@@ -129,15 +129,15 @@ export async function getLiquidityPositionAndEvents(
   blockRewardStartTimestamp: number,
 ): Promise<LiquidityPositionsAndEvents> {
   const ammLiquidityBalances: AccountToAmmLiquidityBalanceMap = {};
-  const ammLiquidityPositions = await Pageable.getPageableValues((async (lastIndex) => {
-    const results = await getLiquidityPositions(rewardsStartBlockNumber, lastIndex);
+  const ammLiquidityPositions = await Pageable.getPageableValues((async (lastId) => {
+    const results = await getLiquidityPositions(rewardsStartBlockNumber, lastId);
     return results.ammLiquidityPositions;
   }));
   parseAmmLiquidityPositions(ammLiquidityBalances, ammLiquidityPositions, blockRewardStartTimestamp);
 
   const userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap = {};
-  const ammLiquiditySnapshots = await Pageable.getPageableValues((async (lastIndex) => {
-    const { snapshots } = await getLiquiditySnapshots(rewardsStartBlockNumber, rewardsEndBlockNumber, lastIndex);
+  const ammLiquiditySnapshots = await Pageable.getPageableValues((async (lastId) => {
+    const { snapshots } = await getLiquiditySnapshots(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
     return snapshots;
   }));
   parseAmmLiquiditySnapshots(userToLiquiditySnapshots, ammLiquiditySnapshots);

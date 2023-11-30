@@ -141,7 +141,10 @@ export function calculateTotalRewardPoints(
           delete accountInfoToDolomiteBalanceMap[account]![subAccount];
         }
       });
-      if (Object.keys(accountInfoToDolomiteBalanceMap[account]!).length === 0) {
+      if (
+        accountInfoToDolomiteBalanceMap[account]
+        && Object.keys(accountInfoToDolomiteBalanceMap[account]!).length === 0
+      ) {
         delete accountInfoToDolomiteBalanceMap[account];
       }
     }
@@ -248,14 +251,15 @@ export function calculateFinalRewards(
   });
 
   let filteredAmount = new BigNumber(0);
-  const finalizedRewardsMap = Object.keys(effectiveUserToOarbRewards).reduce<Record<string, BigNumber>>((map, account) => {
-    if (effectiveUserToOarbRewards[account].gte(minimumOArbAmount)) {
-      map[account] = effectiveUserToOarbRewards[account];
-    } else {
-      filteredAmount = filteredAmount.plus(effectiveUserToOarbRewards[account]);
-    }
-    return map;
-  }, {});
+  const finalizedRewardsMap = Object.keys(effectiveUserToOarbRewards)
+    .reduce<Record<string, BigNumber>>((map, account) => {
+      if (effectiveUserToOarbRewards[account].gte(minimumOArbAmount)) {
+        map[account] = effectiveUserToOarbRewards[account];
+      } else {
+        filteredAmount = filteredAmount.plus(effectiveUserToOarbRewards[account]);
+      }
+      return map;
+    }, {});
 
   console.log('OARB amount filtered out:', filteredAmount.dividedBy('1000000000000000000').toFixed(2));
 
