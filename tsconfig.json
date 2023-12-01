@@ -32,5 +32,6 @@
     "__tests__/**/*.ts",
     "src/**/*.ts",
     "environment.d.ts",
+    "scripts/**/*.ts"
   ],
 }

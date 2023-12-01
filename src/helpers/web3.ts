@@ -1,6 +1,7 @@
 import { DolomiteMargin, Web3 } from '@dolomite-exchange/dolomite-margin';
 import { ChainId } from '../lib/chain-id';
 import Logger from '../lib/logger';
+import '../lib/env';
 
 const accountWalletAddress = process.env.ACCOUNT_WALLET_ADDRESS?.toLowerCase() ?? '';
 const opts = { defaultAccount: accountWalletAddress };

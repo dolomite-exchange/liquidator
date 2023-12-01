@@ -14,6 +14,7 @@
     "migrate": "echo 'Nothing to migrate'",
     "seed": "echo 'Nothing to seed'",
     "calculate-oarb-rewards": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=.env.local npx ts-node scripts/calculate-oarb-rewards.ts",
+    "calculate-assets-held-for-duration": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=.env.local npx ts-node scripts/calculate-assets-held-for-duration.ts",
     "get-lp-yield": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-lp-yield.ts",
     "get-yt-glp-balances": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-yt-glp-balances.ts",
     "get-total-active-users": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-total-active-users.ts",

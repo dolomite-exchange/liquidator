@@ -1,9 +1,7 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
-import { ethers } from 'ethers';
-import { parseEther } from 'ethers/lib/utils';
 import fs from 'fs';
 import v8 from 'v8';
-import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
+import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
@@ -16,40 +14,40 @@ import {
   getBalanceChangingEvents,
   getLiquidityPositionAndEvents,
 } from './lib/event-parser';
-import {
-  calculateFinalRewards,
-  calculateLiquidityPoints,
-  calculateMerkleRootAndProofs,
-  calculateTotalRewardPoints,
-  OArbFinalAmount,
-} from './lib/rewards';
+import { calculateFinalPoints, calculateLiquidityPoints, calculateTotalRewardPoints } from './lib/rewards';
 
+/* eslint-enable */
 
 interface OutputFile {
   epochs: {
     [epoch: string]: {
       [walletAddressLowercase: string]: {
-        amount: string // big int
-        proofs: string[]
+        [marketId: string]: string // big int
       }
     }
   };
   metadata: {
     [epoch: string]: {
-      isFinalized: boolean
-      merkleRoot: string
+      totalPointsPerMarket: {
+        [marketId: string]: string // big int
+      }
     }
   };
 }
 
 const FOLDER_NAME = `${__dirname}/output`;
 
-const MINIMUM_OARB_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.1').toString());
-
 async function start() {
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
+  }
+  const maxMarketId = (await dolomite.getters.getNumMarkets()).toNumber();
+  const marketIds = (process.env.MARKET_IDS?.split(',') ?? []).map(marketId => parseInt(marketId.trim(), 10));
+  if (marketIds.length === 0 || marketIds.some(marketId => Number.isNaN(marketId))) {
+    return Promise.reject(new Error(`Invalid MARKET_IDS, found: ${process.env.MARKET_IDS}`));
+  } else if (marketIds.some(marketId => marketId >= maxMarketId)) {
+    return Promise.reject(new Error(`MARKET_IDS contains an element that is too large, found: ${marketIds}`));
   }
 
   const marketStore = new MarketStore();
@@ -58,24 +56,16 @@ async function start() {
   const blockRewardStartTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
   const blockRewardEnd = liquidityMiningConfig.epochs[epoch].endBlockNumber;
   const blockRewardEndTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
-  const oArbAmount = liquidityMiningConfig.epochs[epoch].oArbAmount;
 
-  const rewardWeights = liquidityMiningConfig.epochs[epoch].rewardWeights as Record<string, string>;
-  const oArbRewardWeiMap = Object.keys(rewardWeights).reduce<Record<string, BigNumber>>((acc, key) => {
-    acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
-    return acc;
+  const marketToIsValidMap = marketIds.reduce((memo, marketId) => {
+    memo[marketId] = true;
+    return memo;
   }, {});
 
-  const { riskParams } = await getDolomiteRiskParams(blockRewardStart);
   const networkId = await dolomite.web3.eth.net.getId();
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
-  if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
-    const message = `Invalid dolomite margin address found!\n
-    { network: ${riskParams.dolomiteMargin} library: ${libraryDolomiteMargin} }`;
-    Logger.error(message);
-    return Promise.reject(new Error(message));
-  } else if (networkId !== Number(process.env.NETWORK_ID)) {
+  if (networkId !== Number(process.env.NETWORK_ID)) {
     const message = `Invalid network ID found!\n
     { network: ${networkId} environment: ${Number(process.env.NETWORK_ID)} }`;
     Logger.error(message);
@@ -92,8 +82,7 @@ async function start() {
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     networkId,
-    oArbAmount,
-    rewardWeights,
+    marketToIsValidMap,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
@@ -118,40 +107,42 @@ async function start() {
     blockRewardStartTimestamp,
     blockRewardEndTimestamp,
   );
+  const allMarketIds = Object.keys(totalPointsPerMarket);
+  allMarketIds.forEach(marketId => {
+    if (!marketToIsValidMap[marketId]) {
+      delete totalPointsPerMarket[marketId];
+    }
+  });
 
   const { ammLiquidityBalances, userToLiquiditySnapshots } = await getLiquidityPositionAndEvents(
     blockRewardStart,
     blockRewardEnd,
     blockRewardStartTimestamp,
   );
-  const totalLiquidityPoints = calculateLiquidityPoints(
+  calculateLiquidityPoints(
     ammLiquidityBalances,
     userToLiquiditySnapshots,
     blockRewardStartTimestamp,
     blockRewardEndTimestamp,
   );
 
-  const userToOArbRewards = calculateFinalRewards(
+  const userToPointsMap = calculateFinalPoints(
     accountToDolomiteBalanceMap,
-    ammLiquidityBalances,
-    totalPointsPerMarket,
-    totalLiquidityPoints,
-    oArbRewardWeiMap,
-    MINIMUM_OARB_AMOUNT_WEI,
+    marketToIsValidMap,
   );
 
-  const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOArbRewards);
-
-  const fileName = `${FOLDER_NAME}/oarb-season-0-epoch-${epoch}-output.json`;
+  const allMarketIdsString = marketIds.join(',');
+  // eslint-disable-next-line max-len
+  const fileName = `${FOLDER_NAME}/markets-held-${blockRewardStartTimestamp}-${blockRewardEndTimestamp}-(${allMarketIdsString})-output.json`;
   const dataToWrite = readOutputFile(fileName);
-  dataToWrite.epochs[epoch] = walletAddressToLeavesMap;
+  dataToWrite.epochs[epoch] = userToPointsMap;
   dataToWrite.metadata[epoch] = {
-    merkleRoot,
-    isFinalized: true,
+    totalPointsPerMarket: Object.entries(totalPointsPerMarket).reduce((memo, [marketId, points]) => {
+      memo[marketId] = points.toFixed();
+      return memo;
+    }, {}),
   };
   writeOutputFile(fileName, dataToWrite);
-
-  rectifyRewardsForEpoch0IfNecessary(epoch, dataToWrite.epochs[epoch]);
 
   return true;
 }
@@ -179,47 +170,6 @@ function writeOutputFile(
     fileName,
     JSON.stringify(fileContent),
     { encoding: 'utf8', flag: 'w' },
-  );
-}
-
-function rectifyRewardsForEpoch0IfNecessary(
-  epoch: number,
-  walletAddressToLeavesMap: Record<string, OArbFinalAmount>,
-): void {
-  if (epoch !== 0) {
-    return;
-  }
-
-  const oldFile = `${__dirname}/finalized/oarb-season-0-epoch-${epoch}-output.json`;
-  const oldWalletAddressToFinalDataMap = readOutputFile(oldFile).epochs[epoch];
-
-  let cumulative = new BigNumber(0);
-  const deltasMap = Object.keys(walletAddressToLeavesMap).reduce<Record<string, BigNumber>>((map, wallet) => {
-    const oldAmount = new BigNumber(oldWalletAddressToFinalDataMap[wallet.toLowerCase()]?.amount ?? '0');
-    const newAmount = new BigNumber(walletAddressToLeavesMap[wallet.toLowerCase()].amount);
-    if (newAmount.gt(oldAmount)) {
-      map[wallet] = newAmount.minus(oldAmount);
-      cumulative = cumulative.plus(map[wallet]);
-    }
-    return map;
-  }, {});
-  console.log('Cumulative amount for fix (in wei):', cumulative.toString());
-  const deltasMerkleRootAndProofs = calculateMerkleRootAndProofs(deltasMap);
-
-  const rectifiedEpochNumber = '999';
-  writeOutputFile(
-    `${FOLDER_NAME}/oarb-season-0-epoch-${rectifiedEpochNumber}-deltas-output.json`,
-    {
-      epochs: {
-        [rectifiedEpochNumber]: deltasMerkleRootAndProofs.walletAddressToLeavesMap,
-      },
-      metadata: {
-        [rectifiedEpochNumber]: {
-          isFinalized: true,
-          merkleRoot: deltasMerkleRootAndProofs.merkleRoot,
-        },
-      },
-    },
   );
 }
 
