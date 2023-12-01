@@ -2,6 +2,7 @@ import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { defaultAbiCoder, keccak256 } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
+import { ONE_ETH_WEI } from '../../src/lib/constants';
 
 const LIQUIDITY_POOLS = ['0xb77a493a4950cad1b049e222d62bce14ff423c6f'];
 const blacklistedAddresses = process.env.BLACKLIST_ADDRESSES?.split(',') ?? []
@@ -212,37 +213,29 @@ export function calculateLiquidityPoints(
 
 export function calculateFinalPoints(
   accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
-  isValidMarketMap: Record<number, boolean | undefined>,
-): Record<string, Record<string, string>> {
-  const effectiveUserToMarketToPoints: Record<string, Record<string, BigNumber>> = {};
+  validMarketId: number,
+): Record<string, string> {
+  const effectiveUserToPoints: Record<string, BigNumber> = {};
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
     Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
       Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
-        const isValid = isValidMarketMap[market];
-        if (isValid) {
+        if (market === validMarketId.toString()) {
           const pointsStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
 
-          if (!effectiveUserToMarketToPoints[pointsStruct.effectiveUser]) {
-            effectiveUserToMarketToPoints[pointsStruct.effectiveUser] = {};
+          if (!effectiveUserToPoints[pointsStruct.effectiveUser]) {
+            effectiveUserToPoints[pointsStruct.effectiveUser] = new BigNumber(0);
           }
-          if (!effectiveUserToMarketToPoints[pointsStruct.effectiveUser][market]) {
-            effectiveUserToMarketToPoints[pointsStruct.effectiveUser][market] = new BigNumber(0);
-          }
-          effectiveUserToMarketToPoints[pointsStruct.effectiveUser][market]
-            = effectiveUserToMarketToPoints[pointsStruct.effectiveUser][market].plus(pointsStruct.rewardPoints);
+          effectiveUserToPoints[pointsStruct.effectiveUser]
+            = effectiveUserToPoints[pointsStruct.effectiveUser].plus(pointsStruct.rewardPoints);
         }
       });
     });
   });
 
-  return Object.keys(effectiveUserToMarketToPoints)
-    .reduce<Record<string, Record<string, string>>>((map, account) => {
-      map[account] = Object.keys(effectiveUserToMarketToPoints[account]).reduce((memo2, market) => {
-        memo2[market] = effectiveUserToMarketToPoints[account][market].toFixed();
-        return memo2;
-      }, {});
-      return map;
-    }, {});
+  return Object.keys(effectiveUserToPoints).reduce<Record<string, string>>((map, account) => {
+    map[account] = effectiveUserToPoints[account].multipliedBy(ONE_ETH_WEI).toFixed(0);
+    return map;
+  }, {});
 }
 
 export function calculateFinalRewards(
@@ -290,13 +283,13 @@ export function calculateFinalRewards(
   let filteredAmount = new BigNumber(0);
   const finalizedRewardsMap = Object.keys(effectiveUserToOarbRewards)
     .reduce<Record<string, BigNumber>>((map, account) => {
-      if (effectiveUserToOarbRewards[account].gte(minimumOArbAmount)) {
-        map[account] = effectiveUserToOarbRewards[account];
-      } else {
-        filteredAmount = filteredAmount.plus(effectiveUserToOarbRewards[account]);
-      }
-      return map;
-    }, {});
+    if (effectiveUserToOarbRewards[account].gte(minimumOArbAmount)) {
+      map[account] = effectiveUserToOarbRewards[account];
+    } else {
+      filteredAmount = filteredAmount.plus(effectiveUserToOarbRewards[account]);
+    }
+    return map;
+  }, {});
 
   console.log('OARB amount filtered out:', filteredAmount.dividedBy('1000000000000000000').toFixed(2));
 

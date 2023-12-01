@@ -3,6 +3,7 @@ import fs from 'fs';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
+import { ONE_ETH_WEI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
@@ -15,23 +16,22 @@ import {
   getLiquidityPositionAndEvents,
 } from './lib/event-parser';
 import { calculateFinalPoints, calculateLiquidityPoints, calculateTotalRewardPoints } from './lib/rewards';
+import TokenAbi from './abis/isolation-mode-factory.json';
 
 /* eslint-enable */
 
 interface OutputFile {
-  epochs: {
-    [epoch: string]: {
-      [walletAddressLowercase: string]: {
-        [marketId: string]: string // big int
-      }
-    }
+  users: {
+    [walletAddressLowercase: string]: string // big int
   };
   metadata: {
-    [epoch: string]: {
-      totalPointsPerMarket: {
-        [marketId: string]: string // big int
-      }
-    }
+    marketId: number
+    marketName: string // big int
+    totalPointsForMarket: string // big int
+    startBlock: number
+    endBlock: number
+    startTimestamp: number
+    endTimestamp: number
   };
 }
 
@@ -43,11 +43,11 @@ async function start() {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
   const maxMarketId = (await dolomite.getters.getNumMarkets()).toNumber();
-  const marketIds = (process.env.MARKET_IDS?.split(',') ?? []).map(marketId => parseInt(marketId.trim(), 10));
-  if (marketIds.length === 0 || marketIds.some(marketId => Number.isNaN(marketId))) {
-    return Promise.reject(new Error(`Invalid MARKET_IDS, found: ${process.env.MARKET_IDS}`));
-  } else if (marketIds.some(marketId => marketId >= maxMarketId)) {
-    return Promise.reject(new Error(`MARKET_IDS contains an element that is too large, found: ${marketIds}`));
+  const validMarketId = parseInt(process.env.MARKET_ID ?? 'NaN', 10);
+  if (Number.isNaN(validMarketId)) {
+    return Promise.reject(new Error(`Invalid MARKET_ID, found: ${process.env.MARKET_IDS}`));
+  } else if (validMarketId >= maxMarketId) {
+    return Promise.reject(new Error(`MARKET_ID contains an element that is too large, found: ${validMarketId}`));
   }
 
   const marketStore = new MarketStore();
@@ -56,11 +56,6 @@ async function start() {
   const blockRewardStartTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
   const blockRewardEnd = liquidityMiningConfig.epochs[epoch].endBlockNumber;
   const blockRewardEndTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
-
-  const marketToIsValidMap = marketIds.reduce((memo, marketId) => {
-    memo[marketId] = true;
-    return memo;
-  }, {});
 
   const networkId = await dolomite.web3.eth.net.getId();
 
@@ -82,7 +77,7 @@ async function start() {
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     networkId,
-    marketToIsValidMap,
+    marketId: validMarketId,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
@@ -109,7 +104,7 @@ async function start() {
   );
   const allMarketIds = Object.keys(totalPointsPerMarket);
   allMarketIds.forEach(marketId => {
-    if (!marketToIsValidMap[marketId]) {
+    if (marketId !== validMarketId.toString()) {
       delete totalPointsPerMarket[marketId];
     }
   });
@@ -128,20 +123,25 @@ async function start() {
 
   const userToPointsMap = calculateFinalPoints(
     accountToDolomiteBalanceMap,
-    marketToIsValidMap,
+    validMarketId,
   );
+  const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
+  const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
+  const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
 
-  const allMarketIdsString = marketIds.join(',');
   // eslint-disable-next-line max-len
-  const fileName = `${FOLDER_NAME}/markets-held-${blockRewardStartTimestamp}-${blockRewardEndTimestamp}-(${allMarketIdsString})-output.json`;
+  const fileName = `${FOLDER_NAME}/markets-held-${blockRewardStartTimestamp}-${blockRewardEndTimestamp}-${validMarketId}-output.json`;
   const dataToWrite = readOutputFile(fileName);
-  dataToWrite.epochs[epoch] = userToPointsMap;
-  dataToWrite.metadata[epoch] = {
-    totalPointsPerMarket: Object.entries(totalPointsPerMarket).reduce((memo, [marketId, points]) => {
-      memo[marketId] = points.toFixed();
-      return memo;
-    }, {}),
-  };
+  dataToWrite.users = userToPointsMap;
+  dataToWrite.metadata = {
+    marketId: validMarketId,
+    marketName: tokenName,
+    totalPointsForMarket: totalPointsPerMarket[validMarketId].times(ONE_ETH_WEI).toFixed(0),
+    startBlock: blockRewardStart,
+    endBlock: blockRewardEnd,
+    startTimestamp: blockRewardStartTimestamp,
+    endTimestamp: blockRewardEndTimestamp,
+  }
   writeOutputFile(fileName, dataToWrite);
 
   return true;
@@ -152,8 +152,16 @@ function readOutputFile(fileName: string): OutputFile {
     return JSON.parse(fs.readFileSync(fileName, 'utf8')) as OutputFile;
   } catch (e) {
     return {
-      epochs: {},
-      metadata: {},
+      users: {},
+      metadata: {
+        marketId: 0,
+        marketName: '',
+        totalPointsForMarket: '0',
+        startBlock: 0,
+        endBlock: 0,
+        startTimestamp: 0,
+        endTimestamp: 0,
+      },
     };
   }
 }
