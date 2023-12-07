@@ -24,7 +24,6 @@ import {
   OArbFinalAmount,
 } from './lib/rewards';
 
-
 interface OutputFile {
   epochs: {
     [epoch: string]: {
@@ -44,7 +43,7 @@ interface OutputFile {
 
 const FOLDER_NAME = `${__dirname}/output`;
 
-const MINIMUM_OARB_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.1').toString());
+const MINIMUM_OARB_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.01').toString());
 
 async function start() {
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
@@ -54,11 +53,13 @@ async function start() {
 
   const marketStore = new MarketStore();
 
-  const blockRewardStart = liquidityMiningConfig.epochs[epoch].startBlockNumber;
-  const blockRewardStartTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
-  const blockRewardEnd = liquidityMiningConfig.epochs[epoch].endBlockNumber;
-  const blockRewardEndTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
-  const oArbAmount = liquidityMiningConfig.epochs[epoch].oArbAmount;
+  const {
+    startBlockNumber,
+    startTimestamp,
+    endBlockNumber,
+    endTimestamp,
+    oArbAmount,
+  } = liquidityMiningConfig.epochs[epoch];
 
   const rewardWeights = liquidityMiningConfig.epochs[epoch].rewardWeights as Record<string, string>;
   const oArbRewardWeiMap = Object.keys(rewardWeights).reduce<Record<string, BigNumber>>((acc, key) => {
@@ -66,7 +67,7 @@ async function start() {
     return acc;
   }, {});
 
-  const { riskParams } = await getDolomiteRiskParams(blockRewardStart);
+  const { riskParams } = await getDolomiteRiskParams(startBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
@@ -84,10 +85,10 @@ async function start() {
 
   Logger.info({
     message: 'DolomiteMargin data',
-    blockRewardStart,
-    blockRewardStartTimestamp,
-    blockRewardEnd,
-    blockRewardEndTimestamp,
+    blockRewardStart: startBlockNumber,
+    blockRewardStartTimestamp: startTimestamp,
+    blockRewardEnd: endBlockNumber,
+    blockRewardEndTimestamp: endTimestamp,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
@@ -103,32 +104,32 @@ async function start() {
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockRewardStart, lastId);
+    const result = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
 
-  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, blockRewardStartTimestamp);
-  await addLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, blockRewardStart);
+  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp);
+  await addLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, startBlockNumber);
 
-  const accountToAssetToEventsMap = await getBalanceChangingEvents(blockRewardStart, blockRewardEnd);
+  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
   const totalPointsPerMarket = calculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
-    blockRewardStartTimestamp,
-    blockRewardEndTimestamp,
+    startTimestamp,
+    endTimestamp,
   );
 
   const { ammLiquidityBalances, userToLiquiditySnapshots } = await getLiquidityPositionAndEvents(
-    blockRewardStart,
-    blockRewardEnd,
-    blockRewardStartTimestamp,
+    startBlockNumber,
+    endBlockNumber,
+    startTimestamp,
   );
   const totalLiquidityPoints = calculateLiquidityPoints(
     ammLiquidityBalances,
     userToLiquiditySnapshots,
-    blockRewardStartTimestamp,
-    blockRewardEndTimestamp,
+    startTimestamp,
+    endTimestamp,
   );
 
   const userToOArbRewards = calculateFinalRewards(

@@ -140,7 +140,7 @@ export async function getDeposits(
   }
   `;
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -258,7 +258,7 @@ export async function getLiquidations(
     }
   `;
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -322,7 +322,7 @@ export async function getLiquidityMiningVestingPositions(
     }
   `;
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -368,7 +368,7 @@ export async function getLiquidityPositions(
     }
   `;
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -416,7 +416,7 @@ export async function getLiquiditySnapshots(
   `;
 
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -490,7 +490,7 @@ export async function getTrades(
     }
   `;
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -573,7 +573,7 @@ export async function getTransfers(
     }
   `;
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -641,7 +641,7 @@ export async function getVestingPositionTransfers(
     }
   `;
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -705,7 +705,7 @@ export async function getWithdrawals(
     }
   `;
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query,
       variables: {
@@ -879,7 +879,7 @@ export async function getDolomiteMarkets(
 
 export async function getDolomiteRiskParams(blockNumber: number): Promise<{ riskParams: ApiRiskParam }> {
   const result: any = await axios.post(
-    `${process.env.SUBGRAPH_URL}`,
+    subgraphUrl,
     {
       query: `query getDolomiteMargins($blockNumber: Int) {
         dolomiteMargins(block: { number: $blockNumber }) {
@@ -978,7 +978,7 @@ export async function getTotalAmmPairYield(blockNumbers: number[], user: address
   }
   for (let i = 0; i < queryChunks.length; i += 1) {
     const result = await axios.post(
-      `${process.env.SUBGRAPH_URL}`,
+      subgraphUrl,
       {
         query: `query getAmmDataForUser {
         ${queryChunks[i]}

@@ -8,12 +8,13 @@
       "endBlockNumber": 150811015,
       "oArbAmount": "90000",
       "rewardWeights": {
-        "17": "36000",
         "0": "22500",
+        "3": "2700",
         "4": "22500",
         "7": "6300",
-        "3": "2700"
-      }
+        "17": "36000"
+      },
+      "isFinalized": true
     },
     "1": {
       "epoch": 1,
@@ -23,12 +24,13 @@
       "endBlockNumber": 153095992,
       "oArbAmount": "90000",
       "rewardWeights": {
-        "17": "36000",
         "0": "22500",
+        "3": "2700",
         "4": "22500",
         "7": "6300",
-        "3": "2700"
-      }
+        "17": "36000"
+      },
+      "isFinalized": true
     },
     "2": {
       "epoch": 2,
@@ -38,13 +40,45 @@
       "endBlockNumber": 155378529,
       "oArbAmount": "90000",
       "rewardWeights": {
-        "17": "36000",
         "0": "22500",
+        "3": "2700",
         "4": "22500",
         "7": "6300",
-        "3": "2700"
-      }
+        "17": "36000"
+      },
+      "isFinalized": true
+    },
+    "3": {
+      "epoch": 3,
+      "startBlockNumber": 155378529,
+      "startTimestamp": 1701302400,
+      "endBlockNumber": 157581702,
+      "endTimestamp": 1701907200,
+      "oArbAmount": "90000",
+      "rewardWeights": {
+        "0": "22500",
+        "3": "2700",
+        "4": "22500",
+        "7": "6300",
+        "17": "36000"
+      },
+      "isFinalized": true
+    },
+    "4": {
+      "epoch": 4,
+      "startBlockNumber": 157581702,
+      "startTimestamp": 1701907200,
+      "endBlockNumber": 157718062,
+      "endTimestamp": 1701944283,
+      "oArbAmount": "90000",
+      "rewardWeights": {
+        "0": "22500",
+        "3": "2700",
+        "4": "22500",
+        "7": "6300",
+        "17": "36000"
+      },
+      "isFinalized": false
     }
-  },
-  "seasonEndTimestamp": 1708041600
+  }
 }
