@@ -117,7 +117,11 @@ export async function getDeposits(
 ): Promise<{ deposits: ApiDeposit[] }> {
   const query = `
   query getDeposits($startBlock: BigInt, $endBlock: Int, $lastId: ID) {
-    deposits(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
+    deposits(
+      first: 1000,
+      orderBy: id
+      where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+    ) {
       id
       serialId
       transaction {
@@ -158,17 +162,17 @@ export async function getDeposits(
     return Promise.reject(result.errors[0]);
   }
 
-  const deposits: ApiDeposit[] = result.data.deposits.map(deposit => {
+  const deposits = (result.data.deposits as any[]).map<ApiDeposit>(deposit => {
     return {
       id: deposit.id,
-      serialId: deposit.serialId,
-      timestamp: deposit.transaction.timestamp,
+      serialId: parseInt(deposit.serialId, 10),
+      timestamp: parseInt(deposit.transaction.timestamp, 10),
       marginAccount: {
         user: deposit.marginAccount.user.id.toLowerCase(),
         accountNumber: deposit.marginAccount.accountNumber,
       },
       effectiveUser: deposit.effectiveUser.id.toLowerCase(),
-      marketId: new BigNumber(deposit.token.marketId),
+      marketId: new BigNumber(deposit.token.marketId).toNumber(),
       amountDeltaPar: new BigNumber(deposit.amountDeltaPar),
     }
   });
@@ -217,7 +221,11 @@ export async function getLiquidations(
 ): Promise<{ liquidations: ApiLiquidation[] }> {
   const query = `
     query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      liquidations(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
+      liquidations(
+        first: 1000,
+        orderBy: id
+        where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+      ) {
         id
         serialId
         transaction {
@@ -279,11 +287,11 @@ export async function getLiquidations(
   if (result.data.liquidations.length === 0) {
     return { liquidations: [] };
   }
-  const liquidations: ApiLiquidation[] = result.data.liquidations.map(liquidation => {
+  const liquidations = (result.data.liquidations as any[]).map<ApiLiquidation>(liquidation => {
     return {
       id: liquidation.id,
-      serialId: liquidation.serialId,
-      timestamp: liquidation.transaction.timestamp,
+      serialId: parseInt(liquidation.serialId, 10),
+      timestamp: parseInt(liquidation.transaction.timestamp, 10),
       solidEffectiveUser: liquidation.solidEffectiveUser.id.toLowerCase(),
       solidMarginAccount: {
         user: liquidation.solidMarginAccount.user.id.toLowerCase(),
@@ -294,8 +302,8 @@ export async function getLiquidations(
         user: liquidation.liquidMarginAccount.user.id.toLowerCase(),
         accountNumber: liquidation.liquidMarginAccount.accountNumber,
       },
-      heldToken: liquidation.heldToken.marketId,
-      borrowedToken: liquidation.borrowedToken.marketId,
+      heldMarketId: new BigNumber(liquidation.heldToken.marketId).toNumber(),
+      borrowedMarketId: new BigNumber(liquidation.borrowedToken.marketId).toNumber(),
       solidHeldTokenAmountDeltaPar: liquidation.solidHeldTokenAmountDeltaPar,
       liquidHeldTokenAmountDeltaPar: liquidation.liquidHeldTokenAmountDeltaPar,
       solidBorrowedTokenAmountDeltaPar: liquidation.solidBorrowedTokenAmountDeltaPar,
@@ -339,13 +347,13 @@ export async function getLiquidityMiningVestingPositions(
     return Promise.reject(result.errors[0]);
   }
 
-  const liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] = result.data.liquidityMiningVestingPositions.map(
+  const liquidityMiningVestingPositions = (result.data.liquidityMiningVestingPositions as any[]).map<ApiLiquidityMiningVestingPosition>(
     liquidityMiningVestingPosition => {
       return {
         id: liquidityMiningVestingPosition.id,
         effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
-        amount: liquidityMiningVestingPosition.arbAmountPar,
-      }
+        amountPar: liquidityMiningVestingPosition.arbAmountPar,
+      };
     },
   );
 
@@ -397,13 +405,17 @@ export async function getLiquidityPositions(
 }
 
 export async function getLiquiditySnapshots(
-  startBlock: number,
-  endBlock: number,
+  startTimestamp: number,
+  endTimestamp: number,
   lastId: string,
 ): Promise<{ snapshots: ApiAmmLiquiditySnapshot[] }> {
   const query = `
-    query getAmmLiquidityPositionSnapshots($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      ammLiquidityPositionSnapshots(first: 10, orderBy: id where: { and: [{ block_gte:  $startBlock } { block_lt: $endBlock } { id_gt: $lastId }] }) {
+    query getAmmLiquidityPositionSnapshots($startTimestamp: Int, $endTimestamp: Int, $lastId: ID) {
+      ammLiquidityPositionSnapshots(
+        first: 1000,
+        orderBy: id
+        where: { timestamp_gte:  $startTimestamp timestamp_lt: $endTimestamp id_gt: $lastId }
+      ) {
         id
         effectiveUser {
           id
@@ -420,8 +432,8 @@ export async function getLiquiditySnapshots(
     {
       query,
       variables: {
-        startBlock,
-        endBlock,
+        startTimestamp,
+        endTimestamp,
         lastId,
       },
     },
@@ -454,7 +466,11 @@ export async function getTrades(
 ): Promise<{ trades: ApiTrade[] }> {
   const query = `
     query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      trades(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
+      trades(
+        first: 1000,
+        orderBy: id
+        where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+      ) {
         id
         serialId
         transaction {
@@ -508,25 +524,25 @@ export async function getTrades(
     return Promise.reject(result.errors[0]);
   }
 
-  const trades: ApiTrade[] = result.data.trades.map(trade => {
+  const trades = (result.data.trades as any[]).map<ApiTrade>(trade => {
     return {
       id: trade.id,
-      serialId: trade.serialId,
-      timestamp: trade.transaction.timestamp,
+      serialId: parseInt(trade.serialId, 10),
+      timestamp: parseInt(trade.transaction.timestamp, 10),
       takerEffectiveUser: trade.takerEffectiveUser.id.toLowerCase(),
       takerMarginAccount: {
         user: trade.takerMarginAccount.user.id.toLowerCase(),
         accountNumber: trade.takerMarginAccount.accountNumber,
       },
-      takerMarketId: trade.takerToken.marketId,
+      takerMarketId: new BigNumber(trade.takerToken.marketId).toNumber(),
       takerInputTokenDeltaPar: trade.takerInputTokenDeltaPar,
       takerOutputTokenDeltaPar: trade.takerOutputTokenDeltaPar,
       makerEffectiveUser: trade.makerEffectiveUser ? trade.makerEffectiveUser.id.toLowerCase() : null,
       makerMarginAccount: trade.makerMarginAccount ? {
         user: trade.makerMarginAccount.user.id.toLowerCase(),
         accountNumber: trade.makerMarginAccount.accountNumber,
-      } : null,
-      makerMarketId: trade.makerToken.marketId,
+      } : undefined,
+      makerMarketId: new BigNumber(trade.makerToken.marketId).toNumber(),
     }
   });
 
@@ -540,7 +556,11 @@ export async function getTransfers(
 ): Promise<{ transfers: ApiTransfer[] }> {
   const query = `
     query getTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      transfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
+      transfers(
+        first: 1000,
+        orderBy: id
+        where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+      ) {
         id
         serialId
         transaction {
@@ -591,11 +611,11 @@ export async function getTransfers(
     return Promise.reject(result.errors[0]);
   }
 
-  const transfers: ApiTransfer[] = result.data.transfers.map(transfer => {
+  const transfers = (result.data.transfers as any[]).map<ApiTransfer>(transfer => {
     return {
       id: transfer.id,
-      serialId: transfer.serialId,
-      timestamp: transfer.transaction.timestamp,
+      serialId: parseInt(transfer.serialId, 10),
+      timestamp: parseInt(transfer.transaction.timestamp, 10),
       fromEffectiveUser: transfer.fromEffectiveUser.id.toLowerCase(),
       fromMarginAccount: {
         user: transfer.fromMarginAccount.user.id.toLowerCase(),
@@ -606,7 +626,7 @@ export async function getTransfers(
         user: transfer.toMarginAccount.user.id.toLowerCase(),
         accountNumber: transfer.toMarginAccount.accountNumber,
       },
-      marketId: new BigNumber(transfer.token.marketId),
+      marketId: new BigNumber(transfer.token.marketId).toNumber(),
       fromAmountDeltaPar: new BigNumber(transfer.fromAmountDeltaPar),
       toAmountDeltaPar: new BigNumber(transfer.toAmountDeltaPar),
     }
@@ -616,22 +636,26 @@ export async function getTransfers(
 }
 
 export async function getVestingPositionTransfers(
-  startBlock: number,
-  endBlock: number,
+  startTimestamp: number,
+  endTimestamp: number,
   lastId: string,
 ): Promise<{ vestingPositionTransfers: ApiVestingPositionTransfer[] }> {
   const query = `
-    query getLiquidityMiningVestingPositionTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
-      vestingPositionTransfers(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
+    query getLiquidityMiningVestingPositionTransfers($startTimestamp: BigInt, $endTimestamp: BigInt, $lastId: ID) {
+      vestingPositionTransfers(
+        first: 1000
+        orderBy: id
+        where: { transaction_: { timestamp_gte: $startTimestamp timestamp_lt: $endTimestamp } id_gt: $lastId }
+      ) {
         id
         serialId
         transaction {
           timestamp
         }
-        fromUser {
+        fromEffectiveUser {
           id
         }
-        toUser {
+        toEffectiveUser {
           id
         }
         vestingPosition {
@@ -645,8 +669,8 @@ export async function getVestingPositionTransfers(
     {
       query,
       variables: {
-        startBlock,
-        endBlock,
+        startTimestamp,
+        endTimestamp,
         lastId,
       },
     },
@@ -659,15 +683,15 @@ export async function getVestingPositionTransfers(
     return Promise.reject(result.errors[0]);
   }
 
-  const vestingPositionTransfers: ApiVestingPositionTransfer[] = result.data.vestingPositionTransfers.map(
+  const vestingPositionTransfers = (result.data.vestingPositionTransfers as any[]).map<ApiVestingPositionTransfer>(
     vestingPositionTransfer => {
       return {
         id: vestingPositionTransfer.id,
-        serialId: vestingPositionTransfer.serialId,
-        timestamp: vestingPositionTransfer.transaction.timestamp,
-        fromEffectiveUser: vestingPositionTransfer.fromUser.id.toLowerCase(),
-        toEffectiveUser: vestingPositionTransfer.toUser.id.toLowerCase(),
-        amount: vestingPositionTransfer.arbAmountPar,
+        serialId: parseInt(vestingPositionTransfer.serialId, 10),
+        timestamp: parseInt(vestingPositionTransfer.transaction.timestamp, 10),
+        fromEffectiveUser: vestingPositionTransfer.fromEffectiveUser?.id?.toLowerCase(),
+        toEffectiveUser: vestingPositionTransfer.toEffectiveUser?.id?.toLowerCase(),
+        amount: new BigNumber(vestingPositionTransfer.vestingPosition.arbAmountPar),
       }
     },
   );
@@ -682,7 +706,10 @@ export async function getWithdrawals(
 ): Promise<{ withdrawals: ApiWithdrawal[] }> {
   const query = `
     query getWithdrawals($startBlock: Int, $endBlock: Int, $lastId: ID) {
-    withdrawals(first: 1000, orderBy: id where: { and: [{ transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }} { id_gt: $lastId }]}) {
+    withdrawals(
+      first: 1000,
+      orderBy: id
+      where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }) {
         id
         serialId
         transaction {
@@ -723,17 +750,17 @@ export async function getWithdrawals(
     return Promise.reject(result.errors[0]);
   }
 
-  const withdrawals: ApiWithdrawal[] = result.data.withdrawals.map(withdrawal => {
+  const withdrawals = (result.data.withdrawals as any[]).map<ApiWithdrawal>(withdrawal => {
     return {
       id: withdrawal.id,
-      serialId: withdrawal.serialId,
-      timestamp: withdrawal.transaction.timestamp,
+      serialId: parseInt(withdrawal.serialId, 10),
+      timestamp: parseInt(withdrawal.transaction.timestamp, 10),
       effectiveUser: withdrawal.effectiveUser.id.toLowerCase(),
       marginAccount: {
         user: withdrawal.marginAccount.user.id.toLowerCase(),
         accountNumber: withdrawal.marginAccount.accountNumber,
       },
-      marketId: new BigNumber(withdrawal.token.marketId),
+      marketId: new BigNumber(withdrawal.token.marketId).toNumber(),
       amountDeltaPar: new BigNumber(withdrawal.amountDeltaPar),
     }
   });

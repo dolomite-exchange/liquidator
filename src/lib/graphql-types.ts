@@ -257,10 +257,6 @@ export interface GraphqlInterestRate {
   supplyInterestRate: string
 }
 
-export interface GraphqlAmmLiquidityPosition {
-  liquidityTokenBalance: string
-}
-
 type GraphqlAmmDataForUserResultSubResult = GraphqlAmmPairData | GraphqlInterestRate | GraphqlAmmLiquidityPosition
 
 export interface GraphqlAmmDataForUserResult {
@@ -273,10 +269,10 @@ export interface GraphqlVestingPositionTransfer {
   transaction: {
     timestamp: string
   }
-  fromUser: {
+  fromEffectiveUser: {
     id: string
   }
-  toUser: {
+  toEffectiveUser: {
     id: string
   }
   vestingPosition: {

@@ -10,32 +10,23 @@ import {
   getVestingPositionTransfers,
   getWithdrawals,
 } from '../../src/clients/dolomite';
-import {
-  ApiAccount,
-  ApiAmmLiquidityPosition,
-  ApiAmmLiquiditySnapshot,
-  ApiDeposit,
-  ApiLiquidation,
-  ApiLiquidityMiningVestingPosition,
-  ApiTrade,
-  ApiTransfer,
-  ApiVestingPositionTransfer,
-  ApiWithdrawal,
-} from '../../src/lib/api-types';
+import { ApiAccount, ApiDeposit, ApiLiquidation, ApiTrade, ApiTransfer, ApiWithdrawal } from '../../src/lib/api-types';
 import Pageable from '../../src/lib/pageable';
 import {
   AccountSubAccountToMarketToBalanceMap,
-  AccountToAmmLiquidityBalanceMap,
-  AccountToAmmLiquiditySnapshotsMap,
   AccountToSubAccountMarketToBalanceChangeMap,
+  AccountToVirtualLiquidityBalanceMap,
+  AccountToVirtualLiquiditySnapshotsMap,
   BalanceAndRewardPoints,
   BalanceChangeEvent,
   BalanceChangeType,
-  LiquiditySnapshot,
+  LiquidityPositionsAndEvents,
+  VirtualLiquidityPosition,
+  VirtualLiquiditySnapshotBalance,
+  VirtualLiquiditySnapshotDeltaPar,
 } from './rewards';
 
 const ZERO = new BigNumber('0');
-const ARB_MARKET_ID = 7;
 export const VESTING_ACCOUNT_NUMBER = '999';
 
 export function getAccountBalancesByMarket(
@@ -61,17 +52,17 @@ export function getAccountBalancesByMarket(
   return accountToDolomiteBalanceMap;
 }
 
-export async function addLiquidityMiningVestingPositions(
-  accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
-  blockRewardStart: number,
-): Promise<void> {
-  const liquidityMiningVestingPositions = await Pageable.getPageableValues((async (lastIndex) => {
-    const result = await getLiquidityMiningVestingPositions(blockRewardStart, lastIndex);
-    return result.liquidityMiningVestingPositions;
-  }));
-
-  parseLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, liquidityMiningVestingPositions);
-}
+// export async function addLiquidityMiningVestingPositions(
+//   accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
+//   blockRewardStart: number,
+// ): Promise<void> {
+//   const liquidityMiningVestingPositions = await Pageable.getPageableValues((async (lastIndex) => {
+//     const result = await getLiquidityMiningVestingPositions(blockRewardStart, lastIndex);
+//     return result.liquidityMiningVestingPositions;
+//   }));
+//
+//   parseLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, liquidityMiningVestingPositions);
+// }
 
 export async function getBalanceChangingEvents(
   rewardsStartBlockNumber: number,
@@ -103,12 +94,6 @@ export async function getBalanceChangingEvents(
   }));
   parseTrades(accountToAssetToEventsMap, trades);
 
-  const vestingPositionTransfers = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getVestingPositionTransfers(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
-    return results.vestingPositionTransfers;
-  }));
-  parseVestingPositionTransfers(accountToAssetToEventsMap, vestingPositionTransfers);
-
   const liquidations = await Pageable.getPageableValues((async (lastId) => {
     const results = await getLiquidations(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
     return results.liquidations;
@@ -118,56 +103,96 @@ export async function getBalanceChangingEvents(
   return accountToAssetToEventsMap;
 }
 
-export interface LiquidityPositionsAndEvents {
-  userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap;
-  ammLiquidityBalances: AccountToAmmLiquidityBalanceMap;
-}
+type VirtualLiquiditySnapshotInternal = VirtualLiquiditySnapshotBalance | VirtualLiquiditySnapshotDeltaPar;
 
-export async function getLiquidityPositionAndEvents(
+export async function getAmmLiquidityPositionAndEvents(
   rewardsStartBlockNumber: number,
-  rewardsEndBlockNumber: number,
   blockRewardStartTimestamp: number,
+  blockRewardEndTimestamp: number,
 ): Promise<LiquidityPositionsAndEvents> {
-  const ammLiquidityBalances: AccountToAmmLiquidityBalanceMap = {};
-  const ammLiquidityPositions = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getLiquidityPositions(rewardsStartBlockNumber, lastId);
-    return results.ammLiquidityPositions;
+  const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
+  const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {};
+  const virtualLiquidityPositions = await Pageable.getPageableValues<VirtualLiquidityPosition>((async (lastId) => {
+    const results = await getLiquidityPositions(rewardsStartBlockNumber - 1, lastId);
+    return results.ammLiquidityPositions.map(position => ({
+      id: position.id,
+      effectiveUser: position.effectiveUser,
+      balance: new BigNumber(position.balance),
+    }));
   }));
-  parseAmmLiquidityPositions(ammLiquidityBalances, ammLiquidityPositions, blockRewardStartTimestamp);
+  parseVirtualLiquidityPositions(
+    virtualLiquidityBalances,
+    virtualLiquidityPositions,
+    blockRewardStartTimestamp,
+  );
 
-  const userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap = {};
-  const ammLiquiditySnapshots = await Pageable.getPageableValues((async (lastId) => {
-    const { snapshots } = await getLiquiditySnapshots(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
-    return snapshots;
+  const ammLiquiditySnapshots = await Pageable.getPageableValues<VirtualLiquiditySnapshotInternal>((async (lastId) => {
+    const { snapshots } = await getLiquiditySnapshots(blockRewardStartTimestamp, blockRewardEndTimestamp, lastId);
+    return snapshots.map<VirtualLiquiditySnapshotInternal>(snapshot => ({
+      id: snapshot.id,
+      effectiveUser: snapshot.effectiveUser,
+      timestamp: parseInt(snapshot.timestamp, 10),
+      balancePar: new BigNumber(snapshot.liquidityTokenBalance),
+    }));
   }));
-  parseAmmLiquiditySnapshots(userToLiquiditySnapshots, ammLiquiditySnapshots);
+  parseVirtualLiquiditySnapshots(userToLiquiditySnapshots, ammLiquiditySnapshots, virtualLiquidityBalances);
 
-  return { ammLiquidityBalances, userToLiquiditySnapshots };
+  return { virtualLiquidityBalances, userToLiquiditySnapshots };
 }
 
-export function parseLiquidityMiningVestingPositions(
-  accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
-  liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[],
-): void {
-  liquidityMiningVestingPositions.forEach((liquidityMiningVestingPosition) => {
-    accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser]
-      = accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser] ?? {};
-    accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser]![VESTING_ACCOUNT_NUMBER]
-      = accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser]![VESTING_ACCOUNT_NUMBER] ?? {};
+export async function getArbVestingLiquidityPositionAndEvents(
+  rewardsStartBlockNumber: number,
+  blockRewardStartTimestamp: number,
+  blockRewardEndTimestamp: number,
+): Promise<LiquidityPositionsAndEvents> {
+  const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
+  const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {};
+  const vestingPositions = await Pageable.getPageableValues<VirtualLiquidityPosition>((async (lastId) => {
+    const results = await getLiquidityMiningVestingPositions(rewardsStartBlockNumber - 1, lastId);
+    return results.liquidityMiningVestingPositions.map<VirtualLiquidityPosition>(position => ({
+      id: position.id,
+      effectiveUser: position.effectiveUser,
+      balance: new BigNumber(position.amountPar),
+    }));
+  }));
+  parseVirtualLiquidityPositions(
+    virtualLiquidityBalances,
+    vestingPositions,
+    blockRewardStartTimestamp,
+  );
 
-    // eslint-disable-next-line max-len
-    const balanceAndPoints = accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser]![VESTING_ACCOUNT_NUMBER]![ARB_MARKET_ID];
-    if (balanceAndPoints) {
-      balanceAndPoints.balance = balanceAndPoints.balance.plus(liquidityMiningVestingPosition.amount);
-    } else {
-      accountToDolomiteBalanceMap[liquidityMiningVestingPosition.effectiveUser]![VESTING_ACCOUNT_NUMBER]![ARB_MARKET_ID]
-        = new BalanceAndRewardPoints(
-        0,
-        liquidityMiningVestingPosition.effectiveUser,
-        new BigNumber(liquidityMiningVestingPosition.amount),
+  const vestingPositionSnapshots = await Pageable.getPageableValues<VirtualLiquiditySnapshotInternal>(
+    (async (lastId) => {
+      const { vestingPositionTransfers } = await getVestingPositionTransfers(
+        blockRewardStartTimestamp,
+        blockRewardEndTimestamp,
+        lastId,
       );
-    }
-  });
+      return vestingPositionTransfers.reduce<VirtualLiquiditySnapshotInternal[]>((acc, transfer) => {
+        let transfers: VirtualLiquiditySnapshotInternal[] = [];
+        if (transfer.fromEffectiveUser) {
+          transfers = transfers.concat({
+            id: transfer.id,
+            effectiveUser: transfer.fromEffectiveUser,
+            timestamp: transfer.timestamp,
+            deltaPar: ZERO.minus(transfer.amount),
+          });
+        }
+        if (transfer.toEffectiveUser) {
+          transfers = transfers.concat({
+            id: transfer.id,
+            effectiveUser: transfer.toEffectiveUser,
+            timestamp: transfer.timestamp,
+            deltaPar: transfer.amount,
+          });
+        }
+        return acc.concat(transfers)
+      }, []);
+    }),
+  );
+  parseVirtualLiquiditySnapshots(userToLiquiditySnapshots, vestingPositionSnapshots, virtualLiquidityBalances);
+
+  return { virtualLiquidityBalances, userToLiquiditySnapshots };
 }
 
 export function parseDeposits(
@@ -340,7 +365,7 @@ export function parseLiquidations(
       accountToAssetToEventsMap,
       liquidation.liquidMarginAccount.user,
       liquidation.liquidMarginAccount.accountNumber,
-      liquidation.heldToken,
+      liquidation.heldMarketId,
       liquidUserCollateralEvent,
     );
 
@@ -355,7 +380,7 @@ export function parseLiquidations(
       accountToAssetToEventsMap,
       liquidation.liquidMarginAccount.user,
       liquidation.liquidMarginAccount.accountNumber,
-      liquidation.borrowedToken,
+      liquidation.borrowedMarketId,
       liquidUserDebtEvent,
     );
 
@@ -370,7 +395,7 @@ export function parseLiquidations(
       accountToAssetToEventsMap,
       liquidation.solidMarginAccount.user,
       liquidation.solidMarginAccount.accountNumber,
-      liquidation.heldToken,
+      liquidation.heldMarketId,
       solidUserCollateralEvent,
     );
 
@@ -385,85 +410,84 @@ export function parseLiquidations(
       accountToAssetToEventsMap,
       liquidation.solidMarginAccount.user,
       liquidation.solidMarginAccount.accountNumber,
-      liquidation.borrowedToken,
+      liquidation.borrowedMarketId,
       solidUserDebtEvent,
     );
   });
 }
 
-export function parseVestingPositionTransfers(
-  accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap,
-  vestingPositionTransfers: ApiVestingPositionTransfer[],
-): void {
-  vestingPositionTransfers.forEach(vestingPositionTransfer => {
-    if (vestingPositionTransfer.fromEffectiveUser === vestingPositionTransfer.toEffectiveUser) {
-      return;
-    }
-    const fromEvent: BalanceChangeEvent = {
-      amountDeltaPar: ZERO.minus(vestingPositionTransfer.amount),
-      serialId: vestingPositionTransfer.serialId,
-      effectiveUser: vestingPositionTransfer.fromEffectiveUser,
-      timestamp: vestingPositionTransfer.timestamp,
-      type: BalanceChangeType.VESTING_POSITION_TRANSFER,
-    };
-    const toEvent: BalanceChangeEvent = {
-      amountDeltaPar: vestingPositionTransfer.amount,
-      serialId: vestingPositionTransfer.serialId,
-      effectiveUser: vestingPositionTransfer.toEffectiveUser,
-      timestamp: vestingPositionTransfer.timestamp,
-      type: BalanceChangeType.VESTING_POSITION_TRANSFER,
-    };
-    addEventToUser(
-      accountToAssetToEventsMap,
-      vestingPositionTransfer.fromEffectiveUser,
-      VESTING_ACCOUNT_NUMBER,
-      ARB_MARKET_ID,
-      fromEvent,
-    );
-    addEventToUser(
-      accountToAssetToEventsMap,
-      vestingPositionTransfer.toEffectiveUser,
-      VESTING_ACCOUNT_NUMBER,
-      ARB_MARKET_ID,
-      toEvent,
-    );
-  });
-}
-
-export function parseAmmLiquidityPositions(
-  userToAmmLiquidityBalances: AccountToAmmLiquidityBalanceMap,
-  ammLiquidityPositions: ApiAmmLiquidityPosition[],
+export function parseVirtualLiquidityPositions(
+  userToVirtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap,
+  virtualLiquidityPositions: VirtualLiquidityPosition[],
   blockRewardStartTimestamp: number,
 ): void {
-  ammLiquidityPositions.forEach(ammLiquidityPosition => {
-    userToAmmLiquidityBalances[ammLiquidityPosition.effectiveUser] = new BalanceAndRewardPoints(
-      blockRewardStartTimestamp,
-      ammLiquidityPosition.effectiveUser,
-      new BigNumber(ammLiquidityPosition.balance),
-    );
+  virtualLiquidityPositions.forEach(position => {
+    if (!userToVirtualLiquidityBalances[position.effectiveUser]) {
+      userToVirtualLiquidityBalances[position.effectiveUser] = new BalanceAndRewardPoints(
+        blockRewardStartTimestamp,
+        position.effectiveUser,
+        new BigNumber(position.balance),
+      );
+    } else {
+      const balanceStruct = userToVirtualLiquidityBalances[position.effectiveUser]!;
+      balanceStruct!.balance = balanceStruct.balance.plus(position.balance);
+    }
+
+    // if (!userToLiquiditySnapshots[virtualLiquidityPosition.effectiveUser]) {
+    //   userToLiquiditySnapshots[virtualLiquidityPosition.effectiveUser] = [
+    //     {
+    //       id: '-1',
+    //       effectiveUser: virtualLiquidityPosition.effectiveUser,
+    //       timestamp: blockRewardStartTimestamp,
+    //       balancePar: new BigNumber(virtualLiquidityPosition.balance),
+    //     },
+    //   ];
+    // } else {
+    //   const snapshot = userToLiquiditySnapshots[virtualLiquidityPosition.effectiveUser]![0];
+    //   snapshot.balancePar = snapshot.balancePar.plus(virtualLiquidityPosition.balance);
+    // }
   });
 }
 
-export function parseAmmLiquiditySnapshots(
-  userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap,
-  ammLiquiditySnapshots: ApiAmmLiquiditySnapshot[],
+export function parseVirtualLiquiditySnapshots(
+  userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap,
+  virtualLiquiditySnapshots: VirtualLiquiditySnapshotInternal[],
+  virtualLiquidityBalanceMap: AccountToVirtualLiquidityBalanceMap,
 ): void {
-  ammLiquiditySnapshots.forEach(snapshot => {
-    const liquiditySnapshot: LiquiditySnapshot = {
-      timestamp: Number(snapshot.timestamp),
-      balance: new BigNumber(snapshot.liquidityTokenBalance),
-    };
-    addLiquiditySnapshotToUser(userToLiquiditySnapshots, snapshot.effectiveUser, liquiditySnapshot);
+  virtualLiquiditySnapshots.forEach(snapshot => {
+    addLiquiditySnapshotToUser(userToLiquiditySnapshots, snapshot.effectiveUser, snapshot, virtualLiquidityBalanceMap);
   });
 }
 
 function addLiquiditySnapshotToUser(
-  userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap,
+  userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap,
   user: string,
-  liquiditySnapshot: LiquiditySnapshot,
+  liquiditySnapshot: VirtualLiquiditySnapshotInternal,
+  virtualLiquidityBalanceMap: AccountToVirtualLiquidityBalanceMap,
 ): void {
   userToLiquiditySnapshots[user] = userToLiquiditySnapshots[user] ?? [];
-  userToLiquiditySnapshots[user]!.push(liquiditySnapshot);
+  if ('balancePar' in liquiditySnapshot) {
+    userToLiquiditySnapshots[user]!.push(liquiditySnapshot);
+  } else if ('deltaPar' in liquiditySnapshot) {
+    const userSnapshots = userToLiquiditySnapshots[user]!;
+    let balanceParBefore: BigNumber;
+    if (userSnapshots.length === 0 && virtualLiquidityBalanceMap[user]) {
+      balanceParBefore = virtualLiquidityBalanceMap[user]!.balance;
+    } else if (userSnapshots.length > 0) {
+      balanceParBefore = userSnapshots[userSnapshots.length - 1].balancePar;
+    } else {
+      balanceParBefore = new BigNumber(0);
+    }
+
+    userToLiquiditySnapshots[user]!.push({
+      id: liquiditySnapshot.id,
+      effectiveUser: liquiditySnapshot.effectiveUser,
+      timestamp: liquiditySnapshot.timestamp,
+      balancePar: balanceParBefore.plus(liquiditySnapshot.deltaPar),
+    });
+  } else {
+    throw new Error(`Invalid liquidity snapshot: ${JSON.stringify(liquiditySnapshot)}`);
+  }
 }
 
 function addEventToUser(

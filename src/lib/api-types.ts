@@ -59,8 +59,8 @@ export interface ApiLiquidation {
   liquidEffectiveUser: string;
   solidMarginAccount: ApiMarginAccount;
   liquidMarginAccount: ApiMarginAccount;
-  heldToken: number;
-  borrowedToken: number;
+  heldMarketId: number;
+  borrowedMarketId: number;
   solidHeldTokenAmountDeltaPar: Integer;
   liquidHeldTokenAmountDeltaPar: Integer;
   solidBorrowedTokenAmountDeltaPar: Integer;
@@ -115,15 +115,15 @@ export interface ApiVestingPositionTransfer {
   id: string;
   serialId: number;
   timestamp: number;
-  fromEffectiveUser: string;
-  toEffectiveUser: string;
+  fromEffectiveUser: string | undefined;
+  toEffectiveUser: string | undefined;
   amount: Integer;
 }
 
 export interface ApiLiquidityMiningVestingPosition {
   id: string;
   effectiveUser: string;
-  amount: string;
+  amountPar: string;
 }
 
 export interface ApiWithdrawal {

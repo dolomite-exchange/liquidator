@@ -228,8 +228,8 @@ describe('event-parser', () => {
             user: address2,
             accountNumber: subAccount1,
           },
-          heldToken: 0,
-          borrowedToken: 2,
+          heldMarketId: 0,
+          borrowedMarketId: 2,
           solidHeldTokenAmountDeltaPar: new BigNumber('0.4'),
           liquidHeldTokenAmountDeltaPar: new BigNumber('-0.4'),
           solidBorrowedTokenAmountDeltaPar: new BigNumber('-612'),
@@ -268,7 +268,7 @@ describe('event-parser', () => {
         {
           id: '0x4d5d9d8a6c6f9e9b1f3f3f8a0b3a9d1d2a0f8a7d1b8a0a5b5a4c5a3b2a1a0a9a8-12',
           effectiveUser: address1,
-          amount: '5',
+          amountPar: '5',
         },
       ]
 

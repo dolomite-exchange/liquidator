@@ -4,7 +4,7 @@ import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
 import {
   AccountSubAccountToMarketToBalanceMap,
-  AccountToAmmLiquiditySnapshotsMap,
+  AccountToVirtualLiquiditySnapshotsMap,
   BalanceAndRewardPoints,
   BalanceChangeEvent,
   BalanceChangeType,
@@ -101,7 +101,7 @@ const ammLiquidityBalances = {
   [user6]: new BalanceAndRewardPoints(blockRewardStartTimestamp, user6, new BigNumber('.05')),
 };
 
-const userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap = {
+const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {
   [user4]: [{ timestamp: 1697500000, balance: new BigNumber('0.025') }],
   [user5]: [
     { timestamp: 1697250000, balance: new BigNumber('0.05') },

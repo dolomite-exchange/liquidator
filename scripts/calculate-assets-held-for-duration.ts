@@ -13,7 +13,7 @@ import {
   addLiquidityMiningVestingPositions,
   getAccountBalancesByMarket,
   getBalanceChangingEvents,
-  getLiquidityPositionAndEvents,
+  getAmmLiquidityPositionAndEvents,
 } from './lib/event-parser';
 import { calculateFinalPoints, calculateLiquidityPoints, calculateTotalRewardPoints } from './lib/rewards';
 import TokenAbi from './abis/isolation-mode-factory.json';
@@ -109,13 +109,13 @@ async function start() {
     }
   });
 
-  const { ammLiquidityBalances, userToLiquiditySnapshots } = await getLiquidityPositionAndEvents(
+  const { virtualLiquidityBalances, userToLiquiditySnapshots } = await getAmmLiquidityPositionAndEvents(
     blockRewardStart,
-    blockRewardEnd,
     blockRewardStartTimestamp,
+    blockRewardEndTimestamp,
   );
   calculateLiquidityPoints(
-    ammLiquidityBalances,
+    virtualLiquidityBalances,
     userToLiquiditySnapshots,
     blockRewardStartTimestamp,
     blockRewardEndTimestamp,

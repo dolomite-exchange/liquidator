@@ -11,16 +11,19 @@ import Pageable from '../src/lib/pageable';
 import liquidityMiningConfig from './config/oarb-season-0.json';
 import './lib/env-reader';
 import {
-  addLiquidityMiningVestingPositions,
   getAccountBalancesByMarket,
+  getAmmLiquidityPositionAndEvents,
+  getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
-  getLiquidityPositionAndEvents,
 } from './lib/event-parser';
 import {
+  ARB_VESTER_PROXY,
   calculateFinalRewards,
   calculateLiquidityPoints,
   calculateMerkleRootAndProofs,
   calculateTotalRewardPoints,
+  ETH_USDC_POOL,
+  LiquidityPositionsAndEvents,
   OArbFinalAmount,
 } from './lib/rewards';
 
@@ -109,7 +112,6 @@ async function start() {
   });
 
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp);
-  await addLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, startBlockNumber);
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
@@ -120,23 +122,34 @@ async function start() {
     endTimestamp,
   );
 
-  const { ammLiquidityBalances, userToLiquiditySnapshots } = await getLiquidityPositionAndEvents(
+  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
     startBlockNumber,
-    endBlockNumber,
     startTimestamp,
+    endTimestamp,
   );
-  const totalLiquidityPoints = calculateLiquidityPoints(
-    ammLiquidityBalances,
-    userToLiquiditySnapshots,
+
+  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
+    startBlockNumber,
+    startTimestamp,
+    endTimestamp,
+  );
+
+  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
+    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
+    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
+  };
+
+  const poolToTotalLiquidityPoints = calculateLiquidityPoints(
+    poolToVirtualLiquidityPositionsAndEvents,
     startTimestamp,
     endTimestamp,
   );
 
   const userToOArbRewards = calculateFinalRewards(
     accountToDolomiteBalanceMap,
-    ammLiquidityBalances,
+    poolToVirtualLiquidityPositionsAndEvents,
     totalPointsPerMarket,
-    totalLiquidityPoints,
+    poolToTotalLiquidityPoints,
     oArbRewardWeiMap,
     MINIMUM_OARB_AMOUNT_WEI,
   );
