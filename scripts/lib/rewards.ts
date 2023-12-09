@@ -113,7 +113,7 @@ export class BalanceAndRewardPoints {
       rewardUpdate = this.balance.times(liquiditySnapshot.timestamp - this.lastUpdated);
       this.rewardPoints = this.rewardPoints.plus(rewardUpdate);
     }
-    this.balance = new BigNumber(liquiditySnapshot.balancePar);
+    this.balance = liquiditySnapshot.balancePar;
     this.lastUpdated = liquiditySnapshot.timestamp;
 
     return rewardUpdate;
@@ -204,10 +204,10 @@ export function calculateLiquidityPoints(
   blockRewardStartTimestamp: number,
   blockRewardEndTimestamp: number,
 ): Record<string, BigNumber> {
-  const totalLiquidityPointsList: Record<string, BigNumber> = {};
+  const poolToTotalLiquidityPoints: Record<string, BigNumber> = {};
   Object.keys(poolToVirtualLiquidityPositionsAndEvents).forEach(pool => {
     const { userToLiquiditySnapshots, virtualLiquidityBalances } = poolToVirtualLiquidityPositionsAndEvents[pool];
-    totalLiquidityPointsList[pool] = new BigNumber(0);
+    poolToTotalLiquidityPoints[pool] = new BigNumber(0);
 
     Object.keys(userToLiquiditySnapshots).forEach(account => {
       userToLiquiditySnapshots[account]!.sort((a, b) => {
@@ -220,28 +220,38 @@ export function calculateLiquidityPoints(
       );
 
       userToLiquiditySnapshots[account]!.forEach((liquiditySnapshot) => {
-        totalLiquidityPointsList[pool] = totalLiquidityPointsList[pool].plus(
+        poolToTotalLiquidityPoints[pool] = poolToTotalLiquidityPoints[pool].plus(
           virtualLiquidityBalances[account]!.processLiquiditySnapshot(liquiditySnapshot),
         );
       });
     });
   });
 
+  // Iterate through balances to finish reward point calculation
   Object.keys(poolToVirtualLiquidityPositionsAndEvents).forEach(pool => {
     const { virtualLiquidityBalances } = poolToVirtualLiquidityPositionsAndEvents[pool];
-    totalLiquidityPointsList[pool] = totalLiquidityPointsList[pool] ?? new BigNumber(0);
 
     Object.keys(virtualLiquidityBalances).forEach(account => {
       const balanceStruct = virtualLiquidityBalances[account]!;
-      const rewardUpdate = balanceStruct.balance.times(blockRewardEndTimestamp - balanceStruct.lastUpdated);
-
-      totalLiquidityPointsList[pool] = totalLiquidityPointsList[pool].plus(rewardUpdate);
-      balanceStruct.rewardPoints = balanceStruct.rewardPoints.plus(rewardUpdate);
-      balanceStruct.lastUpdated = blockRewardEndTimestamp;
+      const points = balanceStruct.processLiquiditySnapshot({
+        id: '-1',
+        effectiveUser: balanceStruct.effectiveUser,
+        balancePar: balanceStruct.balance,
+        timestamp: blockRewardEndTimestamp,
+      });
+      if (account === '0x444e5af2090a69c4151d6bcdcb15c7c660b28dee') {
+        console.log(
+          'bad user',
+          balanceStruct.balance.toFixed(),
+          points.toFixed(),
+          poolToTotalLiquidityPoints[pool].toFixed(),
+        );
+      }
+      poolToTotalLiquidityPoints[pool] = poolToTotalLiquidityPoints[pool].plus(points);
     });
   });
 
-  return totalLiquidityPointsList;
+  return poolToTotalLiquidityPoints;
 }
 
 export function calculateFinalPoints(
@@ -308,29 +318,31 @@ export function calculateFinalRewards(
       liquidityPoolReward?.toFixed(),
       totalLiquidityPointsPerPool[pool]?.toFixed(),
     );
-    const events = poolToVirtualLiquidityPositionsAndEvents[pool];
-    Object.keys(events.virtualLiquidityBalances).forEach(account => {
-      const balances = events.virtualLiquidityBalances[account]!;
-      effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account] ?? new BigNumber(0);
-      const rewardAmount = liquidityPoolReward.times(balances.rewardPoints.dividedBy(
-        totalLiquidityPointsPerPool[pool],
-      ));
+    if (liquidityPoolReward && totalLiquidityPointsPerPool[pool]) {
+      const events = poolToVirtualLiquidityPositionsAndEvents[pool];
+      Object.keys(events.virtualLiquidityBalances).forEach(account => {
+        const balances = events.virtualLiquidityBalances[account]!;
+        effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account] ?? new BigNumber(0);
+        const rewardAmount = liquidityPoolReward.times(balances.rewardPoints.dividedBy(
+          totalLiquidityPointsPerPool[pool],
+        ));
 
-      effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account].plus(rewardAmount);
-      effectiveUserToOarbRewards[pool] = effectiveUserToOarbRewards[pool].minus(rewardAmount);
-    });
+        effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account].plus(rewardAmount);
+        effectiveUserToOarbRewards[pool] = effectiveUserToOarbRewards[pool].minus(rewardAmount);
+      });
+    }
   });
 
   let filteredAmount = new BigNumber(0);
-  const finalizedRewardsMap = Object.keys(effectiveUserToOarbRewards)
-    .reduce<Record<string, BigNumber>>((map, account) => {
-      if (effectiveUserToOarbRewards[account].gte(minimumOArbAmount)) {
-        map[account] = effectiveUserToOarbRewards[account];
-      } else {
-        filteredAmount = filteredAmount.plus(effectiveUserToOarbRewards[account]);
-      }
-      return map;
-    }, {});
+  const accounts = Object.keys(effectiveUserToOarbRewards);
+  const finalizedRewardsMap = accounts.reduce<Record<string, BigNumber>>((map, account) => {
+    if (effectiveUserToOarbRewards[account].gte(minimumOArbAmount)) {
+      map[account] = effectiveUserToOarbRewards[account];
+    } else {
+      filteredAmount = filteredAmount.plus(effectiveUserToOarbRewards[account]);
+    }
+    return map;
+  }, {});
 
   console.log('OARB amount filtered out:', filteredAmount.dividedBy('1000000000000000000').toFixed(2));
 

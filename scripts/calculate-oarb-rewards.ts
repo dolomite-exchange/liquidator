@@ -139,7 +139,7 @@ async function start() {
     [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
   };
 
-  const poolToTotalLiquidityPoints = calculateLiquidityPoints(
+  const poolToTotalSubLiquidityPoints = calculateLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
     startTimestamp,
     endTimestamp,
@@ -149,7 +149,7 @@ async function start() {
     accountToDolomiteBalanceMap,
     poolToVirtualLiquidityPositionsAndEvents,
     totalPointsPerMarket,
-    poolToTotalLiquidityPoints,
+    poolToTotalSubLiquidityPoints,
     oArbRewardWeiMap,
     MINIMUM_OARB_AMOUNT_WEI,
   );
