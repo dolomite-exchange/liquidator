@@ -64,18 +64,6 @@
       },
       "isFinalized": true
     },
-    "987": {
-      "epoch": 987,
-      "startBlockNumber": 155378529,
-      "startTimestamp": 1701302400,
-      "endBlockNumber": 157581702,
-      "endTimestamp": 1701907200,
-      "oArbAmount": "90000",
-      "rewardWeights": {
-        "7": "6300"
-      },
-      "isFinalized": true
-    },
     "4": {
       "epoch": 4,
       "startBlockNumber": 157581702,
@@ -91,6 +79,18 @@
         "17": "36000"
       },
       "isFinalized": false
+    },
+    "998": {
+      "epoch": 998,
+      "startTimestamp": 1699488000,
+      "startBlockNumber": 148514486,
+      "endBlockNumber": 157581702,
+      "endTimestamp": 1701907200,
+      "oArbAmount": "90000",
+      "rewardWeights": {
+        "7": "25200"
+      },
+      "isFinalized": true
     }
   }
 }

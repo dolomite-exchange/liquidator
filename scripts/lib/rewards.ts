@@ -239,14 +239,6 @@ export function calculateLiquidityPoints(
         balancePar: balanceStruct.balance,
         timestamp: blockRewardEndTimestamp,
       });
-      if (account === '0x444e5af2090a69c4151d6bcdcb15c7c660b28dee') {
-        console.log(
-          'bad user',
-          balanceStruct.balance.toFixed(),
-          points.toFixed(),
-          poolToTotalLiquidityPoints[pool].toFixed(),
-        );
-      }
       poolToTotalLiquidityPoints[pool] = poolToTotalLiquidityPoints[pool].plus(points);
     });
   });
@@ -312,25 +304,20 @@ export function calculateFinalRewards(
   // Distribute liquidity pool rewards
   Object.keys(poolToVirtualLiquidityPositionsAndEvents).forEach(pool => {
     const liquidityPoolReward = effectiveUserToOarbRewards[pool];
-    console.log(
-      'liquidityPoolReward',
-      pool,
-      liquidityPoolReward?.toFixed(),
-      totalLiquidityPointsPerPool[pool]?.toFixed(),
-    );
     if (liquidityPoolReward && totalLiquidityPointsPerPool[pool]) {
       const events = poolToVirtualLiquidityPositionsAndEvents[pool];
       Object.keys(events.virtualLiquidityBalances).forEach(account => {
         const balances = events.virtualLiquidityBalances[account]!;
-        effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account] ?? new BigNumber(0);
         const rewardAmount = liquidityPoolReward.times(balances.rewardPoints.dividedBy(
           totalLiquidityPointsPerPool[pool],
         ));
 
+        effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account] ?? new BigNumber(0);
         effectiveUserToOarbRewards[account] = effectiveUserToOarbRewards[account].plus(rewardAmount);
-        effectiveUserToOarbRewards[pool] = effectiveUserToOarbRewards[pool].minus(rewardAmount);
       });
     }
+
+    delete effectiveUserToOarbRewards[pool];
   });
 
   let filteredAmount = new BigNumber(0);
