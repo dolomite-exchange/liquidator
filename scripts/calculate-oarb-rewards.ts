@@ -24,7 +24,6 @@ import {
   calculateTotalRewardPoints,
   ETH_USDC_POOL,
   LiquidityPositionsAndEvents,
-  OArbFinalAmount,
 } from './lib/rewards';
 
 interface OutputFile {
@@ -165,8 +164,6 @@ async function start() {
   };
   writeOutputFile(fileName, dataToWrite);
 
-  rectifyRewardsForEpoch0IfNecessary(epoch, dataToWrite.epochs[epoch]);
-
   return true;
 }
 
@@ -196,52 +193,11 @@ function writeOutputFile(
   );
 }
 
-function rectifyRewardsForEpoch0IfNecessary(
-  epoch: number,
-  walletAddressToLeavesMap: Record<string, OArbFinalAmount>,
-): void {
-  if (epoch !== 0) {
-    return;
-  }
-
-  const oldFile = `${__dirname}/finalized/oarb-season-0-epoch-${epoch}-output.json`;
-  const oldWalletAddressToFinalDataMap = readOutputFile(oldFile).epochs[epoch];
-
-  let cumulative = new BigNumber(0);
-  const deltasMap = Object.keys(walletAddressToLeavesMap).reduce<Record<string, BigNumber>>((map, wallet) => {
-    const oldAmount = new BigNumber(oldWalletAddressToFinalDataMap[wallet.toLowerCase()]?.amount ?? '0');
-    const newAmount = new BigNumber(walletAddressToLeavesMap[wallet.toLowerCase()].amount);
-    if (newAmount.gt(oldAmount)) {
-      map[wallet] = newAmount.minus(oldAmount);
-      cumulative = cumulative.plus(map[wallet]);
-    }
-    return map;
-  }, {});
-  console.log('Cumulative amount for fix (in wei):', cumulative.toString());
-  const deltasMerkleRootAndProofs = calculateMerkleRootAndProofs(deltasMap);
-
-  const rectifiedEpochNumber = '999';
-  writeOutputFile(
-    `${FOLDER_NAME}/oarb-season-0-epoch-${rectifiedEpochNumber}-deltas-output.json`,
-    {
-      epochs: {
-        [rectifiedEpochNumber]: deltasMerkleRootAndProofs.walletAddressToLeavesMap,
-      },
-      metadata: {
-        [rectifiedEpochNumber]: {
-          isFinalized: true,
-          merkleRoot: deltasMerkleRootAndProofs.merkleRoot,
-        },
-      },
-    },
-  );
-}
-
 start()
-  .then(() => {
-    console.log('Finished executing script!');
-  })
-  .catch(error => {
-    console.error(`Found error while starting: ${error.toString()}`, error);
-    process.exit(1);
-  });
+.then(() => {
+  console.log('Finished executing script!');
+})
+.catch(error => {
+  console.error(`Found error while starting: ${error.toString()}`, error);
+  process.exit(1);
+});
