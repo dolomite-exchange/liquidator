@@ -943,8 +943,8 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
 export async function getTimestampToBlockNumberMap(timestamps: number[]): Promise<Record<string, number>> {
   let queries = '';
   timestamps.forEach(timestamp => {
-    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 30}, timestamp_lt: ${timestamp
-    + 30} } first: 1) { number }`
+    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 15}, timestamp_lt: ${timestamp
+    + 15} } first: 1) { number }`
   });
   const result = await axios.post(
     `${process.env.SUBGRAPH_BLOCKS_URL}`,
@@ -1023,6 +1023,77 @@ export async function getTotalAmmPairYield(blockNumbers: number[], user: address
   }
 
   return totalYield;
+}
+
+export interface TotalValueLockedAndFees {
+  totalValueLocked: Decimal[]
+  borrowFees: Decimal[]
+}
+
+export async function getTotalValueLockedAndFees(blockNumbers: number[]): Promise<TotalValueLockedAndFees> {
+  const queryChunks = blockNumbers.map(blockNumber => {
+    return `
+      interestRates(
+        block: { number: ${blockNumber} }
+        orderBy: token__marketId
+        orderDirection: asc
+      ) {
+        token {
+          id
+          decimals
+          supplyLiquidity
+          borrowLiquidity
+        }
+        borrowInterestRate
+      }
+    `;
+  }, []);
+
+  const allTvlAndFees: TotalValueLockedAndFees = {
+    totalValueLocked: [],
+    borrowFees: [],
+  };
+  for (let i = 0; i < queryChunks.length; i += 1) {
+    const blockNumber = blockNumbers[i];
+    const numberOfMarkets = await dolomite.getters.getNumMarkets({ blockNumber });
+    const allMarkets: BigNumber[] = []
+    for (let j = 0; j < numberOfMarkets.toNumber(); j += 1) {
+      allMarkets.push(new BigNumber(j));
+    }
+
+    const allPrices = await Promise.all(
+      allMarkets.map(market => dolomite.getters.getMarketPrice(market, { blockNumber })),
+    );
+
+    const interestRates = await axios.post(
+      subgraphUrl,
+      {
+        query: `query getTvlAndInterestRatesByMarkets { ${queryChunks[i]} }`,
+      },
+      defaultAxiosConfig,
+    )
+      .then(response => response.data)
+      .then(json => (json.data.interestRates) as GraphqlInterestRate[]);
+
+    interestRates.forEach((rate, j) => {
+      if (!allTvlAndFees.totalValueLocked[i]) {
+        allTvlAndFees.totalValueLocked[i] = new BigNumber(0);
+        allTvlAndFees.borrowFees[i] = new BigNumber(0);
+      }
+
+      const supplyLiquidity = new BigNumber(rate.token.supplyLiquidity);
+      const borrowLiquidity = new BigNumber(rate.token.borrowLiquidity);
+      const scaleFactor = new BigNumber(10).pow(new BigNumber(36).minus(rate.token.decimals))
+      const priceUsd = allPrices[j].div(scaleFactor);
+
+      allTvlAndFees.totalValueLocked[i] = allTvlAndFees.totalValueLocked[i].plus(supplyLiquidity.times(priceUsd));
+
+      const feesDaily = borrowLiquidity.times(priceUsd).times(rate.borrowInterestRate).div(365);
+      allTvlAndFees.borrowFees[i] = allTvlAndFees.borrowFees[i].plus(feesDaily);
+    });
+  }
+
+  return allTvlAndFees;
 }
 
 function reduceResultIntoTotalYield(
