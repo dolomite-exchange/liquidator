@@ -38,6 +38,7 @@ import {
   GraphqlWithdrawalsResult,
 } from '../lib/graphql-types';
 import Pageable from '../lib/pageable';
+import '../lib/env';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ethers = require('ethers');
