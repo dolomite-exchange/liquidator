@@ -14,8 +14,8 @@ async function start() {
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
 
-  const startTimestamp = 1701302400;
-  const endTimestamp = 1702512000;
+  const startTimestamp = 1702512000;
+  const endTimestamp = 1703721600;
   const timestamps: number[] = [];
   for (let i = startTimestamp; i < endTimestamp; i += 86400) {
     timestamps.push(i);
