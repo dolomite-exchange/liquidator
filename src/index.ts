@@ -133,6 +133,7 @@ async function start() {
       liquidationMode,
       message: 'Simple liquidation variables',
       collateralPreferences: process.env.COLLATERAL_PREFERENCES,
+      liquidatorProxyV1: dolomite.liquidatorProxyV1.address,
       minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
       minOverheadValue: process.env.MIN_VALUE_LIQUIDATED,
       owedPreferences: process.env.OWED_PREFERENCES,
@@ -143,13 +144,15 @@ async function start() {
     Logger.info({
       liquidationMode,
       message: 'Sell with internal liquidity variables:',
-      revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
+      liquidatorProxyV2WithExternalLiquidity: dolomite.liquidatorProxyV2WithExternalLiquidity.address,
       minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
+      revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
     });
   } else if (liquidationMode === LiquidationMode.Generic) {
     Logger.info({
       liquidationMode,
       message: 'Generic liquidation mode variables:',
+      liquidatorProxyV4WithGenericTrader: dolomite.liquidatorProxyV4WithGenericTrader.address,
     });
   } else {
     throw new Error(`Invalid liquidation mode: ${liquidationMode}`);
