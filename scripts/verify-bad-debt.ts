@@ -1,5 +1,3 @@
-/*@formatter:off*/
-/*@formatter:on*/
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
@@ -10,8 +8,6 @@ import AccountStore from '../src/lib/account-store';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import './lib/env-reader';
-
-/* eslint-enable */
 
 async function start() {
   const marketStore = new MarketStore();
@@ -51,7 +47,7 @@ async function start() {
   // These accounts are not actually liquidatable, but rather accounts that have ANY debt.
   const accounts = accountStore.getLiquidatableDolomiteAccounts();
 
-  const accountsWithBadDebt = accounts.filter(account => {
+  const accountsWithBadDebt = accounts.reduce((memo, account) => {
     const initial = {
       borrow: INTEGERS.ZERO,
       supply: INTEGERS.ZERO,
@@ -61,30 +57,37 @@ async function start() {
       supply,
       borrow,
     } = Object.values(account.balances)
-      .reduce((memo, balance) => {
+      .reduce((acc, balance) => {
         const market = marketMap[balance.marketId.toString()];
         const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR);
         if (balance.wei.lt(INTEGERS.ZERO)) {
           // increase the borrow size by the premium
-          memo.borrow = memo.borrow.plus(value);
+          acc.borrow = acc.borrow.plus(value.abs());
         } else {
           // decrease the supply size by the premium
-          memo.supply = memo.supply.plus(value);
+          acc.supply = acc.supply.plus(value);
         }
-        return memo;
+        return acc;
       }, initial);
 
     if (borrow.gt(supply)) {
       Logger.warn({
         message: 'Found bad debt!',
         account: account.id,
+        markets: Object.values(account.balances).map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
         supplyUSD: supply.toFixed(6),
         borrowUSD: borrow.toFixed(6),
       });
+
+      return memo.concat({
+        ...account,
+        borrow,
+        supply,
+      });
     }
 
-    return borrow.gt(supply);
-  });
+    return memo
+  }, [] as any[]);
 
   if (accountsWithBadDebt.length === 0) {
     Logger.info({
@@ -93,7 +96,7 @@ async function start() {
   } else {
     Logger.info({
       accountsWithBadDebtLength: accountsWithBadDebt.length,
-      accountsWithBadDebt: accountsWithBadDebt,
+      totalBadDebt: accountsWithBadDebt.reduce((memo, account) => memo.plus(account.borrow), INTEGERS.ZERO).toFixed(),
     });
   }
 
