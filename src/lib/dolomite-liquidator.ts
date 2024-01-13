@@ -96,7 +96,13 @@ export default class DolomiteLiquidator {
     for (let i = 0; i < liquidatableAccounts.length; i += 1) {
       const account = liquidatableAccounts[i];
       try {
-        await liquidateAccount(account, marketMap, riskParams, lastBlockTimestamp);
+        const result = await liquidateAccount(account, marketMap, riskParams, lastBlockTimestamp);
+        if (result) {
+          Logger.info({
+            message: 'Liquidation transaction hash:',
+            transactionHash: result?.transactionHash,
+          });
+        }
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
       } catch (error: any) {
         Logger.error({
@@ -111,8 +117,14 @@ export default class DolomiteLiquidator {
     for (let i = 0; i < expirableAccounts.length; i += 1) {
       const account = expirableAccounts[i];
       try {
-        await liquidateExpiredAccount(account, marketMap, riskParams, lastBlockTimestamp);
+        const result = await liquidateExpiredAccount(account, marketMap, riskParams, lastBlockTimestamp);
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
+        if (result) {
+          Logger.info({
+            message: 'Expiration transaction hash:',
+            transactionHash: result?.transactionHash,
+          });
+        }
       } catch (error: any) {
         Logger.error({
           at: 'DolomiteLiquidator#_liquidateAccounts',

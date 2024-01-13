@@ -14,8 +14,8 @@ async function start() {
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
 
-  const startTimestamp = 1702512000;
-  const endTimestamp = 1703721600;
+  const startTimestamp = 1703721600;
+  const endTimestamp = 1704931200;
   const timestamps: number[] = [];
   for (let i = startTimestamp; i < endTimestamp; i += 86400) {
     timestamps.push(i);
@@ -23,7 +23,7 @@ async function start() {
   const timestampToBlockNumberMap = await getTimestampToBlockNumberMap(timestamps);
   const tvlAndFees = await getTotalValueLockedAndFees(Object.values(timestampToBlockNumberMap));
 
-  const tvl = tvlAndFees.totalValueLocked
+  const averageTvl = tvlAndFees.totalValueLocked
     .reduce((acc, value) => acc.plus(value), new BigNumber(0))
     .div(timestamps.length);
   const borrowFees = tvlAndFees.borrowFees.reduce((acc, value) => acc.plus(value), new BigNumber(0));
@@ -32,8 +32,9 @@ async function start() {
   console.log('----------------------------------------------------')
   console.log('-------------------- TVL Data --------------------');
   console.log('----------------------------------------------------')
-  console.log('Average TVL:', `$${tvl.toFixed(2)}`);
+  console.log('Average TVL:', `$${averageTvl.toFixed(2)}`);
   console.log('Total Borrow Fees:', `$${borrowFees.toFixed(2)}`);
+  console.log('Average Borrow Fees:', `$${borrowFees.div(timestamps.length).toFixed(2)}`);
   console.log('Tabulation period:', `${timestamps} days (${startTimestampString} - ${endTimestampString})`);
   console.log();
   const annualizedData = new BigNumber(365).div(timestamps.length)
