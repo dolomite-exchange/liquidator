@@ -100,7 +100,7 @@ async function start() {
         supplyUSD: supply.toFixed(6),
         borrowUSD: borrow.toFixed(6),
       });
-    } else if (borrowAdj.times('1.16').gt(supplyAdj)) {
+    } else if (borrowAdj.times('1.155').gt(supplyAdj)) {
       Logger.info({
         message: 'Found almost liquid account!',
         account: account.id,

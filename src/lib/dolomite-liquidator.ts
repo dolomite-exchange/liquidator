@@ -42,7 +42,15 @@ export default class DolomiteLiquidator {
     await delay(Number(process.env.MARKET_POLL_INTERVAL_MS)); // wait for the markets to initialize
     // noinspection InfiniteLoopJS
     for (; ;) {
-      await this._liquidateAccounts();
+      try {
+        await this._liquidateAccounts();
+      } catch (e) {
+        Logger.error({
+          at: 'DolomiteLiquidator#_poll',
+          message: 'Uncaught error',
+          error: e,
+        });
+      }
 
       await delay(Number(process.env.LIQUIDATE_POLL_INTERVAL_MS));
     }
@@ -107,7 +115,7 @@ export default class DolomiteLiquidator {
       } catch (error: any) {
         Logger.error({
           at: 'DolomiteLiquidator#_liquidateAccounts',
-          message: `Failed to liquidate account: ${error.message}`,
+          message: 'Failed to liquidate account',
           account,
           error,
         });
