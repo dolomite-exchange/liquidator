@@ -136,7 +136,7 @@ export default class DolomiteLiquidator {
       } catch (error: any) {
         Logger.error({
           at: 'DolomiteLiquidator#_liquidateAccounts',
-          message: `Failed to liquidate expired account: ${error.message}`,
+          message: 'Failed to liquidate expired account',
           account,
           error,
         });
