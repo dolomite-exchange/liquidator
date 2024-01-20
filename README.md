@@ -46,50 +46,55 @@ docker run \
 
 This service will automatically liquidate undercollateralized and/or expired accounts on Dolomite.
 
-This bot works for Dolomite (Margin-Trading) accounts. Use the envvars `LIQUIDATIONS_ENABLED`, 
+This bot works for Dolomite (Margin-Trading) accounts. Use the envvars `LIQUIDATIONS_ENABLED`,
 `EXPIRATIONS_ENABLED` to control what kind of liquidations to perform.
 
-**Liquidations on Dolomite happen internally between Accounts, so you will need an already-funded Dolomite Account to 
+**Liquidations on Dolomite happen internally between Accounts, so you will need an already-funded Dolomite Account to
 use this liquidator bot. If you use the default of `DOLOMITE_ACCOUNT_NUMBER=0`, you can fund your Dolomite Margin
 Account on [app.dolomite.io](https://app.dolomite.io).**
 
-Successfully liquidating Accounts will modify your Dolomite Account balances. You can liquidate assets you do not have 
-in your Account provided you have another asset as collateral, which will just cause your Dolomite Account Balance to 
+Successfully liquidating Accounts will modify your Dolomite Account balances. You can liquidate assets you do not have
+in your Account provided you have another asset as collateral, which will just cause your Dolomite Account Balance to
 go negative in that asset.
 
 ### Dolomite Liquidations
-Liquidations on Dolomite reward a 5% spread on top of the current oracle prices for the assets being liquidated and 
+
+Liquidations on Dolomite reward a 5% spread on top of the current oracle prices for the assets being liquidated and
 used as collateral. Example:
 
 Undercollateralized Account:
+
 ```
 +2 ETH
 -350 DAI
 ```
 
 Liquidator Account:
+
 ```
 +100 ETH
 -1000 DAI
 ```
 
 Oracle Prices:
+
 ```
 ETH Oracle Price: $200
 DAI Oracle Price: $1
 ```
 
-Fully liquidating this account would cause 350 DAI to be paid to zero out its balance, and would reward 
+Fully liquidating this account would cause 350 DAI to be paid to zero out its balance, and would reward
 `350 DAI * ($1/DAI / $200/ETH) * 1.05 = 1.8375 ETH` as payout. After the liquidation the account balances would be:
 
-
 Undercollateralized Account:
+
 ```
 +0.1625 ETH
 0 DAI
 ```
 
 Liquidator Account:
+
 ```
 +101.8375 ETH
 -1350 DAI
@@ -120,8 +125,8 @@ Liquidator Account:
 | LIQUIDATIONS_ENABLED                   | Whether to liquidate Dolomite accounts or not. Defaults to `true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | MARKET_POLL_INTERVAL_MS                | How frequently to market information (including which markets exist, oracle prices, and margin premium information). Defaults to `5000` milliseconds.                                                                                                                                                                                                                                                                                                                                                                     |
 | MIN_ACCOUNT_COLLATERALIZATION          | The desired minimum collateralization of the liquidator account after completing a *simple* liquidation. Prevents the liquidator account from being at risk of being liquidated itself if the price of assets continues to move in some direction. Higher values are safer. e.g. 0.5 = 150% collateralization. This value is only used if `LIQUIDATION_MODE` is set to `Simple`. Defaults to `0.50` (150% collateralization).                                                                                             |
-| MIN_VALUE_LIQUIDATED                   | If you can liquidate less than this amount of value before hitting `MIN_ACCOUNT_COLLATERALIZATION`, then don't liquidate. This value is only used if `LIQUIDATION_MODE` is set to `Simple`. Defaults to `100000000000000000000000000000000000000` (100e36; 100 USD).                                                                                                                                                                                                                                                      |
-| MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL | If the amount to be liquidated for `LIQUIDATION_MODE=SellWithExternalLiquidity` is less than this amount, fallback to `LIQUIDATION_MODE=Simple`. Defaults to `1000000000000000000000000000000000000` (0.01e36; 0.01 USD).                                                                                                                                                                                                                                                                                                 |
+| MIN_VALUE_LIQUIDATED                   | The minimum amount of debt required for a liquidation to be processed. Defaults to `1000000000000000000000000000000000` ($0.001 USD).                                                                                                                                                                                                                                                                                                                                                                                     |
+| MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL | If the amount to be liquidated for `LIQUIDATION_MODE=SellWithInternalLiquidity\|Generic` is less than this amount, fallback to `LIQUIDATION_MODE=Simple`. Defaults to `1000000000000000000000000000000000000` (0.1e36; $0.1 USD).                                                                                                                                                                                                                                                                                         |
 | MIN_OWED_OUTPUT_AMOUNT_DISCOUNT        | This parameter is only used if `REVERT_ON_FAIL_TO_SELL_COLLATERAL` is set to `false`. A discount to apply on the required output of the trade (from held collateral to owed balance), or else the transaction reverts. Must be less than `1.00` and greater than or equal to `0`. This value is applied to the `minOutputAmount` of the trade from held amount to owed amount such that the outputted trade amount must be greater than or equal to `owedBalance * (1.00 - discount)`. Defaults to `0.10` (10% discount). |
 | NETWORK_ID                             | **REQUIRED** Ethereum Network ID. This must match the chain ID sent back from `ETHEREUM_NODE_URL`.                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | OWED_PREFERENCES                       | **CONDITIONALLY REQUIRED** A list of preferences for which markets to liquidate first on an account when liquidating.  This variable is only required if `LIQUIDATION_MODE` is set to `Simple`.                                                                                                                                                                                                                                                                                                                           |

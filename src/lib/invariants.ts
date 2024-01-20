@@ -46,6 +46,12 @@ export function checkBigNumber(key: string) {
   }
 }
 
+export function checkBigNumberAndGreaterThan(key: string, minValue: string) {
+  if (!process.env[key] || new BigNumber(process.env[key]!).isNaN() || new BigNumber(process.env[key]!).lte(minValue)) {
+    throw new Error(`${key} is not provided or invalid`);
+  }
+}
+
 export function checkJsNumber(key: string) {
   if (!process.env[key] || Number.isNaN(Number(process.env[key]))) {
     throw new Error(`${key} is not provided or invalid`);

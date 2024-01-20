@@ -9,7 +9,7 @@ import AccountStore from './lib/account-store';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
-  checkBigNumber,
+  checkBigNumber, checkBigNumberAndGreaterThan,
   checkBooleanValue,
   checkDuration,
   checkEthereumAddress,
@@ -46,8 +46,8 @@ checkDuration('LIQUIDATION_KEY_EXPIRATION_SECONDS', 1, /* isMillis = */ false);
 checkBooleanValue('LIQUIDATIONS_ENABLED');
 checkDuration('MARKET_POLL_INTERVAL_MS', 1000);
 checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
-checkBigNumber('MIN_VALUE_LIQUIDATED');
-checkBigNumber('MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL');
+checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED', '1000000000000000000000000'); // 1e24
+checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL', process.env.MIN_VALUE_LIQUIDATED!);
 checkBigNumber('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT');
 checkJsNumber('NETWORK_ID');
 checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkPreferences('OWED_PREFERENCES'));
@@ -114,6 +114,8 @@ async function start() {
     liquidationsEnabled: process.env.LIQUIDATIONS_ENABLED,
     liquidatorProxyV1: dolomite.contracts.liquidatorProxyV1.options.address,
     liquidatorProxyV1WithAmm: dolomite.contracts.liquidatorProxyV1WithAmm.options.address,
+    minValueLiquidated: process.env.MIN_VALUE_LIQUIDATED,
+    minValueLiquidatedForExternalSell: process.env.MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL,
     networkId,
     sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,
@@ -135,7 +137,6 @@ async function start() {
       collateralPreferences: process.env.COLLATERAL_PREFERENCES,
       liquidatorProxyV1: dolomite.liquidatorProxyV1.address,
       minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
-      minOverheadValue: process.env.MIN_VALUE_LIQUIDATED,
       owedPreferences: process.env.OWED_PREFERENCES,
     });
   } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {

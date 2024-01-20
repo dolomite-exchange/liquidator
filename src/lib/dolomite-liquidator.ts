@@ -10,6 +10,9 @@ import Logger from './logger';
 import MarketStore from './market-store';
 import RiskParamsStore from './risk-params-store';
 
+const BASE = new BigNumber('1000000000000000000');
+const MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
+
 export default class DolomiteLiquidator {
   public accountStore: AccountStore;
   public marketStore: MarketStore;
@@ -58,19 +61,21 @@ export default class DolomiteLiquidator {
 
   _liquidateAccounts = async () => {
     const lastBlockTimestamp: DateTime = this.marketStore.getBlockTimestamp();
+    const marketMap = this.marketStore.getMarketMap();
 
     let expirableAccounts = this.accountStore.getExpirableDolomiteAccounts()
-      .filter(a => !this.liquidationStore.contains(a))
-      .filter(a => {
-        return Object.values(a.balances)
+      .filter(account => !this.liquidationStore.contains(account))
+      .filter(account => {
+        return Object.values(account.balances)
           .some((balance => {
-            if (balance.wei.lt(0) && balance.expiresAt) {
+            if (balance.wei.lt(INTEGERS.ZERO) && balance.expiresAt) {
               return isExpired(balance.expiresAt, lastBlockTimestamp)
             } else {
               return false;
             }
           }));
-      });
+      })
+      .filter(account => this.isSufficientDebt(account, marketMap))
 
     const riskParams = this.riskParamsStore.getDolomiteRiskParams();
     if (!riskParams) {
@@ -81,10 +86,10 @@ export default class DolomiteLiquidator {
       return;
     }
 
-    const marketMap = this.marketStore.getMarketMap();
     const liquidatableAccounts = this.accountStore.getLiquidatableDolomiteAccounts()
       .filter(account => !this.liquidationStore.contains(account))
       .filter(account => !this.isCollateralized(account, marketMap, riskParams))
+      .filter(account => this.isSufficientDebt(account, marketMap))
       .sort((a, b) => this.borrowAmountSorterDesc(a, b, marketMap));
 
     // Do not put an account in both liquidatable and expired; prioritize liquidation
@@ -153,7 +158,6 @@ export default class DolomiteLiquidator {
       borrow: INTEGERS.ZERO,
       supply: INTEGERS.ZERO,
     };
-    const base = new BigNumber('1000000000000000000');
     const {
       supply,
       borrow,
@@ -161,25 +165,38 @@ export default class DolomiteLiquidator {
       .reduce((memo, balance) => {
         const market = marketMap[balance.marketId.toString()];
         const value = balance.wei.times(market.oraclePrice);
-        const adjust = base.plus(market.marginPremium);
+        const adjust = BASE.plus(market.marginPremium);
         if (balance.wei.lt(INTEGERS.ZERO)) {
           // increase the borrow size by the premium
-          memo.borrow = memo.borrow.plus(value.times(adjust)
-            .div(base)
-            .integerValue(BigNumber.ROUND_FLOOR));
+          memo.borrow = memo.borrow.plus(value.abs().times(adjust).div(BASE).integerValue(BigNumber.ROUND_FLOOR));
         } else {
           // decrease the supply size by the premium
-          memo.supply = memo.supply.plus(value.times(base)
-            .div(adjust)
-            .integerValue(BigNumber.ROUND_FLOOR));
+          memo.supply = memo.supply.plus(value.times(BASE).div(adjust).integerValue(BigNumber.ROUND_FLOOR));
         }
         return memo;
       }, initial);
 
-    const collateralization = supply.times(base)
-      .div(borrow.abs())
+    const collateralization = supply.times(BASE)
+      .div(borrow)
       .integerValue(BigNumber.ROUND_FLOOR);
     return collateralization.gte(riskParams.liquidationRatio);
+  }
+
+  isSufficientDebt = (
+    account: ApiAccount,
+    marketMap: { [marketId: string]: ApiMarket },
+  ): boolean => {
+    const borrow = Object.values(account.balances)
+      .reduce((memo, balance) => {
+        if (balance.wei.lt(INTEGERS.ZERO)) {
+          const market = marketMap[balance.marketId.toString()];
+          const value = balance.wei.times(market.oraclePrice);
+          return memo.plus(value.abs());
+        }
+        return memo;
+      }, INTEGERS.ZERO);
+
+    return borrow.gte(MIN_VALUE_LIQUIDATED);
   }
 
   /**
