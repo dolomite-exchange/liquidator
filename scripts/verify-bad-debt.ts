@@ -5,9 +5,24 @@ import { getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
 import AccountStore from '../src/lib/account-store';
+import { ApiAccount, ApiBalance } from '../src/lib/api-types';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import './lib/env-reader';
+
+const SMALL_BORROW_THRESHOLD = new BigNumber('0.001');
+
+const TEN = new BigNumber('10');
+
+const TICKERS_TO_IGNORE = ['djUSDC'];
+
+function formatApiBalance(balance: ApiBalance): string {
+  return `${balance.wei.div(TEN.pow(balance.tokenDecimals)).toFixed(6)} ${balance.tokenSymbol}`;
+}
+
+function shouldIgnoreAccount(account: ApiAccount): boolean {
+  return Object.values(account.balances).some(b => TICKERS_TO_IGNORE.includes(b.tokenSymbol));
+}
 
 async function start() {
   const marketStore = new MarketStore();
@@ -47,6 +62,8 @@ async function start() {
   // These accounts are not actually liquidatable, but rather accounts that have ANY debt.
   const accounts = accountStore.getLiquidatableDolomiteAccounts();
 
+  let smallLiquidBorrowCount = 0;
+  let smallAlmostLiquidBorrowCount = 0;
   const accountsWithBadDebt = accounts.reduce((memo, account) => {
     const initial = {
       borrow: INTEGERS.ZERO,
@@ -92,26 +109,42 @@ async function start() {
         borrow,
         supply,
       });
-    } else if (borrowAdj.times('1.15').gt(supplyAdj)) {
-      Logger.warn({
-        message: 'Found liquid account!',
-        account: account.id,
-        markets: Object.values(account.balances).map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
-        supplyUSD: supply.toFixed(6),
-        borrowUSD: borrow.toFixed(6),
-      });
-    } else if (borrowAdj.times('1.155').gt(supplyAdj)) {
-      Logger.info({
-        message: 'Found almost liquid account!',
-        account: account.id,
-        markets: Object.values(account.balances).map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
-        supplyUSD: supply.toFixed(6),
-        borrowUSD: borrow.toFixed(6),
-      });
+    } else if (borrowAdj.times('1.15').gt(supplyAdj) && !shouldIgnoreAccount(account)) {
+      if (borrowAdj.lt(SMALL_BORROW_THRESHOLD)) {
+        smallLiquidBorrowCount += 1;
+      } else {
+        Logger.warn({
+          message: 'Found liquid account!',
+          account: account.id,
+          markets: Object.values(account.balances).map(formatApiBalance),
+          supplyUSD: supply.toFixed(6),
+          borrowUSD: borrow.toFixed(6),
+        });
+      }
+    } else if (borrowAdj.times('1.155').gt(supplyAdj) && !shouldIgnoreAccount(account)) {
+      if (borrowAdj.lt(SMALL_BORROW_THRESHOLD)) {
+        smallAlmostLiquidBorrowCount += 1;
+      } else {
+        Logger.info({
+          message: 'Found almost liquid account!',
+          account: account.id,
+          markets: Object.values(account.balances).map(formatApiBalance),
+          supplyUSD: supply.toFixed(6),
+          borrowUSD: borrow.toFixed(6),
+        });
+      }
     }
 
     return memo
   }, [] as any[]);
+
+  Logger.info({
+    message: `Found ${smallLiquidBorrowCount} liquidatable accounts with small borrow positions`,
+  });
+
+  Logger.info({
+    message: `Found ${smallAlmostLiquidBorrowCount} almost liquidatable accounts with small borrow positions`,
+  });
 
   if (accountsWithBadDebt.length === 0) {
     Logger.info({
