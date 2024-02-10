@@ -1097,6 +1097,36 @@ export async function getTotalValueLockedAndFees(blockNumbers: number[]): Promis
   return allTvlAndFees;
 }
 
+export async function getTotalTransactions(startBlockNumber: number, endBlockNumber: number): Promise<BigNumber> {
+  const query = `
+      start:dolomiteMargins(
+        block: { number: ${startBlockNumber} }
+      ) {
+        transactionCount
+      }
+      end:dolomiteMargins(
+        block: { number: ${endBlockNumber} }
+      ) {
+        transactionCount
+      }
+    `;
+
+  const { start, end } = await axios.post(
+    subgraphUrl,
+    {
+      query: `query getTotalTransactions { ${query} }`,
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => {
+      console.log('json', json)
+      return (json.data) as { start: { transactionCount: string }[], end: { transactionCount: string }[] }
+    });
+
+  return new BigNumber(end[0].transactionCount).minus(start[0].transactionCount);
+}
+
 function reduceResultIntoTotalYield(
   result: GraphqlAmmDataForUserResult,
   blockNumbers: number[],
