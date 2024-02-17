@@ -1,7 +1,7 @@
 import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
-import request from 'request-promise-native';
-import { ChainId, isArbitrum, isPolygon } from '../lib/chain-id';
+import { ChainId, isArbitrum } from '../lib/chain-id';
 import Logger from '../lib/logger';
+import axios from 'axios';
 
 let lastPriceWei: string = process.env.INITIAL_GAS_PRICE_WEI as string;
 
@@ -29,10 +29,8 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
 
   const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
   const addition = new BigNumber(process.env.GAS_PRICE_ADDITION as string);
-  const networkId = Number(process.env.NETWORK_ID)
-  const base = networkId === ChainId.Ethereum ? 100_000_000 : 1_000_000_000;
   const totalWei = new BigNumber(fast)
-    .times(base)
+    .times(1_000_000_000)
     .times(multiplier)
     .plus(addition)
     .toFixed(0);
@@ -57,16 +55,9 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }>
   });
 
   const networkId = Number(process.env.NETWORK_ID);
-  if (isPolygon(networkId)) {
-    const uri = networkId === ChainId.PolygonMatic
-      ? 'https://gasstation-mainnet.matic.network/'
-      : 'https://gasstation-mumbai.matic.today/';
-    const response = await request({
-      uri,
-      method: 'GET',
-      timeout: process.env.GAS_REQUEST_TIMEOUT_MS,
-    });
-    return JSON.parse(response);
+  if (networkId === ChainId.PolygonZkEvm) {
+    const response = await axios.get('https://gasstation.polygon.technology/zkevm');
+    return response.data;
   } else if (isArbitrum(networkId)) {
     const result = await dolomite.arbitrumGasInfo.getPricesInWei();
     return {

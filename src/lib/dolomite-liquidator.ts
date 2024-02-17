@@ -9,27 +9,19 @@ import LiquidationStore from './liquidation-store';
 import Logger from './logger';
 import MarketStore from './market-store';
 import RiskParamsStore from './risk-params-store';
+import BlockStore from './block-store';
 
 const BASE = new BigNumber('1000000000000000000');
 const MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
 
 export default class DolomiteLiquidator {
-  public accountStore: AccountStore;
-  public marketStore: MarketStore;
-  public liquidationStore: LiquidationStore;
-  public riskParamsStore: RiskParamsStore;
-
   constructor(
-    accountStore: AccountStore,
-    marketStore: MarketStore,
-    liquidationStore: LiquidationStore,
-    riskParamsStore: RiskParamsStore,
-  ) {
-    this.accountStore = accountStore;
-    this.marketStore = marketStore;
-    this.liquidationStore = liquidationStore;
-    this.riskParamsStore = riskParamsStore;
-  }
+    private readonly accountStore: AccountStore,
+    private readonly blockStore: BlockStore,
+    private readonly marketStore: MarketStore,
+    private readonly liquidationStore: LiquidationStore,
+    private readonly riskParamsStore: RiskParamsStore,
+  ) {}
 
   start = () => {
     Logger.info({
@@ -60,7 +52,7 @@ export default class DolomiteLiquidator {
   };
 
   _liquidateAccounts = async () => {
-    const lastBlockTimestamp: DateTime = this.marketStore.getBlockTimestamp();
+    const lastBlockTimestamp: DateTime = this.blockStore.getBlockTimestamp();
     const marketMap = this.marketStore.getMarketMap();
 
     let expirableAccounts = this.accountStore.getExpirableDolomiteAccounts()

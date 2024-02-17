@@ -4,14 +4,16 @@ import { delay } from './delay';
 import Logger from './logger';
 import MarketStore from './market-store';
 import Pageable from './pageable';
+import BlockStore from './block-store';
 
 export default class AccountStore {
-  public marketStore: MarketStore;
-
   public liquidatableDolomiteAccounts: ApiAccount[];
   public expirableAccounts: ApiAccount[];
 
-  constructor(marketStore: MarketStore) {
+  constructor(
+    private readonly blockSore: BlockStore,
+    private readonly marketStore: MarketStore,
+  ) {
     this.marketStore = marketStore;
     this.liquidatableDolomiteAccounts = [];
     this.expirableAccounts = [];
@@ -58,11 +60,11 @@ export default class AccountStore {
       message: 'Updating accounts...',
     });
 
-    const blockNumber = this.marketStore.getBlockNumber();
+    const blockNumber = this.blockSore.getBlockNumber();
     if (blockNumber === 0) {
       Logger.warn({
         at: 'AccountStore#_update',
-        message: 'Block number from marketStore is 0, returning...',
+        message: 'Block number from blockStore is 0, returning...',
       });
       return;
     }

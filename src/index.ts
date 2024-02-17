@@ -28,6 +28,7 @@ import RiskParamsStore from './lib/risk-params-store';
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
+checkDuration('BLOCK_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('BRIDGE_TOKEN_ADDRESS');
 checkLiquidationModeConditionally(
   LiquidationMode.Simple,
@@ -48,13 +49,8 @@ checkDuration('MARKET_POLL_INTERVAL_MS', 1000);
 checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
 checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED', '1000000000000000000000000'); // 1e24
 checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL', process.env.MIN_VALUE_LIQUIDATED!);
-checkBigNumber('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT');
 checkJsNumber('NETWORK_ID');
 checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkPreferences('OWED_PREFERENCES'));
-checkLiquidationModeConditionally(
-  LiquidationMode.SellWithInternalLiquidity,
-  () => checkBooleanValue('REVERT_ON_FAIL_TO_SELL_COLLATERAL'),
-);
 checkDuration('RISK_PARAMS_POLL_INTERVAL_MS', 1000);
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 10);
 checkExists('SUBGRAPH_URL');
@@ -98,7 +94,7 @@ async function start() {
   Logger.info({
     message: 'DolomiteMargin data',
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
-    liquidationMode,
+    blockPollIntervalMillis: process.env.BLOCK_POLL_INTERVAL_MS,
     bridgeTokenAddress: process.env.BRIDGE_TOKEN_ADDRESS,
     dolomiteAccountNumber: process.env.DOLOMITE_ACCOUNT_NUMBER,
     dolomiteMargin: libraryDolomiteMargin,
@@ -111,6 +107,7 @@ async function start() {
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
     liquidationKeyExpirationSeconds: process.env.LIQUIDATION_KEY_EXPIRATION_SECONDS,
+    liquidationMode,
     liquidationsEnabled: process.env.LIQUIDATIONS_ENABLED,
     liquidatorProxyV1: dolomite.contracts.liquidatorProxyV1.options.address,
     liquidatorProxyV1WithAmm: dolomite.contracts.liquidatorProxyV1WithAmm.options.address,
@@ -138,16 +135,6 @@ async function start() {
       liquidatorProxyV1: dolomite.liquidatorProxyV1.address,
       minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
       owedPreferences: process.env.OWED_PREFERENCES,
-    });
-  } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {
-    const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true';
-    const discountUsedText = revertOnFailToSellCollateral ? '(unused)' : '';
-    Logger.info({
-      liquidationMode,
-      message: 'Sell with internal liquidity variables:',
-      liquidatorProxyV2WithExternalLiquidity: dolomite.liquidatorProxyV2WithExternalLiquidity.address,
-      minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
-      revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
     });
   } else if (liquidationMode === LiquidationMode.Generic) {
     Logger.info({

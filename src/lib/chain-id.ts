@@ -1,16 +1,17 @@
 export enum ChainId {
-  Ethereum = 1,
-  PolygonMatic = 137,
-  PolygonMumbai = 80001,
+  PolygonZkEvm = 1101,
+  Base = 8453,
   ArbitrumOne = 42161,
-  ArbitrumRinkeby = 421611,
-  ArbitrumGoerli = 421613,
 }
 
 export function isArbitrum(chainId: ChainId): boolean {
-  return chainId === ChainId.ArbitrumOne || chainId === ChainId.ArbitrumRinkeby || chainId === ChainId.ArbitrumGoerli
+  return chainId === ChainId.ArbitrumOne;
+}
+
+export function isBase(chainId: ChainId): boolean {
+  return chainId === ChainId.Base;
 }
 
 export function isPolygon(chainId: ChainId): boolean {
-  return chainId === ChainId.PolygonMatic || chainId === ChainId.PolygonMumbai
+  return chainId === ChainId.PolygonZkEvm;
 }

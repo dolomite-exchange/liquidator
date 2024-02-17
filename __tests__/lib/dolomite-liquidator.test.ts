@@ -1,4 +1,4 @@
-import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { DateTime } from 'luxon';
 import { dolomite } from '../../src/helpers/web3';
 import AccountStore from '../../src/lib/account-store';
@@ -110,8 +110,6 @@ describe('dolomite-liquidator', () => {
     it('Successfully liquidates accounts while selling collateral', async () => {
       process.env.EXPIRATIONS_ENABLED = 'true';
       process.env.BRIDGE_TOKEN_ADDRESS = getTestMarkets()[0].tokenAddress; // WETH
-      process.env.LIQUIDATION_MODE = LiquidationMode.SellWithInternalLiquidity;
-      process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL = 'false';
 
       const liquidatableAccounts = getTestLiquidatableAccounts();
       const expiredAccounts = getTestExpiredAccounts();
@@ -145,8 +143,6 @@ describe('dolomite-liquidator', () => {
         return liquidations.find((l) => l[2] === account.owner && l[3] === account.number);
       });
 
-      const discount = INTEGERS.ONE.minus(new BigNumber(process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT));
-
       expect(sortedLiquidations[0][0])
         .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
       expect(sortedLiquidations[0][1].toFixed())
@@ -163,10 +159,6 @@ describe('dolomite-liquidator', () => {
         ]);
       expect(sortedLiquidations[0][7])
         .toEqual(null);
-      expect(sortedLiquidations[0][8])
-        .toEqual(liquidatableAccounts[0].balances[1].wei.abs().times(discount).integerValue(BigNumber.ROUND_FLOOR));
-      expect(sortedLiquidations[0][9])
-        .toEqual(process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true');
 
       expect(sortedLiquidations[1][0])
         .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
@@ -184,10 +176,6 @@ describe('dolomite-liquidator', () => {
         ]);
       expect(sortedLiquidations[1][7])
         .toEqual(null);
-      expect(sortedLiquidations[1][8])
-        .toEqual(liquidatableAccounts[1].balances[0].wei.abs().times(discount).integerValue(BigNumber.ROUND_FLOOR));
-      expect(sortedLiquidations[1][9])
-        .toEqual(process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true');
 
       expect(liquidatableExpiredAccounts[0][0])
         .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
@@ -209,10 +197,6 @@ describe('dolomite-liquidator', () => {
         ]);
       expect(liquidatableExpiredAccounts[0][7])
         .toEqual(expiredAccounts[0].balances[2].expiresAt);
-      expect(liquidatableExpiredAccounts[0][8])
-        .toEqual(expiredAccounts[0].balances[2].wei.abs().times(discount).integerValue(BigNumber.ROUND_FLOOR));
-      expect(liquidatableExpiredAccounts[0][9])
-        .toEqual(process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true');
     });
   });
 });
