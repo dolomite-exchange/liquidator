@@ -19,7 +19,7 @@ const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? 
 const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split(',')
   .map((pref) => new BigNumber(pref.trim()));
 
-const minValueLiquidatedForExternalSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL as string);
+const minValueLiquidatedForGenericSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL as string);
 
 const NETWORK_ID = Number(process.env.NETWORK_ID);
 const ONE_HOUR = 60 * 60;
@@ -111,8 +111,6 @@ export async function liquidateAccount(
       lastBlockTimestamp,
       false,
     );
-  } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {
-    return _liquidateAccountAndSellWithInternalLiquidity(liquidAccount, marketMap, lastBlockTimestamp, false);
   } else if (liquidationMode === LiquidationMode.Simple) {
     return _liquidateAccountSimple(liquidAccount);
   } else {
@@ -146,8 +144,6 @@ export async function liquidateExpiredAccount(
       lastBlockTimestamp,
       true,
     );
-  } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {
-    return _liquidateAccountAndSellWithInternalLiquidity(expiredAccount, marketMap, lastBlockTimestamp, true);
   } else if (liquidationMode === LiquidationMode.Simple) {
     return _liquidateExpiredAccountInternalSimple(expiredAccount, marketMap, lastBlockTimestamp);
   } else {
@@ -215,7 +211,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     || zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId));
   if (!hasIsolationModeMarket && owedBalance.wei.abs()
     .times(owedMarket.oraclePrice)
-    .isLessThan(minValueLiquidatedForExternalSell)) {
+    .isLessThan(minValueLiquidatedForGenericSell)) {
     Logger.info({
       message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
       owedMarketId: owedMarket.marketId,
@@ -304,81 +300,6 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   }
 }
 
-async function _liquidateAccountAndSellWithInternalLiquidity(
-  liquidAccount: ApiAccount,
-  marketMap: { [marketId: string]: ApiMarket },
-  lastBlockTimestamp: DateTime,
-  isExpiring: boolean,
-): Promise<TxResult> {
-  if (!process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL) {
-    const message = 'REVERT_ON_FAIL_TO_SELL_COLLATERAL is not provided';
-    Logger.error({
-      at: 'dolomite-helpers#liquidateAccountInternalAndSellCollateral',
-      message,
-    });
-    process.exit(-1);
-    return Promise.reject(new Error(message));
-  }
-
-  const owedBalance = _getLargestBalanceUSD(
-    Object.values(liquidAccount.balances),
-    true,
-    marketMap,
-    lastBlockTimestamp,
-    isExpiring,
-  );
-  const heldBalance = _getLargestBalanceUSD(
-    Object.values(liquidAccount.balances),
-    false,
-    marketMap,
-    lastBlockTimestamp,
-    isExpiring,
-  );
-
-  const owedToken = owedBalance.tokenAddress.toLowerCase();
-  const heldToken = heldBalance.tokenAddress.toLowerCase();
-
-  let tokenPath: string[];
-  const bridgeAddress = (process.env.BRIDGE_TOKEN_ADDRESS as string).toLowerCase();
-  if (owedToken === bridgeAddress || heldToken === bridgeAddress) {
-    tokenPath = [heldBalance.tokenAddress, owedBalance.tokenAddress];
-  } else {
-    tokenPath = [heldBalance.tokenAddress, bridgeAddress, owedBalance.tokenAddress];
-  }
-
-  const minOwedOutputDiscount = new BigNumber(process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT as string);
-  if (minOwedOutputDiscount.gte(INTEGERS.ONE)) {
-    return Promise.reject(new Error('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT must be less than 1.00'));
-  } else if (minOwedOutputDiscount.lt(INTEGERS.ZERO)) {
-    return Promise.reject(new Error('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT must be greater than or equal to 0'));
-  }
-
-  const minOwedOutputAmount = owedBalance.wei.abs()
-    .times(INTEGERS.ONE.minus(minOwedOutputDiscount))
-    .integerValue(BigNumber.ROUND_FLOOR);
-  const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL.toLowerCase() === 'true';
-
-  const gasPrice = getGasPriceWei();
-
-  return dolomite.liquidatorProxyV1WithAmm.liquidate(
-    solidAccount.owner,
-    solidAccount.number,
-    liquidAccount.owner,
-    liquidAccount.number,
-    new BigNumber(owedBalance.marketId),
-    new BigNumber(heldBalance.marketId),
-    tokenPath,
-    isExpiring ? (owedBalance.expiresAt ?? null) : null,
-    minOwedOutputAmount,
-    revertOnFailToSellCollateral,
-    {
-      gasPrice: gasPrice.toFixed(),
-      from: solidAccount.owner,
-      confirmationType: ConfirmationType.Hash,
-    },
-  );
-}
-
 async function _liquidateExpiredAccountInternalSimple(
   expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
@@ -420,7 +341,7 @@ async function _liquidateExpiredAccountInternalSimple(
     throw new Error('Could not find an expired balance');
   }
   if (!heldBalance) {
-    throw new Error('Could not find a held balance: ' + JSON.stringify(preferredBalances, null, 2));
+    throw new Error(`Could not find a held balance: ${JSON.stringify(preferredBalances, null, 2)}`);
   }
 
   return dolomite.expiryProxy.expire(

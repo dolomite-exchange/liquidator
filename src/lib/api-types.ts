@@ -1,8 +1,11 @@
-import { address, Integer } from '@dolomite-exchange/dolomite-margin';
+import { address, BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 
-interface ApiMarginAccount {
-  user: string;
-  accountNumber: string;
+export interface ApiToken {
+  marketId: BigNumber;
+  symbol: string;
+  name: string;
+  tokenAddress: string;
+  decimals: number;
 }
 
 export interface ApiBalance {
@@ -27,44 +30,45 @@ export interface ApiAccount {
   };
 }
 
-export interface ApiDeposit {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  effectiveUser: string;
-  marginAccount: ApiMarginAccount;
-  marketId: number;
-  amountDeltaPar: Integer;
+export enum ApiAsyncDepositStatus {
+  CREATED = 'CREATED',
+  DEPOSIT_EXECUTED = 'DEPOSIT_EXECUTED',
+  DEPOSIT_FAILED = 'DEPOSIT_FAILED',
+  DEPOSIT_CANCELLED = 'DEPOSIT_CANCELLED',
+  DEPOSIT_CANCELLED_FAILED = 'DEPOSIT_CANCELLED_FAILED',
 }
 
-export interface ApiAmmLiquidityPosition {
-  id: string;
-  effectiveUser: string;
-  balance: number;
+export enum ApiAsyncActionType {
+  DEPOSIT = 'DEPOSIT',
+  WITHDRAWAL = 'WITHDRAWAL',
 }
 
-export interface ApiAmmLiquiditySnapshot {
+export interface ApiAsyncAction<T> {
   id: string;
-  effectiveUser: string;
-  liquidityTokenBalance: string;
-  block: string;
-  timestamp: string;
+  actionType: ApiAsyncActionType;
+  owner: string;
+  accountNumber: BigNumber;
+  status: T;
+  inputToken: ApiToken;
+  inputAmount: Decimal;
+  outputToken: ApiToken;
 }
 
-export interface ApiLiquidation {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  solidEffectiveUser: string;
-  liquidEffectiveUser: string;
-  solidMarginAccount: ApiMarginAccount;
-  liquidMarginAccount: ApiMarginAccount;
-  heldMarketId: number;
-  borrowedMarketId: number;
-  solidHeldTokenAmountDeltaPar: Integer;
-  liquidHeldTokenAmountDeltaPar: Integer;
-  solidBorrowedTokenAmountDeltaPar: Integer;
-  liquidBorrowedTokenAmountDeltaPar: Integer;
+export interface ApiAsyncDeposit extends ApiAsyncAction<ApiAsyncDepositStatus> {
+  actionType: ApiAsyncActionType.DEPOSIT;
+  minOutputAmount: Decimal;
+}
+
+export enum ApiAsyncWithdrawalStatus {
+  CREATED = 'CREATED',
+  WITHDRAWAL_EXECUTED = 'WITHDRAWAL_EXECUTED',
+  WITHDRAWAL_EXECUTION_FAILED = 'WITHDRAWAL_EXECUTION_FAILED',
+  WITHDRAWAL_CANCELLED = 'WITHDRAWAL_CANCELLED',
+}
+
+export interface ApiAsyncWithdrawal extends ApiAsyncAction<ApiAsyncWithdrawalStatus> {
+  actionType: ApiAsyncActionType.WITHDRAWAL;
+  outputAmount: Decimal;
 }
 
 export interface ApiMarket {
@@ -84,60 +88,13 @@ export interface ApiRiskParam {
   liquidationReward: Integer;
 }
 
-export interface ApiTransfer {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  fromEffectiveUser: string;
-  toEffectiveUser: string;
-  fromMarginAccount: ApiMarginAccount;
-  toMarginAccount: ApiMarginAccount;
-  marketId: number;
-  fromAmountDeltaPar: Integer;
-  toAmountDeltaPar: Integer;
-}
-
-export interface ApiTrade {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  takerEffectiveUser: string;
-  takerMarginAccount: ApiMarginAccount;
-  takerMarketId: number;
-  takerInputTokenDeltaPar: Integer;
-  takerOutputTokenDeltaPar: Integer;
-  makerEffectiveUser: string | undefined;
-  makerMarginAccount: ApiMarginAccount | undefined;
-  makerMarketId: number;
-}
-
-export interface ApiVestingPositionTransfer {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  fromEffectiveUser: string | undefined;
-  toEffectiveUser: string | undefined;
-  amount: Integer;
-}
-
-export interface ApiLiquidityMiningVestingPosition {
-  id: string;
-  effectiveUser: string;
-  amountPar: string;
-}
-
-export interface ApiWithdrawal {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  effectiveUser: string;
-  marginAccount: ApiMarginAccount;
-  marketId: number;
-  amountDeltaPar: Integer;
-}
-
 export interface MarketIndex {
   marketId: number
   borrow: Integer
   supply: Integer
+}
+
+export interface TotalValueLockedAndFees {
+  totalValueLocked: Decimal[]
+  borrowFees: Decimal[]
 }

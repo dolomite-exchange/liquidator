@@ -47,7 +47,7 @@ checkBooleanValue('LIQUIDATIONS_ENABLED');
 checkDuration('MARKET_POLL_INTERVAL_MS', 1000);
 checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
 checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED', '1000000000000000000000000'); // 1e24
-checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL', process.env.MIN_VALUE_LIQUIDATED!);
+checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL', process.env.MIN_VALUE_LIQUIDATED!);
 checkBigNumber('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT');
 checkJsNumber('NETWORK_ID');
 checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkPreferences('OWED_PREFERENCES'));
@@ -115,7 +115,7 @@ async function start() {
     liquidatorProxyV1: dolomite.contracts.liquidatorProxyV1.options.address,
     liquidatorProxyV1WithAmm: dolomite.contracts.liquidatorProxyV1WithAmm.options.address,
     minValueLiquidated: process.env.MIN_VALUE_LIQUIDATED,
-    minValueLiquidatedForExternalSell: process.env.MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL,
+    minValueLiquidatedForExternalSell: process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL,
     networkId,
     sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,
