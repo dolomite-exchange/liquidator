@@ -1,7 +1,7 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
-import { DateTime } from 'luxon';
-import { isExpired, liquidateAccount, liquidateExpiredAccount } from '../helpers/dolomite-helpers';
+import { liquidateAccount, liquidateExpiredAccount } from '../helpers/dolomite-helpers';
+import { isExpired } from '../helpers/time-helpers';
 import AccountStore from './account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
 import { delay } from './delay';
@@ -52,7 +52,15 @@ export default class DolomiteLiquidator {
   };
 
   _liquidateAccounts = async () => {
-    const lastBlockTimestamp: DateTime = this.blockStore.getBlockTimestamp();
+    const lastBlockTimestamp = this.blockStore.getBlockTimestamp();
+    if (!lastBlockTimestamp) {
+      Logger.warn({
+        at: 'DolomiteLiquidator#_liquidateAccounts',
+        message: 'Block timestamp from BlockStore is not initialized yet, returning...',
+      });
+      return;
+    }
+
     const marketMap = this.marketStore.getMarketMap();
 
     let expirableAccounts = this.accountStore.getExpirableDolomiteAccounts()

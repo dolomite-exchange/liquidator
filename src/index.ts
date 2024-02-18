@@ -6,10 +6,12 @@ import { getDolomiteRiskParams } from './clients/dolomite';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
 import { dolomite, initializeDolomiteLiquidations, loadAccounts } from './helpers/web3';
 import AccountStore from './lib/account-store';
+import BlockStore from './lib/block-store';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
-  checkBigNumber, checkBigNumberAndGreaterThan,
+  checkBigNumber,
+  checkBigNumberAndGreaterThan,
   checkBooleanValue,
   checkDuration,
   checkEthereumAddress,
@@ -64,11 +66,18 @@ if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
 }
 
 async function start() {
-  const marketStore = new MarketStore();
-  const accountStore = new AccountStore(marketStore);
+  const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore);
+  const accountStore = new AccountStore(blockStore, marketStore);
   const liquidationStore = new LiquidationStore();
-  const riskParamsStore = new RiskParamsStore(marketStore);
-  const dolomiteLiquidator = new DolomiteLiquidator(accountStore, marketStore, liquidationStore, riskParamsStore);
+  const riskParamsStore = new RiskParamsStore(blockStore);
+  const dolomiteLiquidator = new DolomiteLiquidator(
+    accountStore,
+    blockStore,
+    marketStore,
+    liquidationStore,
+    riskParamsStore,
+  );
   const gasPriceUpdater = new GasPriceUpdater();
   const liquidationMode = getLiquidationMode();
 
@@ -109,8 +118,6 @@ async function start() {
     liquidationKeyExpirationSeconds: process.env.LIQUIDATION_KEY_EXPIRATION_SECONDS,
     liquidationMode,
     liquidationsEnabled: process.env.LIQUIDATIONS_ENABLED,
-    liquidatorProxyV1: dolomite.contracts.liquidatorProxyV1.options.address,
-    liquidatorProxyV1WithAmm: dolomite.contracts.liquidatorProxyV1WithAmm.options.address,
     minValueLiquidated: process.env.MIN_VALUE_LIQUIDATED,
     minValueLiquidatedForExternalSell: process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL,
     networkId,

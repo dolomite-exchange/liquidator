@@ -1,19 +1,23 @@
 import { DateTime } from 'luxon';
 import { getLiquidatableDolomiteAccounts } from '../../src/clients/dolomite';
-import { _getLargestBalanceUSD } from '../../src/helpers/dolomite-helpers';
+import { _getLargestBalanceUSD } from '../../src/helpers/balance-helpers';
 import AccountStore from '../../src/lib/account-store';
+import BlockStore from '../../src/lib/block-store';
 import MarketStore from '../../src/lib/market-store';
 import Pageable from '../../src/lib/pageable';
 
+// eslint-disable-next-line max-len
 const ACCOUNT_ID = '0xb5dd5cfa0577b53aeb7b6ed4662794d5a44affbe-103576997491961730661524320610884432955705929610587706488872870347971589683830';
 
-describe('dolomite-helpers', () => {
+describe('balance-helpers', () => {
   let accountStore: AccountStore;
+  let blockStore: BlockStore;
   let marketStore: MarketStore;
 
   beforeEach(() => {
-    marketStore = new MarketStore();
-    accountStore = new AccountStore(marketStore);
+    blockStore = new BlockStore();
+    marketStore = new MarketStore(blockStore);
+    accountStore = new AccountStore(blockStore, marketStore);
   });
 
   describe('#_getLargestBalanceUSD', () => {

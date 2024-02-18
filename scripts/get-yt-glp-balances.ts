@@ -1,11 +1,10 @@
-/*@formatter:off*/
-import {BigNumber} from '@dolomite-exchange/dolomite-margin';
-import {parseEther} from 'ethers/lib/utils';
-/*@formatter:on*/
+import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { parseEther } from 'ethers/lib/utils';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
+import BlockStore from '../src/lib/block-store';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
@@ -21,7 +20,8 @@ interface PrintableBalance {
 }
 
 async function start() {
-  const marketStore = new MarketStore();
+  const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore);
 
   const { blockNumber } = await getSubgraphBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(blockNumber);
@@ -55,28 +55,34 @@ async function start() {
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
   const accounts = await Pageable.getPageableValues(async (lastId) => {
-    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockNumber, lastId);
-    return accounts;
+    const { accounts: pagedAccounts } = await getAllDolomiteAccountsWithSupplyValue(
+      marketIndexMap,
+      blockNumber,
+      lastId,
+    );
+    return pagedAccounts;
   });
 
   const accountToSubAccountToDolomiteBalanceMap: Record<string, Record<string, PrintableBalance[]>> = {};
-  for (let i = 0; i < accounts.length; i++) {
+  for (let i = 0; i < accounts.length; i += 1) {
     const account = accounts[i];
     const accountAddress = account.owner;
     accountToSubAccountToDolomiteBalanceMap[accountAddress] = accountToSubAccountToDolomiteBalanceMap[accountAddress]
       ?? {};
-    const balances = Object.values(account.balances)
-      .reduce<PrintableBalance[]>((memo, balance, _unused, balances) => {
+    const balances = Object.values(account.balances).reduce<PrintableBalance[]>(
+      (memo, balance, _unused, allBalances) => {
         if (balance.marketId === YT_GLP_MARKET_ID && balance.par.gt(MIN_AMOUNT)) {
-          return balances.map(balance => {
+          return allBalances.map(innerBalance => {
             return {
-              symbol: balance.tokenSymbol,
-              amount: balance.wei.div(new BigNumber(10).pow(balance.tokenDecimals)).toString(),
+              symbol: innerBalance.tokenSymbol,
+              amount: innerBalance.wei.div(new BigNumber(10).pow(innerBalance.tokenDecimals)).toString(),
             }
           });
         }
         return memo;
-      }, []);
+      },
+      [],
+    );
     if (balances.length > 0) {
       accountToSubAccountToDolomiteBalanceMap[accountAddress][account.number.toString()] = balances;
     }
@@ -92,8 +98,8 @@ async function start() {
       totalCount += 1;
       Logger.info({
         message: 'YT-GLP balance for account',
-        account: account,
-        subAccount: subAccount,
+        account,
+        subAccount,
         assetsWithBalances: balances,
       });
     });

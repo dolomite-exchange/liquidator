@@ -61,10 +61,10 @@ export default class AccountStore {
     });
 
     const blockNumber = this.blockSore.getBlockNumber();
-    if (blockNumber === 0) {
+    if (typeof blockNumber === 'undefined') {
       Logger.warn({
         at: 'AccountStore#_update',
-        message: 'Block number from blockStore is 0, returning...',
+        message: 'Block number from BlockStore is not initialized yet, returning...',
       });
       return;
     }

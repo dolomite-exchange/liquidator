@@ -66,9 +66,6 @@ export async function loadAccounts() {
 export async function initializeDolomiteLiquidations() {
   await checkOperatorIsApproved(dolomite.contracts.expiryProxy.options.address);
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV1.options.address);
-  await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV1WithAmm.options.address);
-  await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV2WithExternalLiquidity.options.address);
-  await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV3WithLiquidityToken.options.address);
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV4WithGenericTrader.options.address);
 }
 

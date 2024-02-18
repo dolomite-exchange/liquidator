@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import { dolomite } from '../../src/helpers/web3';
 import AccountStore from '../../src/lib/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
+import BlockStore from '../../src/lib/block-store';
 import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
 import { LiquidationMode } from '../../src/lib/liquidation-mode';
 import LiquidationStore from '../../src/lib/liquidation-store';
@@ -12,6 +13,7 @@ import RiskParamsStore from '../../src/lib/risk-params-store';
 jest.mock('@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation');
 
 describe('dolomite-liquidator', () => {
+  let blockStore: BlockStore;
   let accountStore: AccountStore;
   let marketStore: MarketStore;
   let liquidationStore: LiquidationStore;
@@ -20,13 +22,20 @@ describe('dolomite-liquidator', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    marketStore = new MarketStore();
-    accountStore = new AccountStore(marketStore);
+    blockStore = new BlockStore();
+    marketStore = new MarketStore(blockStore);
+    accountStore = new AccountStore(blockStore, marketStore);
     liquidationStore = new LiquidationStore();
-    riskParamsStore = new RiskParamsStore(marketStore);
-    dolomiteLiquidator = new DolomiteLiquidator(accountStore, marketStore, liquidationStore, riskParamsStore);
+    riskParamsStore = new RiskParamsStore(blockStore);
+    dolomiteLiquidator = new DolomiteLiquidator(
+      accountStore,
+      blockStore,
+      marketStore,
+      liquidationStore,
+      riskParamsStore,
+    );
     (
-      marketStore.getBlockTimestamp as any
+      blockStore.getBlockTimestamp as any
     ) = jest.fn().mockImplementation(() => DateTime.utc(2020, 1, 1));
   });
 
@@ -105,98 +114,6 @@ describe('dolomite-liquidator', () => {
         .toEqual(new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER));
       expect(liquidatableExpiredAccounts[0][3])
         .toEqual(new BigNumber(22)); // liquidAccountNumber
-    });
-
-    it('Successfully liquidates accounts while selling collateral', async () => {
-      process.env.EXPIRATIONS_ENABLED = 'true';
-      process.env.BRIDGE_TOKEN_ADDRESS = getTestMarkets()[0].tokenAddress; // WETH
-
-      const liquidatableAccounts = getTestLiquidatableAccounts();
-      const expiredAccounts = getTestExpiredAccounts();
-      const markets = getTestMarkets();
-      const riskParams = getTestRiskParams();
-      accountStore.getLiquidatableDolomiteAccounts = jest.fn().mockImplementation(() => liquidatableAccounts);
-      accountStore.getExpirableDolomiteAccounts = jest.fn().mockImplementation(() => expiredAccounts);
-      marketStore.getMarketMap = jest.fn().mockImplementation(() => markets);
-      riskParamsStore.getDolomiteRiskParams = jest.fn().mockImplementation(() => riskParams);
-      dolomite.getters.isAccountLiquidatable = jest.fn().mockImplementation(() => true);
-
-      const liquidations: any[] = [];
-      const liquidatableExpiredAccounts: any[] = [];
-      dolomite.liquidatorProxyV1WithAmm.liquidate = jest.fn().mockImplementation((...args) => {
-        if (args[7]) {
-          liquidatableExpiredAccounts.push(args);
-        } else {
-          liquidations.push(args);
-        }
-        return { gas: 1 };
-      });
-
-      await dolomiteLiquidator._liquidateAccounts();
-
-      expect(liquidations.length)
-        .toBe(liquidatableAccounts.length);
-      expect(liquidatableExpiredAccounts.length)
-        .toBe(1);
-
-      const sortedLiquidations = liquidatableAccounts.map((account: ApiAccount) => {
-        return liquidations.find((l) => l[2] === account.owner && l[3] === account.number);
-      });
-
-      expect(sortedLiquidations[0][0])
-        .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
-      expect(sortedLiquidations[0][1].toFixed())
-        .toBe(process.env.DOLOMITE_ACCOUNT_NUMBER);
-      expect(sortedLiquidations[0][4].toFixed())
-        .toBe(/* owedMarket */ liquidatableAccounts[0].balances[1].marketId.toString());
-      expect(sortedLiquidations[0][5].toFixed())
-        .toBe(/* heldMarket */ liquidatableAccounts[0].balances[0].marketId.toString());
-      expect(sortedLiquidations[0][6])
-        .toEqual([
-          liquidatableAccounts[0].balances[0].tokenAddress,
-          process.env.BRIDGE_TOKEN_ADDRESS,
-          liquidatableAccounts[0].balances[1].tokenAddress,
-        ]);
-      expect(sortedLiquidations[0][7])
-        .toEqual(null);
-
-      expect(sortedLiquidations[1][0])
-        .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
-      expect(sortedLiquidations[1][1].toFixed())
-        .toBe(process.env.DOLOMITE_ACCOUNT_NUMBER);
-      expect(sortedLiquidations[1][4].toFixed())
-        .toBe(/* owedMarket */ liquidatableAccounts[0].balances[0].marketId.toString());
-      expect(sortedLiquidations[1][5].toFixed())
-        .toBe(/* heldMarket */ liquidatableAccounts[0].balances[1].marketId.toString());
-      expect(sortedLiquidations[1][6])
-        .toEqual([
-          liquidatableAccounts[0].balances[1].tokenAddress,
-          process.env.BRIDGE_TOKEN_ADDRESS,
-          liquidatableAccounts[0].balances[0].tokenAddress,
-        ]);
-      expect(sortedLiquidations[1][7])
-        .toEqual(null);
-
-      expect(liquidatableExpiredAccounts[0][0])
-        .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
-      expect(liquidatableExpiredAccounts[0][1])
-        .toEqual(new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER));
-      expect(liquidatableExpiredAccounts[0][2])
-        .toEqual(expiredAccounts[0].owner); // liquidAccountOwner
-      expect(liquidatableExpiredAccounts[0][3])
-        .toEqual(expiredAccounts[0].number); // liquidAccountNumber
-      expect(liquidatableExpiredAccounts[0][4].toFixed())
-        .toBe(/* owedMarket */ expiredAccounts[0].balances[2].marketId.toString());
-      expect(liquidatableExpiredAccounts[0][5].toFixed())
-        .toBe(/* heldMarket */ expiredAccounts[0].balances[1].marketId.toString());
-      expect(liquidatableExpiredAccounts[0][6])
-        .toEqual([
-          expiredAccounts[0].balances[1].tokenAddress,
-          process.env.BRIDGE_TOKEN_ADDRESS,
-          expiredAccounts[0].balances[2].tokenAddress,
-        ]);
-      expect(liquidatableExpiredAccounts[0][7])
-        .toEqual(expiredAccounts[0].balances[2].expiresAt);
     });
   });
 });

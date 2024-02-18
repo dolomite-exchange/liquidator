@@ -2,6 +2,7 @@
 import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
+import ethers from 'ethers';
 import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
@@ -31,9 +32,6 @@ import {
 } from '../lib/graphql-types';
 import Pageable from '../lib/pageable';
 import '../lib/env';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const ethers = require('ethers');
 
 const defaultAxiosConfig = {
   headers: { 'Accept-Encoding': 'gzip,deflate,compress' },

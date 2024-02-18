@@ -27,6 +27,7 @@ module.exports = {
     'no-use-before-define': 0,
     'no-await-in-loop': 0,
     'no-underscore-dangle': 0,
+    'import/no-extraneous-dependencies': ["off"],
     'import/prefer-default-export': 0,
     'global-require': 'warn',
     '@typescript-eslint/no-var-requires': 'warn',
@@ -40,6 +41,7 @@ module.exports = {
     'arrow-parens': 0,
     'no-else-return': 0,
     'no-param-reassign': 0,
+    'object-curly-spacing': ["error", "always"],
     '@typescript-eslint/naming-convention': ['error',
       {
         selector: 'variableLike',

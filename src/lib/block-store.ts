@@ -4,19 +4,19 @@ import { delay } from './delay';
 import Logger from './logger';
 
 export default class BlockStore {
-  private blockNumber: number;
-  private blockTimestamp: DateTime;
+  private blockNumber: number | undefined;
+  private blockTimestamp: DateTime | undefined;
 
   constructor() {
-    this.blockNumber = 0;
-    this.blockTimestamp = null;
+    this.blockNumber = undefined;
+    this.blockTimestamp = undefined;
   }
 
-  public getBlockNumber(): number {
+  public getBlockNumber(): number | undefined {
     return this.blockNumber;
   }
 
-  public getBlockTimestamp(): DateTime {
+  public getBlockTimestamp(): DateTime | undefined {
     return this.blockTimestamp;
   }
 

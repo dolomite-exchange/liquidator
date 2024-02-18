@@ -49,10 +49,10 @@ export default class RiskParamsStore {
     });
 
     const blockNumber = this.blockStore.getBlockNumber();
-    if (blockNumber === 0) {
+    if (typeof blockNumber === 'undefined') {
       Logger.warn({
         at: 'RiskParamsStore#_update',
-        message: 'Block number from blockStore is 0, returning...',
+        message: 'Block number from BlockStore is not initialized yet, returning...',
       });
       return;
     }

@@ -1,5 +1,3 @@
-/*@formatter:off*/
-/*@formatter:on*/
 import v8 from 'v8';
 import {
   getAllDolomiteAccountsWithSupplyValue,
@@ -8,13 +6,15 @@ import {
 } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
+import BlockStore from '../src/lib/block-store';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import './lib/env-reader';
 
 async function start() {
-  const marketStore = new MarketStore();
+  const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore);
 
   const { blockNumber } = await getSubgraphBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(blockNumber);

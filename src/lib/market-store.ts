@@ -2,10 +2,10 @@ import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { getDolomiteMarkets } from '../clients/dolomite';
 import { dolomite } from '../helpers/web3';
 import { ApiMarket, MarketIndex } from './api-types';
+import BlockStore from './block-store';
 import { delay } from './delay';
 import Logger from './logger';
 import Pageable from './pageable';
-import BlockStore from './block-store';
 
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };
@@ -19,7 +19,7 @@ export default class MarketStore {
   }
 
   async getMarketIndexMap(
-    marketMap: { [marketId: string]: any },
+    marketMap: Record<string, any>,
   ): Promise<{ [marketId: string]: MarketIndex }> {
     const marketIds = Object.keys(marketMap);
     const indexCalls = marketIds.map(marketId => {
@@ -76,6 +76,13 @@ export default class MarketStore {
     });
 
     const blockNumber = this.blockStore.getBlockNumber();
+    if (typeof blockNumber === 'undefined') {
+      Logger.warn({
+        at: 'MarketStore#_update',
+        message: 'Block number from BlockStore is not initialized yet, returning...',
+      });
+      return;
+    }
 
     const nextDolomiteMarkets = await Pageable.getPageableValues(async (lastId) => {
       const result = await getDolomiteMarkets(blockNumber, lastId);
