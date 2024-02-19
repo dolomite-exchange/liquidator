@@ -1,14 +1,14 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { DateTime } from 'luxon';
 import { dolomite } from '../../src/helpers/web3';
-import AccountStore from '../../src/lib/account-store';
+import AccountStore from '../../src/stores/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
-import BlockStore from '../../src/lib/block-store';
+import BlockStore from '../../src/stores/block-store';
 import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
 import { LiquidationMode } from '../../src/lib/liquidation-mode';
-import LiquidationStore from '../../src/lib/liquidation-store';
-import MarketStore from '../../src/lib/market-store';
-import RiskParamsStore from '../../src/lib/risk-params-store';
+import LiquidationStore from '../../src/stores/liquidation-store';
+import MarketStore from '../../src/stores/market-store';
+import RiskParamsStore from '../../src/stores/risk-params-store';
 
 jest.mock('@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation');
 
@@ -21,6 +21,10 @@ describe('dolomite-liquidator', () => {
   let riskParamsStore: RiskParamsStore;
 
   beforeEach(() => {
+    process.env.EXPIRATIONS_ENABLED = 'true';
+    process.env.LIQUIDATION_MODE = LiquidationMode.Simple;
+    process.env.MIN_VALUE_LIQUIDATED = '1';
+
     jest.clearAllMocks();
     blockStore = new BlockStore();
     marketStore = new MarketStore(blockStore);
@@ -41,10 +45,6 @@ describe('dolomite-liquidator', () => {
 
   describe('#_liquidateAccounts', () => {
     it('Successfully liquidates accounts normally', async () => {
-      process.env.EXPIRATIONS_ENABLED = 'true';
-      process.env.BRIDGE_TOKEN_ADDRESS = getTestMarkets()[0].tokenAddress;
-      process.env.LIQUIDATION_MODE = LiquidationMode.Simple;
-
       const liquidatableAccounts = getTestLiquidatableAccounts();
       const expiredAccounts = getTestExpiredAccounts();
       const markets = getTestMarkets();
@@ -106,14 +106,14 @@ describe('dolomite-liquidator', () => {
         .toEqual(process.env.COLLATERAL_PREFERENCES.split(',')
           .map((p) => new BigNumber(p)));
 
-      expect(liquidatableExpiredAccounts[0][4].eq(new BigNumber(2)))
-        .toBe(true); // marketId
       expect(liquidatableExpiredAccounts[0][0])
         .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
       expect(liquidatableExpiredAccounts[0][1])
         .toEqual(new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER));
       expect(liquidatableExpiredAccounts[0][3])
         .toEqual(new BigNumber(22)); // liquidAccountNumber
+      expect(liquidatableExpiredAccounts[0][4].eq(new BigNumber(0)))
+        .toBe(true); // marketId
     });
   });
 });
@@ -168,8 +168,8 @@ function getTestLiquidatableAccounts(): ApiAccount[] {
           expiryAddress: null,
         },
         1: {
-          par: new BigNumber('1010101010101010010101010010101010101001010'),
-          wei: new BigNumber('2010101010101010010101010010101010101001010'),
+          par: new BigNumber('1010101010101010010101010010101'),
+          wei: new BigNumber('2010101010101010010101010010101'),
           marketId: 1,
           tokenDecimals: 6,
           tokenAddress: '0x0000000000000000000000000000000000000001',
@@ -199,30 +199,30 @@ function getTestExpiredAccounts(): ApiAccount[] {
           tokenAddress: '0x0000000000000000000000000000000000000000',
           tokenName: 'Ethereum',
           tokenSymbol: 'ETH',
-          expiresAt: new BigNumber(Math.floor(new Date(2050, 5, 25).getTime() / 1000)),
+          expiresAt: new BigNumber(Math.floor(new Date(1982, 5, 25).getTime() / 1000)),
           expiryAddress: dolomite.contracts.expiry.options.address,
         },
         1: {
+          par: new BigNumber('-1010101010101010010101010010101010101001010'),
+          wei: new BigNumber('-2010101010101010010101010010101010101001010'),
+          marketId: 1,
+          tokenDecimals: 18,
+          tokenAddress: '0x0000000000000000000000000000000000000002',
+          tokenName: 'DAI Stablecoin',
+          tokenSymbol: 'DAI',
+          expiresAt: new BigNumber(Math.floor(new Date(2050, 5, 25).getTime() / 1000)),
+          expiryAddress: dolomite.contracts.expiry.options.address,
+        },
+        2: {
           par: new BigNumber('1010101010101010010101010010101010101001010'),
           wei: new BigNumber('2010101010101010010101010010101010101001010'),
-          marketId: 1,
+          marketId: 2,
           tokenDecimals: 6,
           tokenAddress: '0x0000000000000000000000000000000000000001',
           tokenName: 'USD Coin',
           tokenSymbol: 'USDC',
           expiresAt: null,
           expiryAddress: null,
-        },
-        2: {
-          par: new BigNumber('-1010101010101010010101010010101010101001010'),
-          wei: new BigNumber('-2010101010101010010101010010101010101001010'),
-          marketId: 2,
-          tokenDecimals: 18,
-          tokenAddress: '0x0000000000000000000000000000000000000002',
-          tokenName: 'DAI Stablecoin',
-          tokenSymbol: 'DAI',
-          expiresAt: new BigNumber(Math.floor(new Date(1982, 5, 25).getTime() / 1000)),
-          expiryAddress: dolomite.contracts.expiry.options.address,
         },
         3: {
           marketId: 3,

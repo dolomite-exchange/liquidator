@@ -3,7 +3,12 @@ import { ChainId, isArbitrum } from '../lib/chain-id';
 import Logger from '../lib/logger';
 import axios from 'axios';
 
-let lastPriceWei: string = process.env.INITIAL_GAS_PRICE_WEI as string;
+let lastPriceWei: string;
+resetGasPriceWei();
+
+export function resetGasPriceWei() {
+  lastPriceWei = process.env.INITIAL_GAS_PRICE_WEI as string;
+}
 
 export async function updateGasPrice(dolomite: DolomiteMargin) {
   let response;
@@ -11,8 +16,7 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
     response = await getGasPrices(dolomite);
   } catch (error: any) {
     Logger.error({
-      at: 'getGasPrices',
-      message: 'Failed to retrieve gas prices',
+      message: '#updateGasPrice: Failed to retrieve gas prices',
       error,
     });
     return;
@@ -50,8 +54,7 @@ export function getGasPriceWei(): Integer {
 
 async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }> {
   Logger.info({
-    at: 'getGasPrices',
-    message: 'Fetching gas prices',
+    message: '#getGasPrices: Fetching gas prices',
   });
 
   const networkId = Number(process.env.NETWORK_ID);

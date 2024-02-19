@@ -1,9 +1,9 @@
 import { getExpiredAccounts, getLiquidatableDolomiteAccounts } from '../clients/dolomite';
-import { ApiAccount } from './api-types';
-import { delay } from './delay';
-import Logger from './logger';
+import { ApiAccount } from '../lib/api-types';
+import { delay } from '../lib/delay';
+import Logger from '../lib/logger';
 import MarketStore from './market-store';
-import Pageable from './pageable';
+import Pageable from '../lib/pageable';
 import BlockStore from './block-store';
 
 export default class AccountStore {
@@ -14,7 +14,6 @@ export default class AccountStore {
     private readonly blockSore: BlockStore,
     private readonly marketStore: MarketStore,
   ) {
-    this.marketStore = marketStore;
     this.liquidatableDolomiteAccounts = [];
     this.expirableAccounts = [];
   }

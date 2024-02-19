@@ -4,11 +4,11 @@ import v8 from 'v8';
 import { getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
-import AccountStore from '../src/lib/account-store';
+import AccountStore from '../src/stores/account-store';
 import { ApiAccount, ApiBalance } from '../src/lib/api-types';
-import BlockStore from '../src/lib/block-store';
+import BlockStore from '../src/stores/block-store';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
+import MarketStore from '../src/stores/market-store';
 import './lib/env-reader';
 
 const SMALL_BORROW_THRESHOLD = new BigNumber('0.001');

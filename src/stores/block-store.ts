@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { getSubgraphBlockNumber } from '../helpers/block-helper';
-import { delay } from './delay';
-import Logger from './logger';
+import { delay } from '../lib/delay';
+import Logger from '../lib/logger';
 
 export default class BlockStore {
   private blockNumber: number | undefined;

@@ -3,11 +3,10 @@ import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/d
 import { BigNumber as ZapBigNumber, DolomiteZap, MinimalApiToken } from '@dolomite-exchange/zap-sdk';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
-import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
+import { ApiAccount, ApiAsyncAction, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
 import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/math-utils';
-import { prepareForLiquidation } from './async-liquidations-helper';
 import { _getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei } from './gas-price-helpers';
 import { dolomite } from './web3';
@@ -45,6 +44,7 @@ export async function liquidateAccount(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[]>,
   lastBlockTimestamp: DateTime,
 ): Promise<TxResult | undefined> {
   if (process.env.LIQUIDATIONS_ENABLED !== 'true') {
@@ -354,18 +354,18 @@ async function _liquidateExpiredAccountInternalSimple(
   );
 }
 
-async function _liquidateAsyncAccount(
-  liquidAccount: ApiAccount,
-  asyncMarketId: Integer,
-  expirationTimestamp: DateTime | undefined,
-): Promise<TxResult> {
-  return prepareForLiquidation(
-    liquidAccount,
-    asyncMarketId,
-    inputAmount,
-    outputMarketId,
-    minOutputAmount,
-    expirationTimestamp?.toSeconds(),
-    extraData,
-  )
-}
+// async function _liquidateAsyncAccount(
+//   liquidAccount: ApiAccount,
+//   asyncMarketId: Integer,
+//   expirationTimestamp: DateTime | undefined,
+// ): Promise<TxResult> {
+//   return prepareForLiquidation(
+//     liquidAccount,
+//     asyncMarketId,
+//     inputAmount,
+//     outputMarketId,
+//     minOutputAmount,
+//     expirationTimestamp?.toSeconds(),
+//     extraData,
+//   )
+// }

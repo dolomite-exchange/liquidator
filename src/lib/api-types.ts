@@ -43,19 +43,20 @@ export enum ApiAsyncActionType {
   WITHDRAWAL = 'WITHDRAWAL',
 }
 
-export interface ApiAsyncAction<T> {
+export interface ApiAsyncAction {
   id: string;
   actionType: ApiAsyncActionType;
   owner: string;
   accountNumber: BigNumber;
-  status: T;
+  status: ApiAsyncDepositStatus | ApiAsyncWithdrawalStatus;
   inputToken: ApiToken;
   inputAmount: Decimal;
   outputToken: ApiToken;
 }
 
-export interface ApiAsyncDeposit extends ApiAsyncAction<ApiAsyncDepositStatus> {
+export interface ApiAsyncDeposit extends ApiAsyncAction {
   actionType: ApiAsyncActionType.DEPOSIT;
+  status: ApiAsyncDepositStatus;
   minOutputAmount: Decimal;
 }
 
@@ -66,8 +67,9 @@ export enum ApiAsyncWithdrawalStatus {
   WITHDRAWAL_CANCELLED = 'WITHDRAWAL_CANCELLED',
 }
 
-export interface ApiAsyncWithdrawal extends ApiAsyncAction<ApiAsyncWithdrawalStatus> {
+export interface ApiAsyncWithdrawal extends ApiAsyncAction {
   actionType: ApiAsyncActionType.WITHDRAWAL;
+  status: ApiAsyncWithdrawalStatus;
   outputAmount: Decimal;
 }
 

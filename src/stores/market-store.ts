@@ -1,11 +1,11 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { getDolomiteMarkets } from '../clients/dolomite';
 import { dolomite } from '../helpers/web3';
-import { ApiMarket, MarketIndex } from './api-types';
+import { ApiMarket, MarketIndex } from '../lib/api-types';
 import BlockStore from './block-store';
-import { delay } from './delay';
-import Logger from './logger';
-import Pageable from './pageable';
+import { delay } from '../lib/delay';
+import Logger from '../lib/logger';
+import Pageable from '../lib/pageable';
 
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };

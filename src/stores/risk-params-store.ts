@@ -1,7 +1,7 @@
 import { getDolomiteRiskParams } from '../clients/dolomite';
-import { ApiRiskParam } from './api-types';
-import { delay } from './delay';
-import Logger from './logger';
+import { ApiRiskParam } from '../lib/api-types';
+import { delay } from '../lib/delay';
+import Logger from '../lib/logger';
 import BlockStore from './block-store';
 
 export default class RiskParamsStore {

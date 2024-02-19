@@ -215,7 +215,12 @@ export async function getDolomiteMarkets(
     subgraphUrl,
     {
       query: `query getMarketRiskInfos($blockNumber: Int, $lastId: ID) {
-                marketRiskInfos(block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE} where: { id_gt: $lastId } orderBy: id) {
+                marketRiskInfos(
+                  block: { number: $blockNumber }
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                  where: { id_gt: $lastId }
+                  orderBy: id
+                ) {
                   token {
                     id
                     marketId
@@ -508,8 +513,10 @@ export async function getRetryableAsyncDeposits(
         $blockNumber: Int!
       ) {
         asyncDeposits(
-          where: { isRetryable: true }
+          where: { isRetryable: true, id_gt: $lastId }
           block: { number: $blockNumber }
+          first: ${Pageable.MAX_PAGE_SIZE}
+          orderBy: id
         ) {
           id
           marginAccount {
@@ -559,7 +566,7 @@ export async function getRetryableAsyncDeposits(
       return {
         id: `${deposit.id}`,
         actionType: ApiAsyncActionType.DEPOSIT,
-        owner: deposit.marginAccount.user.id,
+        owner: ethers.utils.getAddress(deposit.marginAccount.user.id),
         accountNumber: new BigNumber(deposit.marginAccount.accountNumber),
         status: deposit.status,
         inputToken: mapGraphqlTokenToApiToken(deposit.inputToken),
@@ -575,7 +582,7 @@ export async function getRetryableAsyncDeposits(
 export async function getRetryableAsyncWithdrawals(
   blockNumber: number,
   lastId: string | undefined,
-): Promise<{ deposits: ApiAsyncWithdrawal[] }> {
+): Promise<{ withdrawals: ApiAsyncWithdrawal[] }> {
   const withdrawals: ApiAsyncWithdrawal[] = await axios.post(
     subgraphUrl,
     {
@@ -583,8 +590,10 @@ export async function getRetryableAsyncWithdrawals(
         $blockNumber: Int!
       ) {
         asyncWithdrawals(
-          where: { isRetryable: true }
+          where: { isRetryable: true, id_gt: $lastId }
           block: { number: $blockNumber }
+          first: ${Pageable.MAX_PAGE_SIZE}
+          orderBy: id
         ) {
           id
           marginAccount {
@@ -634,7 +643,7 @@ export async function getRetryableAsyncWithdrawals(
       return {
         id: `${withdrawal.id}`,
         actionType: ApiAsyncActionType.WITHDRAWAL,
-        owner: withdrawal.marginAccount.user.id,
+        owner: ethers.utils.getAddress(withdrawal.marginAccount.user.id),
         accountNumber: new BigNumber(withdrawal.marginAccount.accountNumber),
         status: withdrawal.status,
         inputToken: mapGraphqlTokenToApiToken(withdrawal.inputToken),
@@ -644,7 +653,7 @@ export async function getRetryableAsyncWithdrawals(
       };
     }));
 
-  return { deposits: withdrawals };
+  return { withdrawals };
 }
 
 function reduceResultIntoTotalYield(

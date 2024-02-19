@@ -5,8 +5,8 @@ import '../src/lib/env';
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
 import { dolomite, initializeDolomiteLiquidations, loadAccounts } from './helpers/web3';
-import AccountStore from './lib/account-store';
-import BlockStore from './lib/block-store';
+import AccountStore from './stores/account-store';
+import BlockStore from './stores/block-store';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
@@ -22,16 +22,18 @@ import {
   checkPrivateKey,
 } from './lib/invariants';
 import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
-import LiquidationStore from './lib/liquidation-store';
+import LiquidationStore from './stores/liquidation-store';
 import Logger from './lib/logger';
-import MarketStore from './lib/market-store';
-import RiskParamsStore from './lib/risk-params-store';
+import MarketStore from './stores/market-store';
+import RiskParamsStore from './stores/risk-params-store';
+import AsyncActionStore from './stores/async-action-store';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
+checkBooleanValue('ASYNC_ACTIONS_ENABLED');
+checkDuration('ASYNC_ACTIONS_POLL_INTERVAL_MS', 1000);
 checkDuration('BLOCK_POLL_INTERVAL_MS', 1000);
-checkEthereumAddress('BRIDGE_TOKEN_ADDRESS');
 checkLiquidationModeConditionally(
   LiquidationMode.Simple,
   () => checkPreferences('COLLATERAL_PREFERENCES'),
@@ -69,10 +71,12 @@ async function start() {
   const blockStore = new BlockStore();
   const marketStore = new MarketStore(blockStore);
   const accountStore = new AccountStore(blockStore, marketStore);
+  const asyncActionStore = new AsyncActionStore(blockStore);
   const liquidationStore = new LiquidationStore();
   const riskParamsStore = new RiskParamsStore(blockStore);
   const dolomiteLiquidator = new DolomiteLiquidator(
     accountStore,
+    asyncActionStore,
     blockStore,
     marketStore,
     liquidationStore,
@@ -103,8 +107,6 @@ async function start() {
   Logger.info({
     message: 'DolomiteMargin data',
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
-    blockPollIntervalMillis: process.env.BLOCK_POLL_INTERVAL_MS,
-    bridgeTokenAddress: process.env.BRIDGE_TOKEN_ADDRESS,
     dolomiteAccountNumber: process.env.DOLOMITE_ACCOUNT_NUMBER,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
@@ -128,6 +130,8 @@ async function start() {
   Logger.info({
     message: 'Polling intervals',
     accountPollIntervalMillis: process.env.ACCOUNT_POLL_INTERVAL_MS,
+    asyncActionPollIntervalMillis: process.env.ASYNC_ACTIONS_POLL_INTERVAL_MS,
+    blockPollIntervalMillis: process.env.BLOCK_POLL_INTERVAL_MS,
     gasPricePollInterval: process.env.GAS_PRICE_POLL_INTERVAL_MS,
     liquidatePollIntervalMillis: process.env.LIQUIDATE_POLL_INTERVAL_MS,
     marketPollIntervalMillis: process.env.MARKET_POLL_INTERVAL_MS,
@@ -162,7 +166,11 @@ async function start() {
   riskParamsStore.start();
   gasPriceUpdater.start();
 
-  if (process.env.LIQUIDATIONS_ENABLED === 'true' || process.env.EXPIRATIONS_ENABLED === 'true') {
+  if (
+    process.env.LIQUIDATIONS_ENABLED === 'true' ||
+    process.env.EXPIRATIONS_ENABLED === 'true' ||
+    process.env.ASYNC_ACTIONS_ENABLED === 'true'
+  ) {
     dolomiteLiquidator.start();
   }
   return true

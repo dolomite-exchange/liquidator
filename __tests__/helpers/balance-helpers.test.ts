@@ -1,9 +1,9 @@
 import { DateTime } from 'luxon';
 import { getLiquidatableDolomiteAccounts } from '../../src/clients/dolomite';
 import { _getLargestBalanceUSD } from '../../src/helpers/balance-helpers';
-import AccountStore from '../../src/lib/account-store';
-import BlockStore from '../../src/lib/block-store';
-import MarketStore from '../../src/lib/market-store';
+import AccountStore from '../../src/stores/account-store';
+import BlockStore from '../../src/stores/block-store';
+import MarketStore from '../../src/stores/market-store';
 import Pageable from '../../src/lib/pageable';
 
 // eslint-disable-next-line max-len
@@ -22,10 +22,11 @@ describe('balance-helpers', () => {
 
   describe('#_getLargestBalanceUSD', () => {
     it('Successfully sorts balances by USD value', async () => {
-      const blockNumber = 116552758;
+      const blockNumber = 116_552_758;
       process.env.BLOCK_NUMBER = blockNumber.toString();
-      await accountStore._update();
+      await blockStore._update();
       await marketStore._update();
+      await accountStore._update();
 
       const marketMap = marketStore.getMarketMap();
       const accounts = await Pageable.getPageableValues(async (lastId) => {
