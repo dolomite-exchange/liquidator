@@ -2,7 +2,7 @@
 import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
-import ethers from 'ethers';
+import * as ethers from 'ethers';
 import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
@@ -90,8 +90,8 @@ async function getAccounts(
         return memo;
       }, {});
       return {
-        id: `${account.user.id}-${account.accountNumber}`,
-        owner: account.user?.id.toLowerCase(),
+        id: `${account.user.id.toLowerCase()}-${account.accountNumber}`,
+        owner: account.user.id.toLowerCase(),
         number: new BigNumber(account.accountNumber),
         effectiveUser: account.user.effectiveUser?.id.toLowerCase(), // unavailable on the Liquidator subgraph
         balances,
@@ -564,15 +564,15 @@ export async function getRetryableAsyncDeposits(
       const inputValueBase = TEN_BI.pow(deposit.inputToken.decimals)
       const outputValueBase = TEN_BI.pow(deposit.outputToken.decimals)
       return {
-        id: `${deposit.id}`,
+        id: deposit.id,
         actionType: ApiAsyncActionType.DEPOSIT,
-        owner: ethers.utils.getAddress(deposit.marginAccount.user.id),
+        owner: deposit.marginAccount.user.id.toLowerCase(),
         accountNumber: new BigNumber(deposit.marginAccount.accountNumber),
         status: deposit.status,
-        inputToken: mapGraphqlTokenToApiToken(deposit.inputToken),
-        inputAmount: new BigNumber(deposit.inputAmount).times(inputValueBase),
-        outputToken: mapGraphqlTokenToApiToken(deposit.outputToken),
-        minOutputAmount: new BigNumber(deposit.minOutputAmount).times(outputValueBase),
+        inputToken: mapGraphqlTokenToApiToken(deposit.outputToken),
+        inputAmount: new BigNumber(deposit.minOutputAmount).times(outputValueBase),
+        outputToken: mapGraphqlTokenToApiToken(deposit.inputToken),
+        outputAmount: new BigNumber(deposit.inputAmount).times(inputValueBase),
       };
     }));
 
@@ -641,9 +641,9 @@ export async function getRetryableAsyncWithdrawals(
       const inputValueBase = TEN_BI.pow(withdrawal.inputToken.decimals)
       const outputValueBase = TEN_BI.pow(withdrawal.outputToken.decimals)
       return {
-        id: `${withdrawal.id}`,
+        id: withdrawal.id,
         actionType: ApiAsyncActionType.WITHDRAWAL,
-        owner: ethers.utils.getAddress(withdrawal.marginAccount.user.id),
+        owner: withdrawal.marginAccount.user.id.toLowerCase(),
         accountNumber: new BigNumber(withdrawal.marginAccount.accountNumber),
         status: withdrawal.status,
         inputToken: mapGraphqlTokenToApiToken(withdrawal.inputToken),

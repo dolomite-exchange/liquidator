@@ -29,6 +29,7 @@ module.exports = {
     'no-underscore-dangle': 0,
     'import/no-extraneous-dependencies': ["off"],
     'import/prefer-default-export': 0,
+    '@typescript-eslint/indent': ["error", 2],
     'global-require': 'warn',
     '@typescript-eslint/no-var-requires': 'warn',
     '@typescript-eslint/no-explicit-any': 0,

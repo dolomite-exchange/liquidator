@@ -1,12 +1,13 @@
 import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { BigNumber as ZapBigNumber, DolomiteZap, MinimalApiToken } from '@dolomite-exchange/zap-sdk';
+import { BigNumber as ZapBigNumber, DolomiteZap, MinimalApiToken, ZapOutputParam } from '@dolomite-exchange/zap-sdk';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
 import { ApiAccount, ApiAsyncAction, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
 import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/math-utils';
+import { prepareForLiquidation } from './async-liquidations-helper';
 import { _getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei } from './gas-price-helpers';
 import { dolomite } from './web3';
@@ -44,7 +45,7 @@ export async function liquidateAccount(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
-  marginAccountToActionsMap: Record<string, ApiAsyncAction[]>,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
 ): Promise<TxResult | undefined> {
   if (process.env.LIQUIDATIONS_ENABLED !== 'true') {
@@ -102,11 +103,12 @@ export async function liquidateAccount(
       liquidAccount,
       marketMap,
       riskParams,
+      marginAccountToActionsMap,
       lastBlockTimestamp,
       false,
     );
   } else if (liquidationMode === LiquidationMode.Simple) {
-    return _liquidateAccountSimple(liquidAccount);
+    return _liquidateAccountSimple(liquidAccount, marginAccountToActionsMap);
   } else {
     throw new Error(`Unknown liquidation mode: ${liquidationMode}`);
   }
@@ -116,6 +118,7 @@ export async function liquidateExpiredAccount(
   expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
 ) {
   if (process.env.EXPIRATIONS_ENABLED?.toLowerCase() !== 'true') {
@@ -135,11 +138,17 @@ export async function liquidateExpiredAccount(
       expiredAccount,
       marketMap,
       riskParams,
+      marginAccountToActionsMap,
       lastBlockTimestamp,
       true,
     );
   } else if (liquidationMode === LiquidationMode.Simple) {
-    return _liquidateExpiredAccountInternalSimple(expiredAccount, marketMap, lastBlockTimestamp);
+    return _liquidateExpiredAccountInternalSimple(
+      expiredAccount,
+      marketMap,
+      marginAccountToActionsMap,
+      lastBlockTimestamp,
+    );
   } else {
     return Promise.reject(new Error(`Unknown liquidation mode: ${liquidationMode}`))
   }
@@ -147,10 +156,15 @@ export async function liquidateExpiredAccount(
 
 async function _liquidateAccountSimple(
   liquidAccount: ApiAccount,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   owedMarkets: Integer[] = owedPreferences,
   collateralMarkets: Integer[] = collateralPreferences,
   minValueLiquidated: Integer = new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string),
 ): Promise<TxResult> {
+  if (marginAccountToActionsMap[liquidAccount.id]) {
+    return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple liquidations on async account'));
+  }
+
   const gasPrice = getGasPriceWei();
 
   return dolomite.liquidatorProxyV1.liquidate(
@@ -174,6 +188,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
   isExpiring: boolean,
 ): Promise<TxResult> {
@@ -200,12 +215,28 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
   );
+  /* eslint-disable @typescript-eslint/indent */
+  const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])
+    .filter(action => {
+      return action.inputToken.marketId.eq(heldMarket.marketId)
+    })
+    .reduce<Record<string, ApiAsyncAction[]>>(
+      (memo, action) => {
+        const marketId = action.outputToken.marketId.toFixed();
+        if (!memo[marketId]) {
+          memo[marketId] = [];
+        }
+        memo[marketId] = memo[marketId].concat(action);
+        return memo;
+      },
+      {},
+    );
+  /* eslint-enable @typescript-eslint/indent */
 
   const hasIsolationModeMarket = zap.getIsolationModeConverterByMarketId(new ZapBigNumber(owedMarket.marketId))
     || zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId));
-  if (!hasIsolationModeMarket && owedBalance.wei.abs()
-    .times(owedMarket.oraclePrice)
-    .isLessThan(minValueLiquidatedForGenericSell)) {
+  const owedValueUsd = owedBalance.wei.abs().times(owedMarket.oraclePrice);
+  if (!hasIsolationModeMarket && owedValueUsd.isLessThan(minValueLiquidatedForGenericSell)) {
     Logger.info({
       message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
       owedMarketId: owedMarket.marketId,
@@ -222,6 +253,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       return _liquidateExpiredAccountInternalSimple(
         liquidAccount,
         marketMap,
+        marginAccountToActionsMap,
         lastBlockTimestamp,
         [new BigNumber(heldBalance.marketId)],
         [new BigNumber(owedBalance.marketId)],
@@ -229,11 +261,29 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     } else {
       return _liquidateAccountSimple(
         liquidAccount,
+        marginAccountToActionsMap,
         [new BigNumber(owedBalance.marketId)],
         [new BigNumber(heldBalance.marketId)],
         INTEGERS.ZERO,
       );
     }
+  } else if (
+    Object.keys(marketIdToActionsMap).length === 0
+    && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
+  ) {
+    const { outputMarketId, minOutputAmount, extraData } = zap.getOutputMarketAndAmountByAsyncMarketId(
+      new ZapBigNumber(heldMarket.marketId),
+      new ZapBigNumber(heldBalance.wei.toFixed()),
+    );
+    return prepareForLiquidation(
+      liquidAccount,
+      new BigNumber(heldMarket.marketId),
+      heldBalance.wei,
+      new BigNumber(outputMarketId.toFixed()),
+      new BigNumber(minOutputAmount.toFixed()),
+      undefined,
+      extraData,
+    )
   } else {
     Logger.info({
       message: 'Performing liquidation via generic liquidity',
@@ -255,13 +305,19 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       marketId: new ZapBigNumber(owedMarket.marketId),
       symbol: owedMarket.symbol,
     };
-    const outputs = await zap.getSwapExactTokensForTokensParams(
-      heldToken,
-      new ZapBigNumber(heldWei),
-      owedToken,
-      new ZapBigNumber(owedWei),
-      solidAccount.owner,
-    );
+    let outputs: ZapOutputParam[];
+    if (Object.keys(marketIdToActionsMap).length === 0) {
+      outputs = await zap.getSwapExactTokensForTokensParams(
+        heldToken,
+        new ZapBigNumber(heldWei),
+        owedToken,
+        new ZapBigNumber(owedWei),
+        solidAccount.owner,
+        { isLiquidation: true },
+      );
+    } else {
+      outputs = ???;
+    }
 
     let firstError: unknown;
     for (let i = 0; i < outputs.length; i += 1) {
@@ -297,10 +353,15 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
 async function _liquidateExpiredAccountInternalSimple(
   expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
   heldMarketIds: Integer[] = collateralPreferences,
   owedMarketIds: Integer[] = owedPreferences,
 ): Promise<TxResult> {
+  if (marginAccountToActionsMap[expiredAccount.id]) {
+    return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple liquidations on async account'));
+  }
+
   const preferredHeldBalances = heldMarketIds.reduce<ApiBalance[]>((memo, marketId) => {
     const balance = expiredAccount.balances[marketId.toFixed()];
     if (balance.wei.gt(INTEGERS.ZERO)) {

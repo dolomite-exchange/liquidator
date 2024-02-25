@@ -52,12 +52,12 @@ export interface ApiAsyncAction {
   inputToken: ApiToken;
   inputAmount: Decimal;
   outputToken: ApiToken;
+  outputAmount: Decimal;
 }
 
 export interface ApiAsyncDeposit extends ApiAsyncAction {
   actionType: ApiAsyncActionType.DEPOSIT;
   status: ApiAsyncDepositStatus;
-  minOutputAmount: Decimal;
 }
 
 export enum ApiAsyncWithdrawalStatus {
@@ -70,7 +70,6 @@ export enum ApiAsyncWithdrawalStatus {
 export interface ApiAsyncWithdrawal extends ApiAsyncAction {
   actionType: ApiAsyncActionType.WITHDRAWAL;
   status: ApiAsyncWithdrawalStatus;
-  outputAmount: Decimal;
 }
 
 export interface ApiMarket {
