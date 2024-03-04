@@ -142,7 +142,13 @@ export default class DolomiteLiquidator {
     for (let i = 0; i < expirableAccounts.length; i += 1) {
       const account = expirableAccounts[i];
       try {
-        const result = await liquidateExpiredAccount(account, marketMap, riskParams, lastBlockTimestamp);
+        const result = await liquidateExpiredAccount(
+          account,
+          marketMap,
+          riskParams,
+          marginAccountToActionsMap,
+          lastBlockTimestamp
+        );
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
         if (result) {
           Logger.info({
