@@ -29,17 +29,19 @@ const IS_LIQUIDATION = true;
 const THIRTY_BASIS_POINTS = 0.003;
 const BLOCK_TAG = 'latest';
 const USE_PROXY_SERVER = false;
-const zap = new DolomiteZap(
-  NETWORK_ID,
-  process.env.SUBGRAPH_URL!,
-  new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, NETWORK_ID),
-  ONE_HOUR,
-  IS_LIQUIDATION,
-  THIRTY_BASIS_POINTS,
-  BLOCK_TAG,
-  undefined,
-  USE_PROXY_SERVER,
-);
+const zap = new DolomiteZap({
+  network: NETWORK_ID,
+  subgraphUrl: process.env.SUBGRAPH_URL!,
+  web3Provider: new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, NETWORK_ID),
+  cacheSeconds: ONE_HOUR,
+  defaultIsLiquidation: IS_LIQUIDATION,
+  defaultSlippageTolerance: THIRTY_BASIS_POINTS,
+  defaultBlockTag: BLOCK_TAG,
+  referralInfo: undefined,
+  useProxyServer: USE_PROXY_SERVER,
+  usePendleV3: false,
+  gasMultiplier: new ZapBigNumber(2),
+});
 
 export async function liquidateAccount(
   liquidAccount: ApiAccount,
