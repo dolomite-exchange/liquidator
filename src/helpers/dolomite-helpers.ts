@@ -6,7 +6,7 @@ import { DateTime } from 'luxon';
 import { ApiAccount, ApiAsyncAction, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
-import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/math-utils';
+import { DECIMAL_BASE, getAmountsForLiquidation, getOwedPriceForLiquidation, getPartial } from '../lib/math-utils';
 import { prepareForLiquidation } from './async-liquidations-helper';
 import { _getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei } from './gas-price-helpers';
@@ -273,10 +273,54 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     Object.keys(marketIdToActionsMap).length === 0
     && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
   ) {
-    const { outputMarketId, minOutputAmount, extraData } = zap.getOutputMarketAndAmountByAsyncMarketId(
-      new ZapBigNumber(heldMarket.marketId),
-      new ZapBigNumber(heldBalance.wei.toFixed()),
+    const outputMarketIds = zap.getAsyncAssetOutputMarketsByMarketId(new ZapBigNumber(heldMarket.marketId));
+    if (!outputMarketIds) {
+      Logger.error({
+        message: `Could not find output markets for ${heldMarket.marketId.toString()}`,
+      });
+      return Promise.reject(new Error(`Could not find output markets for ${heldMarket.marketId.toString()}`));
+    }
+
+    const zapResults = await Promise.all(
+      outputMarketIds.map(outputMarketId => {
+        const outputMarket = marketMap[outputMarketId.toFixed()];
+        if (!outputMarket) {
+          Logger.error({
+            message: 'Could not retrieve oracle prices for async liquidation',
+            heldMarket: heldMarket.marketId.toString(),
+            outputMarket: outputMarketId.toFixed(),
+          })
+        }
+
+        const heldToken: MinimalApiToken = {
+          marketId: new ZapBigNumber(heldMarket.marketId),
+          symbol: heldMarket.symbol,
+        };
+        const outputToken: MinimalApiToken = {
+          marketId: new ZapBigNumber(outputMarket.marketId),
+          symbol: outputMarket.symbol,
+        };
+        const heldPrice = heldMarket.oraclePrice;
+        const reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
+        const outputPriceAdj = outputMarket.oraclePrice.plus(
+          getPartial(outputMarket.oraclePrice, reward, DECIMAL_BASE),
+        );
+        const minOutputAmount = heldBalance.wei.times(heldPrice).div(outputPriceAdj);
+        return zap.getSwapExactTokensForTokensParams(
+          heldToken,
+          new ZapBigNumber(heldBalance.wei.toFixed()),
+          outputToken,
+          new ZapBigNumber(minOutputAmount.toFixed()),
+          solidAccount.owner,
+          {
+            isLiquidation: true,
+            gasPriceInWei: new ZapBigNumber(getGasPriceWei().toFixed()),
+            subAccountNumber: new ZapBigNumber(liquidAccount.number.toFixed()),
+          }
+        );
+      }),
     );
+
     return prepareForLiquidation(
       liquidAccount,
       new BigNumber(heldMarket.marketId),
@@ -318,7 +362,9 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
         { isLiquidation: true },
       );
     } else {
-      outputs = ???;
+      outputs =
+    ??
+        ?;
     }
 
     let firstError: unknown;

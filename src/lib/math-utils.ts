@@ -1,7 +1,7 @@
 import { BigNumber, Integer } from '@dolomite-exchange/dolomite-margin';
 import { ApiMarket, ApiRiskParam } from './api-types';
 
-const BASE = new BigNumber(10).pow(18);
+export const DECIMAL_BASE = new BigNumber(10).pow(18);
 
 export function getPartial(amount: Integer, numerator: Integer, denominator: Integer): Integer {
   return amount.times(numerator).dividedToIntegerBy(denominator);
@@ -36,10 +36,10 @@ export function getOwedPriceForLiquidation(
   heldMarket: ApiMarket,
   riskParams: ApiRiskParam,
 ): Integer {
-  let reward = riskParams.liquidationReward.minus(BASE);
-  reward = reward.plus(getPartial(reward, heldMarket.liquidationRewardPremium, BASE));
-  reward = reward.plus(getPartial(reward, owedMarket.liquidationRewardPremium, BASE));
-  return owedMarket.oraclePrice.plus(getPartial(owedMarket.oraclePrice, reward, BASE));
+  let reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
+  reward = reward.plus(getPartial(reward, heldMarket.liquidationRewardPremium, DECIMAL_BASE));
+  reward = reward.plus(getPartial(reward, owedMarket.liquidationRewardPremium, DECIMAL_BASE));
+  return owedMarket.oraclePrice.plus(getPartial(owedMarket.oraclePrice, reward, DECIMAL_BASE));
 }
 
 export function getAmountsForLiquidation(
