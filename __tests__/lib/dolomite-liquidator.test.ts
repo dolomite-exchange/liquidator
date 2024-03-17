@@ -1,41 +1,54 @@
-import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { DateTime } from 'luxon';
 import { dolomite } from '../../src/helpers/web3';
-import AccountStore from '../../src/lib/account-store';
+import AccountStore from '../../src/stores/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
+import AsyncActionStore from '../../src/stores/async-action-store';
+import BlockStore from '../../src/stores/block-store';
 import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
 import { LiquidationMode } from '../../src/lib/liquidation-mode';
-import LiquidationStore from '../../src/lib/liquidation-store';
-import MarketStore from '../../src/lib/market-store';
-import RiskParamsStore from '../../src/lib/risk-params-store';
+import LiquidationStore from '../../src/stores/liquidation-store';
+import MarketStore from '../../src/stores/market-store';
+import RiskParamsStore from '../../src/stores/risk-params-store';
 
 jest.mock('@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation');
 
 describe('dolomite-liquidator', () => {
+  let blockStore: BlockStore;
   let accountStore: AccountStore;
+  let asyncActionStore: AsyncActionStore;
   let marketStore: MarketStore;
   let liquidationStore: LiquidationStore;
   let dolomiteLiquidator: DolomiteLiquidator;
   let riskParamsStore: RiskParamsStore;
 
   beforeEach(() => {
+    process.env.EXPIRATIONS_ENABLED = 'true';
+    process.env.LIQUIDATION_MODE = LiquidationMode.Simple;
+    process.env.MIN_VALUE_LIQUIDATED = '1';
+
     jest.clearAllMocks();
-    marketStore = new MarketStore();
-    accountStore = new AccountStore(marketStore);
+    blockStore = new BlockStore();
+    marketStore = new MarketStore(blockStore);
+    accountStore = new AccountStore(blockStore, marketStore);
+    asyncActionStore = new AsyncActionStore(blockStore);
     liquidationStore = new LiquidationStore();
-    riskParamsStore = new RiskParamsStore(marketStore);
-    dolomiteLiquidator = new DolomiteLiquidator(accountStore, marketStore, liquidationStore, riskParamsStore);
+    riskParamsStore = new RiskParamsStore(blockStore);
+    dolomiteLiquidator = new DolomiteLiquidator(
+      accountStore,
+      asyncActionStore,
+      blockStore,
+      marketStore,
+      liquidationStore,
+      riskParamsStore,
+    );
     (
-      marketStore.getBlockTimestamp as any
+      blockStore.getBlockTimestamp as any
     ) = jest.fn().mockImplementation(() => DateTime.utc(2020, 1, 1));
   });
 
   describe('#_liquidateAccounts', () => {
     it('Successfully liquidates accounts normally', async () => {
-      process.env.EXPIRATIONS_ENABLED = 'true';
-      process.env.BRIDGE_TOKEN_ADDRESS = getTestMarkets()[0].tokenAddress;
-      process.env.LIQUIDATION_MODE = LiquidationMode.Simple;
-
       const liquidatableAccounts = getTestLiquidatableAccounts();
       const expiredAccounts = getTestExpiredAccounts();
       const markets = getTestMarkets();
@@ -97,122 +110,14 @@ describe('dolomite-liquidator', () => {
         .toEqual(process.env.COLLATERAL_PREFERENCES.split(',')
           .map((p) => new BigNumber(p)));
 
-      expect(liquidatableExpiredAccounts[0][4].eq(new BigNumber(2)))
-        .toBe(true); // marketId
       expect(liquidatableExpiredAccounts[0][0])
         .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
       expect(liquidatableExpiredAccounts[0][1])
         .toEqual(new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER));
       expect(liquidatableExpiredAccounts[0][3])
         .toEqual(new BigNumber(22)); // liquidAccountNumber
-    });
-
-    it('Successfully liquidates accounts while selling collateral', async () => {
-      process.env.EXPIRATIONS_ENABLED = 'true';
-      process.env.BRIDGE_TOKEN_ADDRESS = getTestMarkets()[0].tokenAddress; // WETH
-      process.env.LIQUIDATION_MODE = LiquidationMode.SellWithInternalLiquidity;
-      process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL = 'false';
-
-      const liquidatableAccounts = getTestLiquidatableAccounts();
-      const expiredAccounts = getTestExpiredAccounts();
-      const markets = getTestMarkets();
-      const riskParams = getTestRiskParams();
-      accountStore.getLiquidatableDolomiteAccounts = jest.fn().mockImplementation(() => liquidatableAccounts);
-      accountStore.getExpirableDolomiteAccounts = jest.fn().mockImplementation(() => expiredAccounts);
-      marketStore.getMarketMap = jest.fn().mockImplementation(() => markets);
-      riskParamsStore.getDolomiteRiskParams = jest.fn().mockImplementation(() => riskParams);
-      dolomite.getters.isAccountLiquidatable = jest.fn().mockImplementation(() => true);
-
-      const liquidations: any[] = [];
-      const liquidatableExpiredAccounts: any[] = [];
-      dolomite.liquidatorProxyV1WithAmm.liquidate = jest.fn().mockImplementation((...args) => {
-        if (args[7]) {
-          liquidatableExpiredAccounts.push(args);
-        } else {
-          liquidations.push(args);
-        }
-        return { gas: 1 };
-      });
-
-      await dolomiteLiquidator._liquidateAccounts();
-
-      expect(liquidations.length)
-        .toBe(liquidatableAccounts.length);
-      expect(liquidatableExpiredAccounts.length)
-        .toBe(1);
-
-      const sortedLiquidations = liquidatableAccounts.map((account: ApiAccount) => {
-        return liquidations.find((l) => l[2] === account.owner && l[3] === account.number);
-      });
-
-      const discount = INTEGERS.ONE.minus(new BigNumber(process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT));
-
-      expect(sortedLiquidations[0][0])
-        .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
-      expect(sortedLiquidations[0][1].toFixed())
-        .toBe(process.env.DOLOMITE_ACCOUNT_NUMBER);
-      expect(sortedLiquidations[0][4].toFixed())
-        .toBe(/* owedMarket */ liquidatableAccounts[0].balances[1].marketId.toString());
-      expect(sortedLiquidations[0][5].toFixed())
-        .toBe(/* heldMarket */ liquidatableAccounts[0].balances[0].marketId.toString());
-      expect(sortedLiquidations[0][6])
-        .toEqual([
-          liquidatableAccounts[0].balances[0].tokenAddress,
-          process.env.BRIDGE_TOKEN_ADDRESS,
-          liquidatableAccounts[0].balances[1].tokenAddress,
-        ]);
-      expect(sortedLiquidations[0][7])
-        .toEqual(null);
-      expect(sortedLiquidations[0][8])
-        .toEqual(liquidatableAccounts[0].balances[1].wei.abs().times(discount).integerValue(BigNumber.ROUND_FLOOR));
-      expect(sortedLiquidations[0][9])
-        .toEqual(process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true');
-
-      expect(sortedLiquidations[1][0])
-        .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
-      expect(sortedLiquidations[1][1].toFixed())
-        .toBe(process.env.DOLOMITE_ACCOUNT_NUMBER);
-      expect(sortedLiquidations[1][4].toFixed())
-        .toBe(/* owedMarket */ liquidatableAccounts[0].balances[0].marketId.toString());
-      expect(sortedLiquidations[1][5].toFixed())
-        .toBe(/* heldMarket */ liquidatableAccounts[0].balances[1].marketId.toString());
-      expect(sortedLiquidations[1][6])
-        .toEqual([
-          liquidatableAccounts[0].balances[1].tokenAddress,
-          process.env.BRIDGE_TOKEN_ADDRESS,
-          liquidatableAccounts[0].balances[0].tokenAddress,
-        ]);
-      expect(sortedLiquidations[1][7])
-        .toEqual(null);
-      expect(sortedLiquidations[1][8])
-        .toEqual(liquidatableAccounts[1].balances[0].wei.abs().times(discount).integerValue(BigNumber.ROUND_FLOOR));
-      expect(sortedLiquidations[1][9])
-        .toEqual(process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true');
-
-      expect(liquidatableExpiredAccounts[0][0])
-        .toBe(process.env.ACCOUNT_WALLET_ADDRESS);
-      expect(liquidatableExpiredAccounts[0][1])
-        .toEqual(new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER));
-      expect(liquidatableExpiredAccounts[0][2])
-        .toEqual(expiredAccounts[0].owner); // liquidAccountOwner
-      expect(liquidatableExpiredAccounts[0][3])
-        .toEqual(expiredAccounts[0].number); // liquidAccountNumber
-      expect(liquidatableExpiredAccounts[0][4].toFixed())
-        .toBe(/* owedMarket */ expiredAccounts[0].balances[2].marketId.toString());
-      expect(liquidatableExpiredAccounts[0][5].toFixed())
-        .toBe(/* heldMarket */ expiredAccounts[0].balances[1].marketId.toString());
-      expect(liquidatableExpiredAccounts[0][6])
-        .toEqual([
-          expiredAccounts[0].balances[1].tokenAddress,
-          process.env.BRIDGE_TOKEN_ADDRESS,
-          expiredAccounts[0].balances[2].tokenAddress,
-        ]);
-      expect(liquidatableExpiredAccounts[0][7])
-        .toEqual(expiredAccounts[0].balances[2].expiresAt);
-      expect(liquidatableExpiredAccounts[0][8])
-        .toEqual(expiredAccounts[0].balances[2].wei.abs().times(discount).integerValue(BigNumber.ROUND_FLOOR));
-      expect(liquidatableExpiredAccounts[0][9])
-        .toEqual(process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true');
+      expect(liquidatableExpiredAccounts[0][4].eq(new BigNumber(0)))
+        .toBe(true); // marketId
     });
   });
 });
@@ -267,8 +172,8 @@ function getTestLiquidatableAccounts(): ApiAccount[] {
           expiryAddress: null,
         },
         1: {
-          par: new BigNumber('1010101010101010010101010010101010101001010'),
-          wei: new BigNumber('2010101010101010010101010010101010101001010'),
+          par: new BigNumber('1010101010101010010101010010101'),
+          wei: new BigNumber('2010101010101010010101010010101'),
           marketId: 1,
           tokenDecimals: 6,
           tokenAddress: '0x0000000000000000000000000000000000000001',
@@ -298,30 +203,30 @@ function getTestExpiredAccounts(): ApiAccount[] {
           tokenAddress: '0x0000000000000000000000000000000000000000',
           tokenName: 'Ethereum',
           tokenSymbol: 'ETH',
-          expiresAt: new BigNumber(Math.floor(new Date(2050, 5, 25).getTime() / 1000)),
+          expiresAt: new BigNumber(Math.floor(new Date(1982, 5, 25).getTime() / 1000)),
           expiryAddress: dolomite.contracts.expiry.options.address,
         },
         1: {
+          par: new BigNumber('-1010101010101010010101010010101010101001010'),
+          wei: new BigNumber('-2010101010101010010101010010101010101001010'),
+          marketId: 1,
+          tokenDecimals: 18,
+          tokenAddress: '0x0000000000000000000000000000000000000002',
+          tokenName: 'DAI Stablecoin',
+          tokenSymbol: 'DAI',
+          expiresAt: new BigNumber(Math.floor(new Date(2050, 5, 25).getTime() / 1000)),
+          expiryAddress: dolomite.contracts.expiry.options.address,
+        },
+        2: {
           par: new BigNumber('1010101010101010010101010010101010101001010'),
           wei: new BigNumber('2010101010101010010101010010101010101001010'),
-          marketId: 1,
+          marketId: 2,
           tokenDecimals: 6,
           tokenAddress: '0x0000000000000000000000000000000000000001',
           tokenName: 'USD Coin',
           tokenSymbol: 'USDC',
           expiresAt: null,
           expiryAddress: null,
-        },
-        2: {
-          par: new BigNumber('-1010101010101010010101010010101010101001010'),
-          wei: new BigNumber('-2010101010101010010101010010101010101001010'),
-          marketId: 2,
-          tokenDecimals: 18,
-          tokenAddress: '0x0000000000000000000000000000000000000002',
-          tokenName: 'DAI Stablecoin',
-          tokenSymbol: 'DAI',
-          expiresAt: new BigNumber(Math.floor(new Date(1982, 5, 25).getTime() / 1000)),
-          expiryAddress: dolomite.contracts.expiry.options.address,
         },
         3: {
           marketId: 3,

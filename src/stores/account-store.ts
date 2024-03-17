@@ -1,18 +1,19 @@
 import { getExpiredAccounts, getLiquidatableDolomiteAccounts } from '../clients/dolomite';
-import { ApiAccount } from './api-types';
-import { delay } from './delay';
-import Logger from './logger';
+import { ApiAccount } from '../lib/api-types';
+import { delay } from '../lib/delay';
+import Logger from '../lib/logger';
 import MarketStore from './market-store';
-import Pageable from './pageable';
+import Pageable from '../lib/pageable';
+import BlockStore from './block-store';
 
 export default class AccountStore {
-  public marketStore: MarketStore;
-
   public liquidatableDolomiteAccounts: ApiAccount[];
   public expirableAccounts: ApiAccount[];
 
-  constructor(marketStore: MarketStore) {
-    this.marketStore = marketStore;
+  constructor(
+    private readonly blockSore: BlockStore,
+    private readonly marketStore: MarketStore,
+  ) {
     this.liquidatableDolomiteAccounts = [];
     this.expirableAccounts = [];
   }
@@ -58,11 +59,11 @@ export default class AccountStore {
       message: 'Updating accounts...',
     });
 
-    const blockNumber = this.marketStore.getBlockNumber();
-    if (blockNumber === 0) {
+    const blockNumber = this.blockSore.getBlockNumber();
+    if (typeof blockNumber === 'undefined') {
       Logger.warn({
         at: 'AccountStore#_update',
-        message: 'Block number from marketStore is 0, returning...',
+        message: 'Block number from BlockStore is not initialized yet, returning...',
       });
       return;
     }

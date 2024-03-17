@@ -1,16 +1,13 @@
 import { getDolomiteRiskParams } from '../clients/dolomite';
-import { ApiRiskParam } from './api-types';
-import { delay } from './delay';
-import Logger from './logger';
-import MarketStore from './market-store';
+import { ApiRiskParam } from '../lib/api-types';
+import { delay } from '../lib/delay';
+import Logger from '../lib/logger';
+import BlockStore from './block-store';
 
 export default class RiskParamsStore {
-  public marketStore: MarketStore
-
   public dolomiteRiskParams: ApiRiskParam | undefined;
 
-  constructor(marketStore: MarketStore) {
-    this.marketStore = marketStore;
+  constructor(private readonly blockStore: BlockStore) {
     this.dolomiteRiskParams = undefined;
   }
 
@@ -51,11 +48,11 @@ export default class RiskParamsStore {
       message: 'Updating risk params...',
     });
 
-    const blockNumber = this.marketStore.getBlockNumber();
-    if (blockNumber === 0) {
+    const blockNumber = this.blockStore.getBlockNumber();
+    if (typeof blockNumber === 'undefined') {
       Logger.warn({
         at: 'RiskParamsStore#_update',
-        message: 'Block number from marketStore is 0, returning...',
+        message: 'Block number from BlockStore is not initialized yet, returning...',
       });
       return;
     }

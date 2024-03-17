@@ -1,34 +1,30 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
-import { DateTime } from 'luxon';
-import { isExpired, liquidateAccount, liquidateExpiredAccount } from '../helpers/dolomite-helpers';
-import AccountStore from './account-store';
+import { liquidateAccount, liquidateExpiredAccount } from '../helpers/dolomite-helpers';
+import { isExpired } from '../helpers/time-helpers';
+import AccountStore from '../stores/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
 import { delay } from './delay';
-import LiquidationStore from './liquidation-store';
+import LiquidationStore from '../stores/liquidation-store';
 import Logger from './logger';
-import MarketStore from './market-store';
-import RiskParamsStore from './risk-params-store';
-
-const BASE = new BigNumber('1000000000000000000');
-const MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
+import MarketStore from '../stores/market-store';
+import RiskParamsStore from '../stores/risk-params-store';
+import BlockStore from '../stores/block-store';
+import AsyncActionStore from '../stores/async-action-store';
 
 export default class DolomiteLiquidator {
-  public accountStore: AccountStore;
-  public marketStore: MarketStore;
-  public liquidationStore: LiquidationStore;
-  public riskParamsStore: RiskParamsStore;
+
+  private BASE = new BigNumber('1000000000000000000');
+  private MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
 
   constructor(
-    accountStore: AccountStore,
-    marketStore: MarketStore,
-    liquidationStore: LiquidationStore,
-    riskParamsStore: RiskParamsStore,
+    private readonly accountStore: AccountStore,
+    private readonly asyncActionStore: AsyncActionStore,
+    private readonly blockStore: BlockStore,
+    private readonly marketStore: MarketStore,
+    private readonly liquidationStore: LiquidationStore,
+    private readonly riskParamsStore: RiskParamsStore,
   ) {
-    this.accountStore = accountStore;
-    this.marketStore = marketStore;
-    this.liquidationStore = liquidationStore;
-    this.riskParamsStore = riskParamsStore;
   }
 
   start = () => {
@@ -60,7 +56,15 @@ export default class DolomiteLiquidator {
   };
 
   _liquidateAccounts = async () => {
-    const lastBlockTimestamp: DateTime = this.marketStore.getBlockTimestamp();
+    const lastBlockTimestamp = this.blockStore.getBlockTimestamp();
+    if (!lastBlockTimestamp) {
+      Logger.warn({
+        at: 'DolomiteLiquidator#_liquidateAccounts',
+        message: 'Block timestamp from BlockStore is not initialized yet, returning...',
+      });
+      return;
+    }
+
     const marketMap = this.marketStore.getMarketMap();
 
     let expirableAccounts = this.accountStore.getExpirableDolomiteAccounts()
@@ -95,6 +99,8 @@ export default class DolomiteLiquidator {
     // Do not put an account in both liquidatable and expired; prioritize liquidation
     expirableAccounts = expirableAccounts.filter((ea) => !liquidatableAccounts.find((la) => la.id === ea.id));
 
+    const marginAccountToActionsMap = this.asyncActionStore.getMarginAccountToRetryableActionsMap();
+
     if (liquidatableAccounts.length === 0 && expirableAccounts.length === 0) {
       Logger.info({
         at: 'DolomiteLiquidator#_liquidateAccounts',
@@ -109,7 +115,13 @@ export default class DolomiteLiquidator {
     for (let i = 0; i < liquidatableAccounts.length; i += 1) {
       const account = liquidatableAccounts[i];
       try {
-        const result = await liquidateAccount(account, marketMap, riskParams, lastBlockTimestamp);
+        const result = await liquidateAccount(
+          account,
+          marketMap,
+          riskParams,
+          marginAccountToActionsMap,
+          lastBlockTimestamp
+        );
         if (result) {
           Logger.info({
             message: 'Liquidation transaction hash:',
@@ -130,7 +142,13 @@ export default class DolomiteLiquidator {
     for (let i = 0; i < expirableAccounts.length; i += 1) {
       const account = expirableAccounts[i];
       try {
-        const result = await liquidateExpiredAccount(account, marketMap, riskParams, lastBlockTimestamp);
+        const result = await liquidateExpiredAccount(
+          account,
+          marketMap,
+          riskParams,
+          marginAccountToActionsMap,
+          lastBlockTimestamp
+        );
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
         if (result) {
           Logger.info({
@@ -165,18 +183,23 @@ export default class DolomiteLiquidator {
       .reduce((memo, balance) => {
         const market = marketMap[balance.marketId.toString()];
         const value = balance.wei.times(market.oraclePrice);
-        const adjust = BASE.plus(market.marginPremium);
+        const adjust = this.BASE.plus(market.marginPremium);
         if (balance.wei.lt(INTEGERS.ZERO)) {
           // increase the borrow size by the premium
-          memo.borrow = memo.borrow.plus(value.abs().times(adjust).div(BASE).integerValue(BigNumber.ROUND_FLOOR));
+          memo.borrow = memo.borrow.plus(value.abs()
+            .times(adjust)
+            .div(this.BASE)
+            .integerValue(BigNumber.ROUND_FLOOR));
         } else {
           // decrease the supply size by the premium
-          memo.supply = memo.supply.plus(value.times(BASE).div(adjust).integerValue(BigNumber.ROUND_FLOOR));
+          memo.supply = memo.supply.plus(value.times(this.BASE)
+            .div(adjust)
+            .integerValue(BigNumber.ROUND_FLOOR));
         }
         return memo;
       }, initial);
 
-    const collateralization = supply.times(BASE)
+    const collateralization = supply.times(this.BASE)
       .div(borrow)
       .integerValue(BigNumber.ROUND_FLOOR);
     return collateralization.gte(riskParams.liquidationRatio);
@@ -196,7 +219,7 @@ export default class DolomiteLiquidator {
         return memo;
       }, INTEGERS.ZERO);
 
-    return borrow.gte(MIN_VALUE_LIQUIDATED);
+    return borrow.gte(this.MIN_VALUE_LIQUIDATED);
   }
 
   /**

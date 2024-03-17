@@ -1,13 +1,12 @@
-/*@formatter:off*/
-/*@formatter:on*/
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
+import BlockStore from '../src/stores/block-store';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
+import MarketStore from '../src/stores/market-store';
 import Pageable from '../src/lib/pageable';
 import GlpIsolationModeVaultAbi from './abis/glp-isolation-mode-vault.json';
 import vGlpAbi from './abis/gmx-vester.json';
@@ -18,7 +17,8 @@ const GLP_TOKEN_ADDRESS = '0x1aDDD80E6039594eE970E5872D247bf0414C8903';
 const V_GLP_TOKEN_ADDRESS = '0xa75287d2f8b217273e7fcd7e86ef07d33972042e';
 
 async function start() {
-  const marketStore = new MarketStore();
+  const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore);
 
   const { blockNumber } = await getSubgraphBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(blockNumber);
@@ -52,12 +52,16 @@ async function start() {
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
   const accounts = await Pageable.getPageableValues(async (lastId) => {
-    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockNumber, lastId);
-    return accounts;
+    const { accounts: innerAccounts } = await getAllDolomiteAccountsWithSupplyValue(
+      marketIndexMap,
+      blockNumber,
+      lastId,
+    );
+    return innerAccounts;
   });
 
   const accountToDolomiteBalanceMap: Record<string, BigNumber> = {};
-  for (let i = 0; i < accounts.length; i++) {
+  for (let i = 0; i < accounts.length; i += 1) {
     const account = accounts[i];
     const dolomiteBalance = Object.values(account.balances)
       .reduce((memo, balance) => {
@@ -75,18 +79,18 @@ async function start() {
   let invalidBalanceCount = 0;
   let totalGmxBalances = new BigNumber(0);
   const accountOwners = Object.keys(accountToDolomiteBalanceMap);
-  for (let i = 0; i < accountOwners.length; i++) {
+  for (let i = 0; i < accountOwners.length; i += 1) {
     const dolomiteBalance = accountToDolomiteBalanceMap[accountOwners[i]];
     if (dolomiteBalance.gt(INTEGERS.ZERO)) {
       const glpIsolationModeVault = new dolomite.web3.eth.Contract(GlpIsolationModeVaultAbi, accountOwners[i]);
       const [nakedBalance, vGlpBalanceString, gmxBalanceString] = await Promise.all([
         dolomite.token.getBalance(GLP_TOKEN_ADDRESS, accountOwners[i], { blockNumber }),
         dolomite.contracts.callConstantContractFunction(
-          vGlpToken.methods['pairAmounts'](accountOwners[i]),
+          vGlpToken.methods.pairAmounts(accountOwners[i]),
           { blockNumber },
         ),
         dolomite.contracts.callConstantContractFunction(
-          glpIsolationModeVault.methods['gmxBalanceOf'](),
+          glpIsolationModeVault.methods.gmxBalanceOf(),
           { blockNumber },
         ),
       ]);

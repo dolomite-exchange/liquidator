@@ -13,7 +13,7 @@
     "compose-clean": "docker-compose rm -f",
     "migrate": "echo 'Nothing to migrate'",
     "seed": "echo 'Nothing to seed'",
-    "execute:get-average-tvl": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-average-tvl.ts",
+    "execute:get-global-stats": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-global-stats.ts",
     "execute:get-lp-yield": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-lp-yield.ts",
     "execute:get-yt-glp-balances": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-yt-glp-balances.ts",
     "execute:get-total-active-users": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-total-active-users.ts",
@@ -33,8 +33,8 @@
   },
   "homepage": "https://github.com/dolomite-exchange/liquidator#readme",
   "dependencies": {
-    "@dolomite-exchange/dolomite-margin": "^0.9.33",
-    "@dolomite-exchange/zap-sdk": "^0.2.10",
+    "@dolomite-exchange/dolomite-margin": "^0.11.1",
+    "@dolomite-exchange/zap-sdk": "^0.2.16",
     "axios": "^1.1.3",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",
@@ -46,6 +46,7 @@
   },
   "devDependencies": {
     "@types/jest": "^24.9.1",
+    "@types/luxon": "^1.26.5",
     "@types/node": "^14.0.14",
     "@types/node-fetch": "^2.5.12",
     "@typescript-eslint/eslint-plugin": "^3.10.1",

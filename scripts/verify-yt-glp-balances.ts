@@ -1,13 +1,12 @@
-/*@formatter:off*/
-/*@formatter:on*/
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
+import BlockStore from '../src/stores/block-store';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
+import MarketStore from '../src/stores/market-store';
 import Pageable from '../src/lib/pageable';
 import './lib/env-reader';
 
@@ -15,7 +14,8 @@ const YT_GLP_MARKET_ID = 16;
 const YT_GLP_TOKEN_ADDRESS = '0x56051f8e46b67b4d286454995dBC6F5f3C433E34';
 
 async function start() {
-  const marketStore = new MarketStore();
+  const blockStore = new BlockStore()
+  const marketStore = new MarketStore(blockStore);
 
   const { blockNumber } = await getSubgraphBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(blockNumber);
@@ -49,12 +49,16 @@ async function start() {
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
   const accounts = await Pageable.getPageableValues(async (lastId) => {
-    const { accounts } = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockNumber, lastId);
-    return accounts;
+    const { accounts: innerAccounts } = await getAllDolomiteAccountsWithSupplyValue(
+      marketIndexMap,
+      blockNumber,
+      lastId,
+    );
+    return innerAccounts;
   });
 
   const accountToDolomiteBalanceMap: Record<string, BigNumber> = {};
-  for (let i = 0; i < accounts.length; i++) {
+  for (let i = 0; i < accounts.length; i += 1) {
     const account = accounts[i];
     const dolomiteBalance = Object.values(account.balances)
       .reduce((memo, balance) => {
@@ -70,7 +74,7 @@ async function start() {
 
   let invalidBalanceCount = 0;
   const accountOwners = Object.keys(accountToDolomiteBalanceMap);
-  for (let i = 0; i < accountOwners.length; i++) {
+  for (let i = 0; i < accountOwners.length; i += 1) {
     const dolomiteBalance = accountToDolomiteBalanceMap[accountOwners[i]];
     if (dolomiteBalance.gt(INTEGERS.ZERO)) {
       const actualBalance = await dolomite.token.getBalance(YT_GLP_TOKEN_ADDRESS, accountOwners[i], { blockNumber });

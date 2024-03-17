@@ -2,12 +2,12 @@ import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
 import { getDolomiteRiskParams } from '../src/clients/dolomite';
-import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
-import AccountStore from '../src/lib/account-store';
 import { ApiAccount, ApiBalance } from '../src/lib/api-types';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
+import AccountStore from '../src/stores/account-store';
+import BlockStore from '../src/stores/block-store';
+import MarketStore from '../src/stores/market-store';
 import './lib/env-reader';
 
 const SMALL_BORROW_THRESHOLD = new BigNumber('0.001');
@@ -25,10 +25,13 @@ function shouldIgnoreAccount(account: ApiAccount): boolean {
 }
 
 async function start() {
-  const marketStore = new MarketStore();
-  const accountStore = new AccountStore(marketStore);
+  const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore);
+  const accountStore = new AccountStore(blockStore, marketStore);
 
-  const { blockNumber } = await getSubgraphBlockNumber();
+  await blockStore._update();
+
+  const blockNumber = blockStore.getBlockNumber()!;
   const { riskParams } = await getDolomiteRiskParams(blockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
 

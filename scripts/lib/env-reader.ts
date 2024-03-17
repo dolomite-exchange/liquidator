@@ -3,6 +3,7 @@ import Logger from '../../src/lib/logger';
 const ENV_FILENAME = process.env.ENV_FILENAME ? process.env.ENV_FILENAME : undefined;
 
 if (ENV_FILENAME) {
+  // eslint-disable-next-line
   require('dotenv').config({ path: ENV_FILENAME });
 } else {
   Logger.warn({

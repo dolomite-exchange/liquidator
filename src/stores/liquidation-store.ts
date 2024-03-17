@@ -1,5 +1,5 @@
 import LRU from 'lru-cache';
-import { ApiAccount } from './api-types';
+import { ApiAccount } from '../lib/api-types';
 
 export default class LiquidationStore {
   public store: LRU;

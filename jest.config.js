@@ -1,7 +1,6 @@
 module.exports = {
   globalSetup: './__tests__/helpers/setup.ts',
   roots: [
-    '<rootDir>/__script_tests__',
     '<rootDir>/__tests__',
   ],
   transform: {

@@ -1,8 +1,11 @@
-import { address, Integer } from '@dolomite-exchange/dolomite-margin';
+import { address, BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 
-interface ApiMarginAccount {
-  user: string;
-  accountNumber: string;
+export interface ApiToken {
+  marketId: BigNumber;
+  symbol: string;
+  name: string;
+  tokenAddress: string;
+  decimals: number;
 }
 
 export interface ApiBalance {
@@ -27,46 +30,6 @@ export interface ApiAccount {
   };
 }
 
-export interface ApiDeposit {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  effectiveUser: string;
-  marginAccount: ApiMarginAccount;
-  marketId: number;
-  amountDeltaPar: Integer;
-}
-
-export interface ApiAmmLiquidityPosition {
-  id: string;
-  effectiveUser: string;
-  balance: number;
-}
-
-export interface ApiAmmLiquiditySnapshot {
-  id: string;
-  effectiveUser: string;
-  liquidityTokenBalance: string;
-  block: string;
-  timestamp: string;
-}
-
-export interface ApiLiquidation {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  solidEffectiveUser: string;
-  liquidEffectiveUser: string;
-  solidMarginAccount: ApiMarginAccount;
-  liquidMarginAccount: ApiMarginAccount;
-  heldMarketId: number;
-  borrowedMarketId: number;
-  solidHeldTokenAmountDeltaPar: Integer;
-  liquidHeldTokenAmountDeltaPar: Integer;
-  solidBorrowedTokenAmountDeltaPar: Integer;
-  liquidBorrowedTokenAmountDeltaPar: Integer;
-}
-
 export interface ApiMarket {
   marketId: number
   symbol: string
@@ -84,60 +47,13 @@ export interface ApiRiskParam {
   liquidationReward: Integer;
 }
 
-export interface ApiTransfer {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  fromEffectiveUser: string;
-  toEffectiveUser: string;
-  fromMarginAccount: ApiMarginAccount;
-  toMarginAccount: ApiMarginAccount;
-  marketId: number;
-  fromAmountDeltaPar: Integer;
-  toAmountDeltaPar: Integer;
-}
-
-export interface ApiTrade {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  takerEffectiveUser: string;
-  takerMarginAccount: ApiMarginAccount;
-  takerMarketId: number;
-  takerInputTokenDeltaPar: Integer;
-  takerOutputTokenDeltaPar: Integer;
-  makerEffectiveUser: string | undefined;
-  makerMarginAccount: ApiMarginAccount | undefined;
-  makerMarketId: number;
-}
-
-export interface ApiVestingPositionTransfer {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  fromEffectiveUser: string | undefined;
-  toEffectiveUser: string | undefined;
-  amount: Integer;
-}
-
-export interface ApiLiquidityMiningVestingPosition {
-  id: string;
-  effectiveUser: string;
-  amountPar: string;
-}
-
-export interface ApiWithdrawal {
-  id: string;
-  serialId: number;
-  timestamp: number;
-  effectiveUser: string;
-  marginAccount: ApiMarginAccount;
-  marketId: number;
-  amountDeltaPar: Integer;
-}
-
 export interface MarketIndex {
   marketId: number
   borrow: Integer
   supply: Integer
+}
+
+export interface TotalValueLockedAndFees {
+  totalValueLocked: Decimal[]
+  borrowFees: Decimal[]
 }

@@ -1,12 +1,20 @@
 import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { BigNumber as ZapBigNumber, DolomiteZap, MinimalApiToken } from '@dolomite-exchange/zap-sdk';
+import {
+  ApiAsyncAction,
+  BigNumber as ZapBigNumber,
+  DolomiteZap,
+  MinimalApiToken,
+  ZapOutputParam,
+} from '@dolomite-exchange/zap-sdk';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
-import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/math-utils';
+import { DECIMAL_BASE, getAmountsForLiquidation, getOwedPriceForLiquidation, getPartial } from '../lib/math-utils';
+import { prepareForLiquidation } from './async-liquidations-helper';
+import { _getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei } from './gas-price-helpers';
 import { dolomite } from './web3';
 
@@ -19,7 +27,7 @@ const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? 
 const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split(',')
   .map((pref) => new BigNumber(pref.trim()));
 
-const minValueLiquidatedForExternalSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL as string);
+const minValueLiquidatedForGenericSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL as string);
 
 const NETWORK_ID = Number(process.env.NETWORK_ID);
 const ONE_HOUR = 60 * 60;
@@ -41,18 +49,11 @@ const zap = new DolomiteZap({
   gasMultiplier: new ZapBigNumber(2),
 });
 
-export function isExpired(
-  expiresAt: Integer | null,
-  latestBlockTimestamp: DateTime,
-): boolean {
-  const expiresAtPlusDelay = expiresAt?.plus(process.env.EXPIRED_ACCOUNT_DELAY_SECONDS as string);
-  return expiresAtPlusDelay?.lt(latestBlockTimestamp.toSeconds()) ?? false;
-}
-
 export async function liquidateAccount(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
 ): Promise<TxResult | undefined> {
   if (process.env.LIQUIDATIONS_ENABLED !== 'true') {
@@ -110,13 +111,12 @@ export async function liquidateAccount(
       liquidAccount,
       marketMap,
       riskParams,
+      marginAccountToActionsMap,
       lastBlockTimestamp,
       false,
     );
-  } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {
-    return _liquidateAccountAndSellWithInternalLiquidity(liquidAccount, marketMap, lastBlockTimestamp, false);
   } else if (liquidationMode === LiquidationMode.Simple) {
-    return _liquidateAccountSimple(liquidAccount);
+    return _liquidateAccountSimple(liquidAccount, marginAccountToActionsMap);
   } else {
     throw new Error(`Unknown liquidation mode: ${liquidationMode}`);
   }
@@ -126,6 +126,7 @@ export async function liquidateExpiredAccount(
   expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
 ) {
   if (process.env.EXPIRATIONS_ENABLED?.toLowerCase() !== 'true') {
@@ -145,13 +146,17 @@ export async function liquidateExpiredAccount(
       expiredAccount,
       marketMap,
       riskParams,
+      marginAccountToActionsMap,
       lastBlockTimestamp,
       true,
     );
-  } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {
-    return _liquidateAccountAndSellWithInternalLiquidity(expiredAccount, marketMap, lastBlockTimestamp, true);
   } else if (liquidationMode === LiquidationMode.Simple) {
-    return _liquidateExpiredAccountInternalSimple(expiredAccount, marketMap, lastBlockTimestamp);
+    return _liquidateExpiredAccountInternalSimple(
+      expiredAccount,
+      marketMap,
+      marginAccountToActionsMap,
+      lastBlockTimestamp,
+    );
   } else {
     return Promise.reject(new Error(`Unknown liquidation mode: ${liquidationMode}`))
   }
@@ -159,10 +164,15 @@ export async function liquidateExpiredAccount(
 
 async function _liquidateAccountSimple(
   liquidAccount: ApiAccount,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   owedMarkets: Integer[] = owedPreferences,
   collateralMarkets: Integer[] = collateralPreferences,
   minValueLiquidated: Integer = new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string),
 ): Promise<TxResult> {
+  if (marginAccountToActionsMap[liquidAccount.id]) {
+    return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple liquidations on async account'));
+  }
+
   const gasPrice = getGasPriceWei();
 
   return dolomite.liquidatorProxyV1.liquidate(
@@ -186,6 +196,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
   isExpiring: boolean,
 ): Promise<TxResult> {
@@ -206,18 +217,34 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   const owedMarket = marketMap[owedBalance.marketId];
   const heldMarket = marketMap[heldBalance.marketId];
   const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskParams);
-  const { owedWei, heldWei } = getAmountsForLiquidation(
+  const { owedWei, heldWei, isVaporizable } = getAmountsForLiquidation(
     owedBalance.wei.abs(),
     owedPriceAdj,
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
   );
+  /* eslint-disable @typescript-eslint/indent */
+  const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])
+    .filter(action => {
+      return action.inputToken.marketId.eq(heldMarket.marketId)
+    })
+    .reduce<Record<string, ApiAsyncAction[]>>(
+      (memo, action) => {
+        const marketId = action.outputToken.marketId.toFixed();
+        if (!memo[marketId]) {
+          memo[marketId] = [];
+        }
+        memo[marketId] = memo[marketId].concat(action);
+        return memo;
+      },
+      {},
+    );
+  /* eslint-enable @typescript-eslint/indent */
 
   const hasIsolationModeMarket = zap.getIsolationModeConverterByMarketId(new ZapBigNumber(owedMarket.marketId))
     || zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId));
-  if (!hasIsolationModeMarket && owedBalance.wei.abs()
-    .times(owedMarket.oraclePrice)
-    .isLessThan(minValueLiquidatedForExternalSell)) {
+  const owedValueUsd = owedBalance.wei.abs().times(owedMarket.oraclePrice);
+  if (!hasIsolationModeMarket && owedValueUsd.isLessThan(minValueLiquidatedForGenericSell)) {
     Logger.info({
       message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
       owedMarketId: owedMarket.marketId,
@@ -234,6 +261,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       return _liquidateExpiredAccountInternalSimple(
         liquidAccount,
         marketMap,
+        marginAccountToActionsMap,
         lastBlockTimestamp,
         [new BigNumber(heldBalance.marketId)],
         [new BigNumber(owedBalance.marketId)],
@@ -241,11 +269,23 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     } else {
       return _liquidateAccountSimple(
         liquidAccount,
+        marginAccountToActionsMap,
         [new BigNumber(owedBalance.marketId)],
         [new BigNumber(heldBalance.marketId)],
         INTEGERS.ZERO,
       );
     }
+  } else if (
+    Object.keys(marketIdToActionsMap).length === 0
+    && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
+  ) {
+    return _prepareLiquidationForAsyncMarket(
+      liquidAccount,
+      heldMarket,
+      heldBalance,
+      marketMap,
+      riskParams,
+    );
   } else {
     Logger.info({
       message: 'Performing liquidation via generic liquidity',
@@ -267,13 +307,32 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       marketId: new ZapBigNumber(owedMarket.marketId),
       symbol: owedMarket.symbol,
     };
-    const outputs = await zap.getSwapExactTokensForTokensParams(
-      heldToken,
-      new ZapBigNumber(heldWei),
-      owedToken,
-      new ZapBigNumber(owedWei),
-      solidAccount.owner,
-    );
+    let outputs: ZapOutputParam[];
+    if (Object.keys(marketIdToActionsMap).length === 0) {
+      outputs = await zap.getSwapExactTokensForTokensParams(
+        heldToken,
+        new ZapBigNumber(heldWei),
+        owedToken,
+        new ZapBigNumber(owedWei),
+        solidAccount.owner,
+        { isLiquidation: true },
+      );
+    } else {
+      const marketToOracleMap = Object.keys(marketMap).reduce((acc, marketId) => {
+        acc[marketId] = new ZapBigNumber(marketMap[marketId].oraclePrice.toFixed());
+        return acc;
+      }, {});
+      outputs = await zap.getSwapExactAsyncTokensForTokensParamsForLiquidation(
+        heldToken,
+        new ZapBigNumber(heldWei),
+        owedToken,
+        new ZapBigNumber(owedWei),
+        solidAccount.owner,
+        marketIdToActionsMap,
+        marketToOracleMap,
+        { isLiquidation: true, isVaporizable },
+      );
+    }
 
     let firstError: unknown;
     for (let i = 0; i < outputs.length; i += 1) {
@@ -306,88 +365,18 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   }
 }
 
-async function _liquidateAccountAndSellWithInternalLiquidity(
-  liquidAccount: ApiAccount,
-  marketMap: { [marketId: string]: ApiMarket },
-  lastBlockTimestamp: DateTime,
-  isExpiring: boolean,
-): Promise<TxResult> {
-  if (!process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL) {
-    const message = 'REVERT_ON_FAIL_TO_SELL_COLLATERAL is not provided';
-    Logger.error({
-      at: 'dolomite-helpers#liquidateAccountInternalAndSellCollateral',
-      message,
-    });
-    process.exit(-1);
-    return Promise.reject(new Error(message));
-  }
-
-  const owedBalance = _getLargestBalanceUSD(
-    Object.values(liquidAccount.balances),
-    true,
-    marketMap,
-    lastBlockTimestamp,
-    isExpiring,
-  );
-  const heldBalance = _getLargestBalanceUSD(
-    Object.values(liquidAccount.balances),
-    false,
-    marketMap,
-    lastBlockTimestamp,
-    isExpiring,
-  );
-
-  const owedToken = owedBalance.tokenAddress.toLowerCase();
-  const heldToken = heldBalance.tokenAddress.toLowerCase();
-
-  let tokenPath: string[];
-  const bridgeAddress = (process.env.BRIDGE_TOKEN_ADDRESS as string).toLowerCase();
-  if (owedToken === bridgeAddress || heldToken === bridgeAddress) {
-    tokenPath = [heldBalance.tokenAddress, owedBalance.tokenAddress];
-  } else {
-    tokenPath = [heldBalance.tokenAddress, bridgeAddress, owedBalance.tokenAddress];
-  }
-
-  const minOwedOutputDiscount = new BigNumber(process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT as string);
-  if (minOwedOutputDiscount.gte(INTEGERS.ONE)) {
-    return Promise.reject(new Error('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT must be less than 1.00'));
-  } else if (minOwedOutputDiscount.lt(INTEGERS.ZERO)) {
-    return Promise.reject(new Error('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT must be greater than or equal to 0'));
-  }
-
-  const minOwedOutputAmount = owedBalance.wei.abs()
-    .times(INTEGERS.ONE.minus(minOwedOutputDiscount))
-    .integerValue(BigNumber.ROUND_FLOOR);
-  const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL.toLowerCase() === 'true';
-
-  const gasPrice = getGasPriceWei();
-
-  return dolomite.liquidatorProxyV1WithAmm.liquidate(
-    solidAccount.owner,
-    solidAccount.number,
-    liquidAccount.owner,
-    liquidAccount.number,
-    new BigNumber(owedBalance.marketId),
-    new BigNumber(heldBalance.marketId),
-    tokenPath,
-    isExpiring ? (owedBalance.expiresAt ?? null) : null,
-    minOwedOutputAmount,
-    revertOnFailToSellCollateral,
-    {
-      gasPrice: gasPrice.toFixed(),
-      from: solidAccount.owner,
-      confirmationType: ConfirmationType.Hash,
-    },
-  );
-}
-
 async function _liquidateExpiredAccountInternalSimple(
   expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
+  marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
   heldMarketIds: Integer[] = collateralPreferences,
   owedMarketIds: Integer[] = owedPreferences,
 ): Promise<TxResult> {
+  if (marginAccountToActionsMap[expiredAccount.id]) {
+    return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple expirations on async account'));
+  }
+
   const preferredHeldBalances = heldMarketIds.reduce<ApiBalance[]>((memo, marketId) => {
     const balance = expiredAccount.balances[marketId.toFixed()];
     if (balance.wei.gt(INTEGERS.ZERO)) {
@@ -441,37 +430,124 @@ async function _liquidateExpiredAccountInternalSimple(
   );
 }
 
-export function _getLargestBalanceUSD(
-  balances: ApiBalance[],
-  isOwed: boolean,
-  marketMap: { [marketId: string]: ApiMarket },
-  lastBlockTimestamp: DateTime,
-  isExpiring: boolean,
-): ApiBalance {
-  return balances
-    .filter(balance => {
-      if (isOwed) {
-        if (isExpiring) {
-          // Return any market that has expired and is borrowed (negative)
-          return isExpired(balance.expiresAt, lastBlockTimestamp) && balance.wei.lt('0');
-        } else {
-          return balance.wei.lt('0');
-        }
-      } else {
-        return balance.wei.gte('0');
-      }
-    })
-    .sort((a, b) => _balanceUSDSorterDesc(a, b, marketMap))[0]
-}
+async function _prepareLiquidationForAsyncMarket(
+  liquidAccount: ApiAccount,
+  heldMarket: ApiMarket,
+  heldBalance: ApiBalance,
+  marketMap: Record<string, ApiMarket>,
+  riskParams: ApiRiskParam,
+): Promise<TxResult> {
+  const outputMarketIds = zap.getAsyncAssetOutputMarketsByMarketId(new ZapBigNumber(heldMarket.marketId));
+  if (!outputMarketIds) {
+    Logger.error({
+      message: `Could not find output markets for ${heldMarket.marketId.toString()}`,
+      heldMarket: {
+        ...heldMarket,
+        oraclePrice: heldMarket.oraclePrice.toFixed(),
+      },
+    });
+    return Promise.reject(new Error(`Could not find output markets for ${heldMarket.marketId.toString()}`));
+  }
 
-function _balanceUSDSorterDesc(
-  balance1: ApiBalance,
-  balance2: ApiBalance,
-  marketMap: { [marketId: string]: ApiMarket },
-): number {
-  const market1 = marketMap[balance1.marketId];
-  const market2 = marketMap[balance2.marketId];
-  const balanceUSD1 = balance1.wei.abs().times(market1.oraclePrice);
-  const balanceUSD2 = balance2.wei.abs().times(market2.oraclePrice);
-  return balanceUSD1.gt(balanceUSD2) ? -1 : 1;
+  const zapResults = await Promise.all(
+    outputMarketIds.map(outputMarketId => {
+      const outputMarket = marketMap[outputMarketId.toFixed()];
+      if (!outputMarket) {
+        Logger.error({
+          message: 'Could not retrieve oracle prices for async liquidation',
+          heldMarket: heldMarket.marketId.toString(),
+          outputMarket: outputMarketId.toFixed(),
+        })
+      }
+
+      const heldToken: MinimalApiToken = {
+        marketId: new ZapBigNumber(heldMarket.marketId),
+        symbol: heldMarket.symbol,
+      };
+      const outputToken: MinimalApiToken = {
+        marketId: new ZapBigNumber(outputMarket.marketId),
+        symbol: outputMarket.symbol,
+      };
+      const heldPrice = heldMarket.oraclePrice;
+      const reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
+      const outputPriceAdj = outputMarket.oraclePrice.plus(
+        getPartial(outputMarket.oraclePrice, reward, DECIMAL_BASE),
+      );
+      const minOutputAmount = heldBalance.wei.times(heldPrice).div(outputPriceAdj);
+      return zap.getSwapExactTokensForTokensParams(
+        heldToken,
+        new ZapBigNumber(heldBalance.wei.toFixed()),
+        outputToken,
+        new ZapBigNumber(minOutputAmount.toFixed()),
+        solidAccount.owner,
+        {
+          isLiquidation: true,
+          gasPriceInWei: new ZapBigNumber(getGasPriceWei().toFixed()),
+          subAccountNumber: new ZapBigNumber(liquidAccount.number.toFixed()),
+          disallowAggregator: true,
+        },
+      );
+    }),
+  );
+
+  const bestZapResult = zapResults.reduce<ZapOutputParam | undefined>((best, zapResult) => {
+    const other = zapResult[0];
+    if (!best) {
+      return zapResult[0];
+    }
+    if (!other) {
+      return best;
+    }
+
+    const bestOutputMarket = marketMap[best.marketIdsPath[best.marketIdsPath.length - 1].toFixed()];
+    const otherOutputMarket = marketMap[other.marketIdsPath[other.marketIdsPath.length - 1].toFixed()];
+    if (!bestOutputMarket || !otherOutputMarket) {
+      return best;
+    }
+
+    const bestExpectedOut = best.expectedAmountOut.times(bestOutputMarket.oraclePrice);
+    const otherExpectedOut = other.expectedAmountOut.times(otherOutputMarket.oraclePrice);
+    return bestExpectedOut.gt(otherExpectedOut) ? best : other;
+  }, undefined)
+
+  if (!bestZapResult) {
+    const message = `Could not find valid zap for ${heldMarket.marketId.toString()}`;
+    Logger.error({
+      message,
+      heldMarket: {
+        ...heldMarket,
+        oraclePrice: heldMarket.oraclePrice.toFixed(),
+      },
+    });
+    return Promise.reject(new Error(message));
+  } else if (!bestZapResult.executionFee || bestZapResult.executionFee.eq(INTEGERS.ZERO)) {
+    const message = `Zap does not have an execution fee for ${heldMarket.marketId.toString()}`;
+    Logger.error({
+      message,
+      heldMarket: {
+        ...heldMarket,
+        oraclePrice: heldMarket.oraclePrice.toFixed(),
+      },
+    });
+    return Promise.reject(new Error(message));
+  } else if (bestZapResult.marketIdsPath.length !== 2) {
+    const message = 'Zap markets path must be of length 2';
+    Logger.error({
+      message,
+    });
+    return Promise.reject(new Error(message));
+  }
+
+  return prepareForLiquidation(
+    liquidAccount,
+    new BigNumber(heldMarket.marketId),
+    heldBalance.wei,
+    new BigNumber(bestZapResult.marketIdsPath[bestZapResult.marketIdsPath.length - 1].toFixed()),
+    new BigNumber(bestZapResult.originalAmountOutMin.toFixed()),
+    undefined,
+    bestZapResult.traderParams[0].tradeData,
+    {
+      value: bestZapResult.executionFee.toFixed(),
+    },
+  );
 }
