@@ -30,48 +30,6 @@ export interface ApiAccount {
   };
 }
 
-export enum ApiAsyncDepositStatus {
-  CREATED = 'CREATED',
-  DEPOSIT_EXECUTED = 'DEPOSIT_EXECUTED',
-  DEPOSIT_FAILED = 'DEPOSIT_FAILED',
-  DEPOSIT_CANCELLED = 'DEPOSIT_CANCELLED',
-  DEPOSIT_CANCELLED_FAILED = 'DEPOSIT_CANCELLED_FAILED',
-}
-
-export enum ApiAsyncActionType {
-  DEPOSIT = 'DEPOSIT',
-  WITHDRAWAL = 'WITHDRAWAL',
-}
-
-export interface ApiAsyncAction {
-  id: string;
-  actionType: ApiAsyncActionType;
-  owner: string;
-  accountNumber: BigNumber;
-  status: ApiAsyncDepositStatus | ApiAsyncWithdrawalStatus;
-  inputToken: ApiToken;
-  inputAmount: Decimal;
-  outputToken: ApiToken;
-  outputAmount: Decimal;
-}
-
-export interface ApiAsyncDeposit extends ApiAsyncAction {
-  actionType: ApiAsyncActionType.DEPOSIT;
-  status: ApiAsyncDepositStatus;
-}
-
-export enum ApiAsyncWithdrawalStatus {
-  CREATED = 'CREATED',
-  WITHDRAWAL_EXECUTED = 'WITHDRAWAL_EXECUTED',
-  WITHDRAWAL_EXECUTION_FAILED = 'WITHDRAWAL_EXECUTION_FAILED',
-  WITHDRAWAL_CANCELLED = 'WITHDRAWAL_CANCELLED',
-}
-
-export interface ApiAsyncWithdrawal extends ApiAsyncAction {
-  actionType: ApiAsyncActionType.WITHDRAWAL;
-  status: ApiAsyncWithdrawalStatus;
-}
-
 export interface ApiMarket {
   marketId: number
   symbol: string

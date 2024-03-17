@@ -1,9 +1,15 @@
 import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { BigNumber as ZapBigNumber, DolomiteZap, MinimalApiToken, ZapOutputParam } from '@dolomite-exchange/zap-sdk';
+import {
+  ApiAsyncAction,
+  BigNumber as ZapBigNumber,
+  DolomiteZap,
+  MinimalApiToken,
+  ZapOutputParam,
+} from '@dolomite-exchange/zap-sdk';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
-import { ApiAccount, ApiAsyncAction, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
+import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
 import { DECIMAL_BASE, getAmountsForLiquidation, getOwedPriceForLiquidation, getPartial } from '../lib/math-utils';
@@ -211,7 +217,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   const owedMarket = marketMap[owedBalance.marketId];
   const heldMarket = marketMap[heldBalance.marketId];
   const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskParams);
-  const { owedWei, heldWei } = getAmountsForLiquidation(
+  const { owedWei, heldWei, isVaporizable } = getAmountsForLiquidation(
     owedBalance.wei.abs(),
     owedPriceAdj,
     heldBalance.wei.abs(),
@@ -273,63 +279,13 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     Object.keys(marketIdToActionsMap).length === 0
     && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
   ) {
-    const outputMarketIds = zap.getAsyncAssetOutputMarketsByMarketId(new ZapBigNumber(heldMarket.marketId));
-    if (!outputMarketIds) {
-      Logger.error({
-        message: `Could not find output markets for ${heldMarket.marketId.toString()}`,
-      });
-      return Promise.reject(new Error(`Could not find output markets for ${heldMarket.marketId.toString()}`));
-    }
-
-    const zapResults = await Promise.all(
-      outputMarketIds.map(outputMarketId => {
-        const outputMarket = marketMap[outputMarketId.toFixed()];
-        if (!outputMarket) {
-          Logger.error({
-            message: 'Could not retrieve oracle prices for async liquidation',
-            heldMarket: heldMarket.marketId.toString(),
-            outputMarket: outputMarketId.toFixed(),
-          })
-        }
-
-        const heldToken: MinimalApiToken = {
-          marketId: new ZapBigNumber(heldMarket.marketId),
-          symbol: heldMarket.symbol,
-        };
-        const outputToken: MinimalApiToken = {
-          marketId: new ZapBigNumber(outputMarket.marketId),
-          symbol: outputMarket.symbol,
-        };
-        const heldPrice = heldMarket.oraclePrice;
-        const reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
-        const outputPriceAdj = outputMarket.oraclePrice.plus(
-          getPartial(outputMarket.oraclePrice, reward, DECIMAL_BASE),
-        );
-        const minOutputAmount = heldBalance.wei.times(heldPrice).div(outputPriceAdj);
-        return zap.getSwapExactTokensForTokensParams(
-          heldToken,
-          new ZapBigNumber(heldBalance.wei.toFixed()),
-          outputToken,
-          new ZapBigNumber(minOutputAmount.toFixed()),
-          solidAccount.owner,
-          {
-            isLiquidation: true,
-            gasPriceInWei: new ZapBigNumber(getGasPriceWei().toFixed()),
-            subAccountNumber: new ZapBigNumber(liquidAccount.number.toFixed()),
-          }
-        );
-      }),
-    );
-
-    return prepareForLiquidation(
+    return _prepareLiquidationForAsyncMarket(
       liquidAccount,
-      new BigNumber(heldMarket.marketId),
-      heldBalance.wei,
-      new BigNumber(outputMarketId.toFixed()),
-      new BigNumber(minOutputAmount.toFixed()),
-      undefined,
-      extraData,
-    )
+      heldMarket,
+      heldBalance,
+      marketMap,
+      riskParams,
+    );
   } else {
     Logger.info({
       message: 'Performing liquidation via generic liquidity',
@@ -362,9 +318,20 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
         { isLiquidation: true },
       );
     } else {
-      outputs =
-    ??
-        ?;
+      const marketToOracleMap = Object.keys(marketMap).reduce((acc, marketId) => {
+        acc[marketId] = new ZapBigNumber(marketMap[marketId].oraclePrice.toFixed());
+        return acc;
+      }, {});
+      outputs = await zap.getSwapExactAsyncTokensForTokensParamsForLiquidation(
+        heldToken,
+        new ZapBigNumber(heldWei),
+        owedToken,
+        new ZapBigNumber(owedWei),
+        solidAccount.owner,
+        marketIdToActionsMap,
+        marketToOracleMap,
+        { isLiquidation: true, isVaporizable },
+      );
     }
 
     let firstError: unknown;
@@ -407,7 +374,7 @@ async function _liquidateExpiredAccountInternalSimple(
   owedMarketIds: Integer[] = owedPreferences,
 ): Promise<TxResult> {
   if (marginAccountToActionsMap[expiredAccount.id]) {
-    return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple liquidations on async account'));
+    return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple expirations on async account'));
   }
 
   const preferredHeldBalances = heldMarketIds.reduce<ApiBalance[]>((memo, marketId) => {
@@ -463,18 +430,124 @@ async function _liquidateExpiredAccountInternalSimple(
   );
 }
 
-// async function _liquidateAsyncAccount(
-//   liquidAccount: ApiAccount,
-//   asyncMarketId: Integer,
-//   expirationTimestamp: DateTime | undefined,
-// ): Promise<TxResult> {
-//   return prepareForLiquidation(
-//     liquidAccount,
-//     asyncMarketId,
-//     inputAmount,
-//     outputMarketId,
-//     minOutputAmount,
-//     expirationTimestamp?.toSeconds(),
-//     extraData,
-//   )
-// }
+async function _prepareLiquidationForAsyncMarket(
+  liquidAccount: ApiAccount,
+  heldMarket: ApiMarket,
+  heldBalance: ApiBalance,
+  marketMap: Record<string, ApiMarket>,
+  riskParams: ApiRiskParam,
+): Promise<TxResult> {
+  const outputMarketIds = zap.getAsyncAssetOutputMarketsByMarketId(new ZapBigNumber(heldMarket.marketId));
+  if (!outputMarketIds) {
+    Logger.error({
+      message: `Could not find output markets for ${heldMarket.marketId.toString()}`,
+      heldMarket: {
+        ...heldMarket,
+        oraclePrice: heldMarket.oraclePrice.toFixed(),
+      },
+    });
+    return Promise.reject(new Error(`Could not find output markets for ${heldMarket.marketId.toString()}`));
+  }
+
+  const zapResults = await Promise.all(
+    outputMarketIds.map(outputMarketId => {
+      const outputMarket = marketMap[outputMarketId.toFixed()];
+      if (!outputMarket) {
+        Logger.error({
+          message: 'Could not retrieve oracle prices for async liquidation',
+          heldMarket: heldMarket.marketId.toString(),
+          outputMarket: outputMarketId.toFixed(),
+        })
+      }
+
+      const heldToken: MinimalApiToken = {
+        marketId: new ZapBigNumber(heldMarket.marketId),
+        symbol: heldMarket.symbol,
+      };
+      const outputToken: MinimalApiToken = {
+        marketId: new ZapBigNumber(outputMarket.marketId),
+        symbol: outputMarket.symbol,
+      };
+      const heldPrice = heldMarket.oraclePrice;
+      const reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
+      const outputPriceAdj = outputMarket.oraclePrice.plus(
+        getPartial(outputMarket.oraclePrice, reward, DECIMAL_BASE),
+      );
+      const minOutputAmount = heldBalance.wei.times(heldPrice).div(outputPriceAdj);
+      return zap.getSwapExactTokensForTokensParams(
+        heldToken,
+        new ZapBigNumber(heldBalance.wei.toFixed()),
+        outputToken,
+        new ZapBigNumber(minOutputAmount.toFixed()),
+        solidAccount.owner,
+        {
+          isLiquidation: true,
+          gasPriceInWei: new ZapBigNumber(getGasPriceWei().toFixed()),
+          subAccountNumber: new ZapBigNumber(liquidAccount.number.toFixed()),
+          disallowAggregator: true,
+        },
+      );
+    }),
+  );
+
+  const bestZapResult = zapResults.reduce<ZapOutputParam | undefined>((best, zapResult) => {
+    const other = zapResult[0];
+    if (!best) {
+      return zapResult[0];
+    }
+    if (!other) {
+      return best;
+    }
+
+    const bestOutputMarket = marketMap[best.marketIdsPath[best.marketIdsPath.length - 1].toFixed()];
+    const otherOutputMarket = marketMap[other.marketIdsPath[other.marketIdsPath.length - 1].toFixed()];
+    if (!bestOutputMarket || !otherOutputMarket) {
+      return best;
+    }
+
+    const bestExpectedOut = best.expectedAmountOut.times(bestOutputMarket.oraclePrice);
+    const otherExpectedOut = other.expectedAmountOut.times(otherOutputMarket.oraclePrice);
+    return bestExpectedOut.gt(otherExpectedOut) ? best : other;
+  }, undefined)
+
+  if (!bestZapResult) {
+    const message = `Could not find valid zap for ${heldMarket.marketId.toString()}`;
+    Logger.error({
+      message,
+      heldMarket: {
+        ...heldMarket,
+        oraclePrice: heldMarket.oraclePrice.toFixed(),
+      },
+    });
+    return Promise.reject(new Error(message));
+  } else if (!bestZapResult.executionFee || bestZapResult.executionFee.eq(INTEGERS.ZERO)) {
+    const message = `Zap does not have an execution fee for ${heldMarket.marketId.toString()}`;
+    Logger.error({
+      message,
+      heldMarket: {
+        ...heldMarket,
+        oraclePrice: heldMarket.oraclePrice.toFixed(),
+      },
+    });
+    return Promise.reject(new Error(message));
+  } else if (bestZapResult.marketIdsPath.length !== 2) {
+    const message = 'Zap markets path must be of length 2';
+    Logger.error({
+      message,
+    });
+    return Promise.reject(new Error(message));
+  }
+
+  return prepareForLiquidation(
+    liquidAccount,
+    new BigNumber(heldMarket.marketId),
+    heldBalance.wei,
+    new BigNumber(bestZapResult.marketIdsPath[bestZapResult.marketIdsPath.length - 1].toFixed()),
+    new BigNumber(bestZapResult.originalAmountOutMin.toFixed()),
+    undefined,
+    bestZapResult.traderParams[0].tradeData,
+    {
+      value: bestZapResult.executionFee.toFixed(),
+    },
+  );
+}

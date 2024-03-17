@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import { dolomite } from '../../src/helpers/web3';
 import AccountStore from '../../src/stores/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
+import AsyncActionStore from '../../src/stores/async-action-store';
 import BlockStore from '../../src/stores/block-store';
 import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
 import { LiquidationMode } from '../../src/lib/liquidation-mode';
@@ -15,6 +16,7 @@ jest.mock('@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOp
 describe('dolomite-liquidator', () => {
   let blockStore: BlockStore;
   let accountStore: AccountStore;
+  let asyncActionStore: AsyncActionStore;
   let marketStore: MarketStore;
   let liquidationStore: LiquidationStore;
   let dolomiteLiquidator: DolomiteLiquidator;
@@ -29,10 +31,12 @@ describe('dolomite-liquidator', () => {
     blockStore = new BlockStore();
     marketStore = new MarketStore(blockStore);
     accountStore = new AccountStore(blockStore, marketStore);
+    asyncActionStore = new AsyncActionStore(blockStore);
     liquidationStore = new LiquidationStore();
     riskParamsStore = new RiskParamsStore(blockStore);
     dolomiteLiquidator = new DolomiteLiquidator(
       accountStore,
+      asyncActionStore,
       blockStore,
       marketStore,
       liquidationStore,

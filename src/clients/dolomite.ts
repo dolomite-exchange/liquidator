@@ -1,18 +1,21 @@
 /* eslint-disable max-len */
 import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
+import {
+  ApiAsyncActionType,
+  ApiAsyncDeposit,
+  ApiAsyncWithdrawal,
+  ApiToken as ZapApiToken,
+  BigNumber as ZapBigNumber,
+} from '@dolomite-exchange/zap-sdk';
 import axios from 'axios';
 import * as ethers from 'ethers';
 import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
-  ApiAsyncActionType,
-  ApiAsyncDeposit,
-  ApiAsyncWithdrawal,
   ApiBalance,
   ApiMarket,
   ApiRiskParam,
-  ApiToken,
   MarketIndex,
   TotalValueLockedAndFees,
 } from '../lib/api-types';
@@ -492,10 +495,10 @@ export async function getTotalTransactions(startBlockNumber: number, endBlockNum
   return new BigNumber(end[0].transactionCount).minus(start[0].transactionCount);
 }
 
-function mapGraphqlTokenToApiToken(token: GraphqlToken): ApiToken {
+function mapGraphqlTokenToZapApiToken(token: GraphqlToken): ZapApiToken {
   return {
     tokenAddress: token.id,
-    marketId: new BigNumber(token.marketId),
+    marketId: new ZapBigNumber(token.marketId),
     decimals: parseInt(token.decimals, 10),
     symbol: token.symbol,
     name: token.name,
@@ -519,6 +522,7 @@ export async function getRetryableAsyncDeposits(
           orderBy: id
         ) {
           id
+          key
           marginAccount {
             user {
               id
@@ -565,14 +569,15 @@ export async function getRetryableAsyncDeposits(
       const outputValueBase = TEN_BI.pow(deposit.outputToken.decimals)
       return {
         id: deposit.id,
+        key: deposit.key,
         actionType: ApiAsyncActionType.DEPOSIT,
         owner: deposit.marginAccount.user.id.toLowerCase(),
-        accountNumber: new BigNumber(deposit.marginAccount.accountNumber),
+        accountNumber: new ZapBigNumber(deposit.marginAccount.accountNumber),
         status: deposit.status,
-        inputToken: mapGraphqlTokenToApiToken(deposit.outputToken),
-        inputAmount: new BigNumber(deposit.minOutputAmount).times(outputValueBase),
-        outputToken: mapGraphqlTokenToApiToken(deposit.inputToken),
-        outputAmount: new BigNumber(deposit.inputAmount).times(inputValueBase),
+        inputToken: mapGraphqlTokenToZapApiToken(deposit.outputToken),
+        inputAmount: new ZapBigNumber(deposit.minOutputAmount).times(outputValueBase),
+        outputToken: mapGraphqlTokenToZapApiToken(deposit.inputToken),
+        outputAmount: new ZapBigNumber(deposit.inputAmount).times(inputValueBase),
       };
     }));
 
@@ -596,6 +601,7 @@ export async function getRetryableAsyncWithdrawals(
           orderBy: id
         ) {
           id
+          key
           marginAccount {
             user {
               id
@@ -642,14 +648,15 @@ export async function getRetryableAsyncWithdrawals(
       const outputValueBase = TEN_BI.pow(withdrawal.outputToken.decimals)
       return {
         id: withdrawal.id,
+        key: withdrawal.key,
         actionType: ApiAsyncActionType.WITHDRAWAL,
         owner: withdrawal.marginAccount.user.id.toLowerCase(),
-        accountNumber: new BigNumber(withdrawal.marginAccount.accountNumber),
+        accountNumber: new ZapBigNumber(withdrawal.marginAccount.accountNumber),
         status: withdrawal.status,
-        inputToken: mapGraphqlTokenToApiToken(withdrawal.inputToken),
-        inputAmount: new BigNumber(withdrawal.inputAmount).times(inputValueBase),
-        outputToken: mapGraphqlTokenToApiToken(withdrawal.outputToken),
-        outputAmount: new BigNumber(withdrawal.outputAmount).times(outputValueBase),
+        inputToken: mapGraphqlTokenToZapApiToken(withdrawal.inputToken),
+        inputAmount: new ZapBigNumber(withdrawal.inputAmount).times(inputValueBase),
+        outputToken: mapGraphqlTokenToZapApiToken(withdrawal.outputToken),
+        outputAmount: new ZapBigNumber(withdrawal.outputAmount).times(outputValueBase),
       };
     }));
 

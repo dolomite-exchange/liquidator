@@ -1,5 +1,5 @@
+import { ApiAsyncAction } from '@dolomite-exchange/zap-sdk';
 import { getRetryableAsyncDeposits, getRetryableAsyncWithdrawals } from '../clients/dolomite';
-import { ApiAsyncAction } from '../lib/api-types';
 import { delay } from '../lib/delay';
 import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
@@ -73,7 +73,7 @@ export default class AsyncActionStore {
       ...await Pageable.getPageableValues(async (lastId) => {
         const { withdrawals } = await getRetryableAsyncWithdrawals(blockNumber, lastId);
         return withdrawals;
-      })
+      }),
     ];
 
     this.marginAccountToRetryableAsyncActions = allActions.reduce<Record<string, ApiAsyncAction[]>>((acc, action) => {

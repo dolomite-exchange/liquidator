@@ -1,4 +1,4 @@
-import { ApiAsyncDepositStatus, ApiAsyncWithdrawalStatus } from './api-types';
+import { ApiAsyncDepositStatus, ApiAsyncWithdrawalStatus } from '@dolomite-exchange/zap-sdk';
 
 export interface GraphqlToken {
   id: string;
@@ -10,6 +10,7 @@ export interface GraphqlToken {
 
 export interface GraphqlAsyncDeposit {
   id: string;
+  key: string;
   marginAccount: {
     user: {
       id: string
@@ -26,6 +27,7 @@ export interface GraphqlAsyncDeposit {
 
 export interface GraphqlAsyncWithdrawal {
   id: string;
+  key: string;
   marginAccount: {
     user: {
       id: string

@@ -47,10 +47,10 @@ export function getAmountsForLiquidation(
   owedPriceAdj: Integer,
   maxHeldWei: Integer,
   heldPrice: Integer,
-): { owedWei: Integer, heldWei: Integer } {
+): { owedWei: Integer, heldWei: Integer, isVaporizable: boolean } {
   if (owedWei.times(owedPriceAdj).gt(maxHeldWei.times(heldPrice))) {
-    return { owedWei: heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj), heldWei: maxHeldWei };
+    return { owedWei: heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj), heldWei: maxHeldWei, isVaporizable: true };
   } else {
-    return { owedWei, heldWei: owedWeiToHeldWei(owedWei, owedPriceAdj, heldPrice) };
+    return { owedWei, heldWei: owedWeiToHeldWei(owedWei, owedPriceAdj, heldPrice), isVaporizable: false };
   }
 }
