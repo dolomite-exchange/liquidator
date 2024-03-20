@@ -67,8 +67,8 @@ export default class AsyncActionStore {
     // don't set the field variables until both values have been retrieved from the network
     const allActions = [
       ...await Pageable.getPageableValues(async (lastId) => {
-        const { deposits } = await getRetryableAsyncDeposits(blockNumber, lastId);
-        return deposits;
+        const { withdrawals } = await getRetryableAsyncDeposits(blockNumber, lastId);
+        return withdrawals;
       }),
       ...await Pageable.getPageableValues(async (lastId) => {
         const { withdrawals } = await getRetryableAsyncWithdrawals(blockNumber, lastId);

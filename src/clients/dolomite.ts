@@ -2,8 +2,8 @@
 import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import {
+  ApiAsyncAction,
   ApiAsyncActionType,
-  ApiAsyncDeposit,
   ApiAsyncWithdrawal,
   ApiToken as ZapApiToken,
   BigNumber as ZapBigNumber,
@@ -505,11 +505,15 @@ function mapGraphqlTokenToZapApiToken(token: GraphqlToken): ZapApiToken {
   }
 }
 
+/**
+ * Despite the name of this function, we return the data as Withdrawals, since it's used for undoing a deposit (aka
+ * withdrawing)
+ */
 export async function getRetryableAsyncDeposits(
   blockNumber: number,
   lastId: string | undefined,
-): Promise<{ deposits: ApiAsyncDeposit[] }> {
-  const deposits: ApiAsyncDeposit[] = await axios.post(
+): Promise<{ withdrawals: ApiAsyncAction[] }> {
+  const withdrawals: ApiAsyncAction[] = await axios.post(
     subgraphUrl,
     {
       query: `query getAsyncDeposits(
@@ -564,24 +568,24 @@ export async function getRetryableAsyncDeposits(
         return (response as GraphqlAsyncDepositResult).data.asyncDeposits;
       }
     })
-    .then(graphqlDeposits => graphqlDeposits.map<ApiAsyncDeposit>(deposit => {
-      const inputValueBase = TEN_BI.pow(deposit.inputToken.decimals)
-      const outputValueBase = TEN_BI.pow(deposit.outputToken.decimals)
+    .then(graphqlDeposits => graphqlDeposits.map<ApiAsyncAction>(withdrawal => {
+      const inputValueBase = TEN_BI.pow(withdrawal.inputToken.decimals)
+      const outputValueBase = TEN_BI.pow(withdrawal.outputToken.decimals)
       return {
-        id: deposit.id,
-        key: deposit.key,
+        id: withdrawal.id,
+        key: withdrawal.key,
         actionType: ApiAsyncActionType.DEPOSIT,
-        owner: deposit.marginAccount.user.id.toLowerCase(),
-        accountNumber: new ZapBigNumber(deposit.marginAccount.accountNumber),
-        status: deposit.status,
-        inputToken: mapGraphqlTokenToZapApiToken(deposit.outputToken),
-        inputAmount: new ZapBigNumber(deposit.minOutputAmount).times(outputValueBase),
-        outputToken: mapGraphqlTokenToZapApiToken(deposit.inputToken),
-        outputAmount: new ZapBigNumber(deposit.inputAmount).times(inputValueBase),
+        owner: withdrawal.marginAccount.user.id.toLowerCase(),
+        accountNumber: new ZapBigNumber(withdrawal.marginAccount.accountNumber),
+        status: withdrawal.status,
+        inputToken: mapGraphqlTokenToZapApiToken(withdrawal.outputToken),
+        inputAmount: new ZapBigNumber(withdrawal.minOutputAmount).times(outputValueBase).integerValue(),
+        outputToken: mapGraphqlTokenToZapApiToken(withdrawal.inputToken),
+        outputAmount: new ZapBigNumber(withdrawal.inputAmount).times(inputValueBase).integerValue(),
       };
     }));
 
-  return { deposits };
+  return { withdrawals };
 }
 
 export async function getRetryableAsyncWithdrawals(
@@ -654,9 +658,9 @@ export async function getRetryableAsyncWithdrawals(
         accountNumber: new ZapBigNumber(withdrawal.marginAccount.accountNumber),
         status: withdrawal.status,
         inputToken: mapGraphqlTokenToZapApiToken(withdrawal.inputToken),
-        inputAmount: new ZapBigNumber(withdrawal.inputAmount).times(inputValueBase),
+        inputAmount: new ZapBigNumber(withdrawal.inputAmount).times(inputValueBase).integerValue(),
         outputToken: mapGraphqlTokenToZapApiToken(withdrawal.outputToken),
-        outputAmount: new ZapBigNumber(withdrawal.outputAmount).times(outputValueBase),
+        outputAmount: new ZapBigNumber(withdrawal.outputAmount).times(outputValueBase).integerValue(),
       };
     }));
 

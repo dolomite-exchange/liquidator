@@ -1,19 +1,18 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
-import { liquidateAccount, liquidateExpiredAccount } from '../helpers/dolomite-helpers';
+import { liquidateAccount, liquidateExpiredAccount, retryAsyncAction } from '../helpers/dolomite-helpers';
 import { isExpired } from '../helpers/time-helpers';
 import AccountStore from '../stores/account-store';
-import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
-import { delay } from './delay';
+import AsyncActionStore from '../stores/async-action-store';
+import BlockStore from '../stores/block-store';
 import LiquidationStore from '../stores/liquidation-store';
-import Logger from './logger';
 import MarketStore from '../stores/market-store';
 import RiskParamsStore from '../stores/risk-params-store';
-import BlockStore from '../stores/block-store';
-import AsyncActionStore from '../stores/async-action-store';
+import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
+import { delay } from './delay';
+import Logger from './logger';
 
 export default class DolomiteLiquidator {
-
   private BASE = new BigNumber('1000000000000000000');
   private MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
 
@@ -100,12 +99,41 @@ export default class DolomiteLiquidator {
     expirableAccounts = expirableAccounts.filter((ea) => !liquidatableAccounts.find((la) => la.id === ea.id));
 
     const marginAccountToActionsMap = this.asyncActionStore.getMarginAccountToRetryableActionsMap();
+    const retryableActions = Object.values(
+      liquidatableAccounts.reduce((acc, account) => {
+        delete acc[account.id];
+        return acc;
+      }, { ...marginAccountToActionsMap }),
+    );
+    if (retryableActions.length > 0) {
+      for (let i = 0; i < retryableActions.length; i += 1) {
+        const action = retryableActions[i][0];
+        try {
+          const result = await retryAsyncAction(action);
+          if (result) {
+            Logger.info({
+              message: 'Retry action transaction hash:',
+              transactionHash: result?.transactionHash,
+            });
+          }
+          await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
+        } catch (error: any) {
+          Logger.error({
+            at: 'DolomiteLiquidator#_liquidateAccounts',
+            message: 'Failed to retry action',
+            actions: action,
+            error,
+          });
+        }
+      }
+    }
 
     if (liquidatableAccounts.length === 0 && expirableAccounts.length === 0) {
       Logger.info({
         at: 'DolomiteLiquidator#_liquidateAccounts',
         message: 'No accounts to liquidate',
       });
+
       return;
     }
 
@@ -120,7 +148,7 @@ export default class DolomiteLiquidator {
           marketMap,
           riskParams,
           marginAccountToActionsMap,
-          lastBlockTimestamp
+          lastBlockTimestamp,
         );
         if (result) {
           Logger.info({
@@ -147,7 +175,7 @@ export default class DolomiteLiquidator {
           marketMap,
           riskParams,
           marginAccountToActionsMap,
-          lastBlockTimestamp
+          lastBlockTimestamp,
         );
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
         if (result) {

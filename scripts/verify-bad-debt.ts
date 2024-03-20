@@ -16,6 +16,10 @@ const TEN = new BigNumber('10');
 
 const TICKERS_TO_IGNORE = ['djUSDC'];
 
+const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
+
+const ONE_DOLLAR = new BigNumber(10).pow(36);
+
 function formatApiBalance(balance: ApiBalance): string {
   return `${balance.wei.div(TEN.pow(balance.tokenDecimals)).toFixed(6)} ${balance.tokenSymbol}`;
 }
@@ -74,8 +78,6 @@ async function start() {
       borrowAdj: INTEGERS.ZERO,
       supplyAdj: INTEGERS.ZERO,
     };
-    const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
-    const ONE_DOLLAR = new BigNumber(10).pow(36);
     const {
       supply,
       borrow,
@@ -99,13 +101,15 @@ async function start() {
       }, initial);
 
     if (borrow.gt(supply)) {
-      Logger.warn({
-        message: 'Found bad debt!',
-        account: account.id,
-        markets: Object.values(account.balances).map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
-        supplyUSD: supply.toFixed(6),
-        borrowUSD: borrow.toFixed(6),
-      });
+      if (borrow.gt(SMALL_BORROW_THRESHOLD.times(ONE_DOLLAR))) {
+        Logger.warn({
+          message: 'Found bad debt for more than $0.01',
+          account: account.id,
+          markets: Object.values(account.balances).map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
+          supplyUSD: supply.toFixed(6),
+          borrowUSD: borrow.toFixed(6),
+        });
+      }
 
       return memo.concat({
         ...account,

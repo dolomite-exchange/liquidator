@@ -12,8 +12,8 @@ import { DateTime } from 'luxon';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
-import { DECIMAL_BASE, getAmountsForLiquidation, getOwedPriceForLiquidation, getPartial } from '../lib/math-utils';
-import { prepareForLiquidation } from './async-liquidations-helper';
+import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/math-utils';
+import { prepareForLiquidation, retryDepositOrWithdrawalAction } from './async-liquidations-helper';
 import { _getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei } from './gas-price-helpers';
 import { dolomite } from './web3';
@@ -49,6 +49,28 @@ const zap = new DolomiteZap({
   gasMultiplier: new ZapBigNumber(2),
 });
 
+export async function retryAsyncAction(action: ApiAsyncAction): Promise<TxResult | undefined> {
+  Logger.info({
+    at: 'dolomite-helpers#retryAsyncAction',
+    message: 'Starting retry for async action',
+    accountOwner: action.owner,
+    accountNumber: action.accountNumber.toFixed(),
+  });
+
+  const converter = zap.getIsolationModeConverterByMarketId(action.inputToken.marketId);
+  if (!converter) {
+    Logger.error({
+      at: 'dolomite-helpers#retryAsyncAction',
+      message: 'Could not find converter',
+      id: action.id,
+      marketId: action.inputToken.marketId.toFixed(),
+    });
+    return undefined;
+  }
+
+  return retryDepositOrWithdrawalAction(action, converter);
+}
+
 export async function liquidateAccount(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
@@ -80,7 +102,7 @@ export async function liquidateAccount(
       accountNumber: liquidAccount.number,
     });
 
-    return undefined;
+    return undefined
   }
 
   const borrowMarkets: string[] = [];
@@ -284,7 +306,6 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       heldMarket,
       heldBalance,
       marketMap,
-      riskParams,
     );
   } else {
     Logger.info({
@@ -435,7 +456,6 @@ async function _prepareLiquidationForAsyncMarket(
   heldMarket: ApiMarket,
   heldBalance: ApiBalance,
   marketMap: Record<string, ApiMarket>,
-  riskParams: ApiRiskParam,
 ): Promise<TxResult> {
   const outputMarketIds = zap.getAsyncAssetOutputMarketsByMarketId(new ZapBigNumber(heldMarket.marketId));
   if (!outputMarketIds) {
@@ -468,17 +488,11 @@ async function _prepareLiquidationForAsyncMarket(
         marketId: new ZapBigNumber(outputMarket.marketId),
         symbol: outputMarket.symbol,
       };
-      const heldPrice = heldMarket.oraclePrice;
-      const reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
-      const outputPriceAdj = outputMarket.oraclePrice.plus(
-        getPartial(outputMarket.oraclePrice, reward, DECIMAL_BASE),
-      );
-      const minOutputAmount = heldBalance.wei.times(heldPrice).div(outputPriceAdj);
       return zap.getSwapExactTokensForTokensParams(
         heldToken,
         new ZapBigNumber(heldBalance.wei.toFixed()),
         outputToken,
-        new ZapBigNumber(minOutputAmount.toFixed()),
+        new ZapBigNumber('1'),
         solidAccount.owner,
         {
           isLiquidation: true,
@@ -543,7 +557,7 @@ async function _prepareLiquidationForAsyncMarket(
     new BigNumber(heldMarket.marketId),
     heldBalance.wei,
     new BigNumber(bestZapResult.marketIdsPath[bestZapResult.marketIdsPath.length - 1].toFixed()),
-    new BigNumber(bestZapResult.originalAmountOutMin.toFixed()),
+    new BigNumber(bestZapResult.amountWeisPath[bestZapResult.marketIdsPath.length - 1].toFixed()),
     undefined,
     bestZapResult.traderParams[0].tradeData,
     {
