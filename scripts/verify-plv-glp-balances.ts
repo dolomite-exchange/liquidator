@@ -4,12 +4,12 @@ import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/stores/block-store';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/stores/market-store';
 import Pageable from '../src/lib/pageable';
+import BlockStore from '../src/stores/block-store';
+import MarketStore from '../src/stores/market-store';
 import plvGlpFarmAbi from './abis/plv-glp-farm.json';
-import './lib/env-reader';
+import '../src/lib/env';
 
 const PLV_GLP_MARKET_ID = 9;
 const PLV_GLP_TOKEN_ADDRESS = '0x5326E71Ff593Ecc2CF7AcaE5Fe57582D6e74CFF1';

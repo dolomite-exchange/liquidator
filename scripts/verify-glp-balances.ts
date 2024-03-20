@@ -4,13 +4,13 @@ import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/stores/block-store';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/stores/market-store';
 import Pageable from '../src/lib/pageable';
+import BlockStore from '../src/stores/block-store';
+import MarketStore from '../src/stores/market-store';
 import GlpIsolationModeVaultAbi from './abis/glp-isolation-mode-vault.json';
 import vGlpAbi from './abis/gmx-vester.json';
-import './lib/env-reader';
+import '../src/lib/env';
 
 const GLP_MARKET_ID = 6;
 const GLP_TOKEN_ADDRESS = '0x1aDDD80E6039594eE970E5872D247bf0414C8903';

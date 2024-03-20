@@ -6,11 +6,11 @@ import {
 } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/stores/block-store';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/stores/market-store';
 import Pageable from '../src/lib/pageable';
-import './lib/env-reader';
+import BlockStore from '../src/stores/block-store';
+import MarketStore from '../src/stores/market-store';
+import '../src/lib/env';
 
 async function start() {
   const blockStore = new BlockStore();

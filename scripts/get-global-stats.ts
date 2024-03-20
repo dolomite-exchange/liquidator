@@ -8,7 +8,7 @@ import {
   getTotalValueLockedAndFees,
 } from '../src/clients/dolomite';
 import Logger from '../src/lib/logger';
-import './lib/env-reader';
+import '../src/lib/env';
 
 const ONE_DAY_SECONDS = 86_400;
 

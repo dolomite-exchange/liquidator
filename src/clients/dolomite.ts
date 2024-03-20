@@ -44,6 +44,7 @@ const subgraphUrl = process.env.SUBGRAPH_URL ?? '';
 if (!subgraphUrl) {
   throw new Error('SUBGRAPH_URL is not set')
 }
+console.log('subgraphUrl', subgraphUrl);
 
 async function getAccounts(
   marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } },

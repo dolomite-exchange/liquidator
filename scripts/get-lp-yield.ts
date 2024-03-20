@@ -1,5 +1,5 @@
 /** @formatter:off */
-import './lib/env-reader';
+import '../src/lib/env';
 /** @formatter:on */
 import { address, BigNumber } from '@dolomite-exchange/dolomite-margin';
 import v8 from 'v8';
