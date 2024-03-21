@@ -5,8 +5,6 @@ import '../src/lib/env';
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
 import { dolomite, initializeDolomiteLiquidations, loadAccounts } from './helpers/web3';
-import AccountStore from './stores/account-store';
-import BlockStore from './stores/block-store';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
@@ -22,11 +20,13 @@ import {
   checkPrivateKey,
 } from './lib/invariants';
 import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
-import LiquidationStore from './stores/liquidation-store';
 import Logger from './lib/logger';
+import AccountStore from './stores/account-store';
+import AsyncActionStore from './stores/async-action-store';
+import BlockStore from './stores/block-store';
+import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
 import RiskParamsStore from './stores/risk-params-store';
-import AsyncActionStore from './stores/async-action-store';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -161,15 +161,16 @@ async function start() {
     await initializeDolomiteLiquidations();
   }
 
+  blockStore.start();
   accountStore.start();
   marketStore.start();
   riskParamsStore.start();
   gasPriceUpdater.start();
 
   if (
-    process.env.LIQUIDATIONS_ENABLED === 'true' ||
-    process.env.EXPIRATIONS_ENABLED === 'true' ||
-    process.env.ASYNC_ACTIONS_ENABLED === 'true'
+    process.env.LIQUIDATIONS_ENABLED === 'true'
+    || process.env.EXPIRATIONS_ENABLED === 'true'
+    || process.env.ASYNC_ACTIONS_ENABLED === 'true'
   ) {
     dolomiteLiquidator.start();
   }
