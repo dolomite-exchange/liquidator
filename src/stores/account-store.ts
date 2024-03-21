@@ -79,7 +79,6 @@ export default class AccountStore {
       const { accounts } = await getExpiredAccounts(marketIndexMap, blockNumber, lastId);
       return accounts;
     });
-    console.log('nextLiquidatableDolomiteAccounts', nextLiquidatableDolomiteAccounts.length);
 
     // don't set the field variables until both values have been retrieved from the network
     this.liquidatableDolomiteAccounts = nextLiquidatableDolomiteAccounts;
