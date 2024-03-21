@@ -46,7 +46,7 @@ checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
-checkDuration('INITIAL_GAS_PRICE_WEI', 1);
+checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkDuration('LIQUIDATE_POLL_INTERVAL_MS', 1000);
 checkDuration('LIQUIDATION_KEY_EXPIRATION_SECONDS', 1, /* isMillis = */ false);
 checkBooleanValue('LIQUIDATIONS_ENABLED');
@@ -164,7 +164,7 @@ async function start() {
 
   // Star the block store and wait to finish the first round of polling
   blockStore.start();
-  await sleep(process.env.BLOCK_POLL_INTERVAL_MS);
+  await sleep(Number(process.env.BLOCK_POLL_INTERVAL_MS));
 
   marketStore.start();
   accountStore.start();

@@ -14,7 +14,7 @@ const solidAccountOwner = process.env.ACCOUNT_WALLET_ADDRESS as string;
 
 const isolationModeFreezableLiquidatorProxy = new dolomite.web3.eth.Contract(
   IsolationModeFreezableLiquidatorProxyAbi,
-  ModuleDeployments.LiquidatorProxyV4WithGenericTraderOld[process.env.NETWORK_ID].address,
+  ModuleDeployments.LiquidatorProxyV4WithGenericTraderOld[process.env.NETWORK_ID as string].address,
 );
 
 export async function retryDepositOrWithdrawalAction(

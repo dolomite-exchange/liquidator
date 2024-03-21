@@ -11,7 +11,6 @@ const subgraphUrl = process.env.BLOCKS_SUBGRAPH_URL ?? '';
 if (!subgraphUrl) {
   throw new Error('BLOCKS_SUBGRAPH_URL is not set')
 }
-console.log('subgraphUrl', subgraphUrl);
 
 interface LatestBlockNumberAndTimestamp {
   blockNumber: number;
