@@ -1,3 +1,4 @@
+import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import v8 from 'v8';
 // eslint-disable-next-line
 import '../src/lib/env';
@@ -161,9 +162,12 @@ async function start() {
     await initializeDolomiteLiquidations();
   }
 
+  // Star the block store and wait to finish the first round of polling
   blockStore.start();
-  accountStore.start();
+  await sleep(process.env.BLOCK_POLL_INTERVAL_MS);
+
   marketStore.start();
+  accountStore.start();
   riskParamsStore.start();
   gasPriceUpdater.start();
 
