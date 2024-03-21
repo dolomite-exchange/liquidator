@@ -13,7 +13,7 @@ USER dolomite
 WORKDIR /home/dolomite/app
 
 COPY ./.env* ./
-COPY ./package.json ./package-lock.json ./
+COPY ./package.json ./yarn.lock ./
 RUN yarn install --frozen-lockfile
 
 COPY ./src ./src
