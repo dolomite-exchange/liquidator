@@ -24,6 +24,7 @@ import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
 import Logger from './lib/logger';
 import AccountStore from './stores/account-store';
 import AsyncActionStore from './stores/async-action-store';
+import BalanceStore from './stores/balance-store';
 import BlockStore from './stores/block-store';
 import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
@@ -34,6 +35,7 @@ checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
 checkBooleanValue('ASYNC_ACTIONS_ENABLED');
 checkDuration('ASYNC_ACTIONS_POLL_INTERVAL_MS', 1000);
+checkDuration('BALANCE_POLL_INTERVAL_MS', 1000);
 checkDuration('BLOCK_POLL_INTERVAL_MS', 1000);
 checkLiquidationModeConditionally(
   LiquidationMode.Simple,
@@ -73,6 +75,7 @@ async function start() {
   const marketStore = new MarketStore(blockStore);
   const accountStore = new AccountStore(blockStore, marketStore);
   const asyncActionStore = new AsyncActionStore(blockStore);
+  const balanceStore = new BalanceStore(marketStore);
   const liquidationStore = new LiquidationStore();
   const riskParamsStore = new RiskParamsStore(blockStore);
   const dolomiteLiquidator = new DolomiteLiquidator(
@@ -80,6 +83,7 @@ async function start() {
     asyncActionStore,
     blockStore,
     marketStore,
+    balanceStore,
     liquidationStore,
     riskParamsStore,
   );
@@ -167,6 +171,7 @@ async function start() {
   await sleep(Number(process.env.BLOCK_POLL_INTERVAL_MS));
 
   marketStore.start();
+  balanceStore.start();
   accountStore.start();
   riskParamsStore.start();
   gasPriceUpdater.start();

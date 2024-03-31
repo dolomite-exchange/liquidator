@@ -4,6 +4,7 @@ import { dolomite } from '../../src/helpers/web3';
 import AccountStore from '../../src/stores/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
 import AsyncActionStore from '../../src/stores/async-action-store';
+import BalanceStore from '../../src/stores/balance-store';
 import BlockStore from '../../src/stores/block-store';
 import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
 import { LiquidationMode } from '../../src/lib/liquidation-mode';
@@ -18,6 +19,7 @@ describe('dolomite-liquidator', () => {
   let accountStore: AccountStore;
   let asyncActionStore: AsyncActionStore;
   let marketStore: MarketStore;
+  let balanceStore: BalanceStore;
   let liquidationStore: LiquidationStore;
   let dolomiteLiquidator: DolomiteLiquidator;
   let riskParamsStore: RiskParamsStore;
@@ -30,6 +32,7 @@ describe('dolomite-liquidator', () => {
     jest.clearAllMocks();
     blockStore = new BlockStore();
     marketStore = new MarketStore(blockStore);
+    balanceStore = new BalanceStore(marketStore);
     accountStore = new AccountStore(blockStore, marketStore);
     asyncActionStore = new AsyncActionStore(blockStore);
     liquidationStore = new LiquidationStore();
@@ -39,6 +42,7 @@ describe('dolomite-liquidator', () => {
       asyncActionStore,
       blockStore,
       marketStore,
+      balanceStore,
       liquidationStore,
       riskParamsStore,
     );
@@ -255,6 +259,7 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
+      isBorrowingDisabled: false,
     },
     {
       marketId: 1,
@@ -265,6 +270,7 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
+      isBorrowingDisabled: false,
     },
     {
       marketId: 2,
@@ -275,6 +281,7 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
+      isBorrowingDisabled: false,
     },
     {
       marketId: 3,
@@ -285,6 +292,7 @@ function getTestMarkets(): ApiMarket[] {
       marginPremium: new BigNumber('0'),
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
+      isBorrowingDisabled: false,
     },
   ];
 }

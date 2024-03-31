@@ -4,6 +4,7 @@ import { liquidateAccount, liquidateExpiredAccount, retryAsyncAction } from '../
 import { isExpired } from '../helpers/time-helpers';
 import AccountStore from '../stores/account-store';
 import AsyncActionStore from '../stores/async-action-store';
+import BalanceStore from '../stores/balance-store';
 import BlockStore from '../stores/block-store';
 import LiquidationStore from '../stores/liquidation-store';
 import MarketStore from '../stores/market-store';
@@ -21,6 +22,7 @@ export default class DolomiteLiquidator {
     private readonly asyncActionStore: AsyncActionStore,
     private readonly blockStore: BlockStore,
     private readonly marketStore: MarketStore,
+    private readonly balanceStore: BalanceStore,
     private readonly liquidationStore: LiquidationStore,
     private readonly riskParamsStore: RiskParamsStore,
   ) {
@@ -146,6 +148,7 @@ export default class DolomiteLiquidator {
         const result = await liquidateAccount(
           account,
           marketMap,
+          this.balanceStore.getMarketBalancesMap(),
           riskParams,
           marginAccountToActionsMap,
           lastBlockTimestamp,
@@ -173,6 +176,7 @@ export default class DolomiteLiquidator {
         const result = await liquidateExpiredAccount(
           account,
           marketMap,
+          this.balanceStore.getMarketBalancesMap(),
           riskParams,
           marginAccountToActionsMap,
           lastBlockTimestamp,

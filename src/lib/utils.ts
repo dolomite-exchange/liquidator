@@ -45,12 +45,26 @@ export function getOwedPriceForLiquidation(
 export function getAmountsForLiquidation(
   owedWei: Integer,
   owedPriceAdj: Integer,
-  maxHeldWei: Integer,
+  heldWei: Integer,
   heldPrice: Integer,
+  heldBalance: Integer,
 ): { owedWei: Integer, heldWei: Integer, isVaporizable: boolean } {
+  const maxHeldWei = heldBalance.lt(heldWei) ? heldBalance : heldWei;
   if (owedWei.times(owedPriceAdj).gt(maxHeldWei.times(heldPrice))) {
     return { owedWei: heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj), heldWei: maxHeldWei, isVaporizable: true };
   } else {
     return { owedWei, heldWei: owedWeiToHeldWei(owedWei, owedPriceAdj, heldPrice), isVaporizable: false };
   }
+}
+
+export function chunkArray<T>(inputArray: T[], chunkSize: number): T[][] {
+  const arrayLength = inputArray.length;
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < arrayLength; index += chunkSize) {
+    const chunk = inputArray.slice(index, index + chunkSize);
+    chunks.push(chunk);
+  }
+
+  return chunks;
 }

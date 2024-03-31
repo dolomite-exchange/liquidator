@@ -12,9 +12,9 @@ import { DateTime } from 'luxon';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
-import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/math-utils';
+import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/utils';
 import { prepareForLiquidation, retryDepositOrWithdrawalAction } from './async-liquidations-helper';
-import { _getLargestBalanceUSD } from './balance-helpers';
+import { getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei } from './gas-price-helpers';
 import { dolomite } from './web3';
 
@@ -74,6 +74,7 @@ export async function retryAsyncAction(action: ApiAsyncAction): Promise<TxResult
 export async function liquidateAccount(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
+  balanceMap: { [marketId: string]: Integer },
   riskParams: ApiRiskParam,
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
@@ -124,7 +125,7 @@ export async function liquidateAccount(
   }
 
   if (supplyMarkets.length === 0) {
-    return Promise.reject(new Error('Supposedly liquidatable account has no collateral'));
+    return Promise.reject(new Error('Supposedly liquidatable account has no supplies'));
   }
 
   const liquidationMode = getLiquidationMode();
@@ -132,6 +133,7 @@ export async function liquidateAccount(
     return _liquidateAccountAndSellWithGenericLiquidity(
       liquidAccount,
       marketMap,
+      balanceMap,
       riskParams,
       marginAccountToActionsMap,
       lastBlockTimestamp,
@@ -147,6 +149,7 @@ export async function liquidateAccount(
 export async function liquidateExpiredAccount(
   expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
+  balanceMap: { [marketId: string]: Integer },
   riskParams: ApiRiskParam,
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
@@ -167,6 +170,7 @@ export async function liquidateExpiredAccount(
     return _liquidateAccountAndSellWithGenericLiquidity(
       expiredAccount,
       marketMap,
+      balanceMap,
       riskParams,
       marginAccountToActionsMap,
       lastBlockTimestamp,
@@ -217,22 +221,25 @@ async function _liquidateAccountSimple(
 async function _liquidateAccountAndSellWithGenericLiquidity(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
+  balanceMap: { [marketId: string]: Integer },
   riskParams: ApiRiskParam,
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
   isExpiring: boolean,
 ): Promise<TxResult> {
-  const owedBalance = _getLargestBalanceUSD(
+  const owedBalance = getLargestBalanceUSD(
     Object.values(liquidAccount.balances),
     true,
     marketMap,
+    balanceMap,
     lastBlockTimestamp,
     isExpiring,
   );
-  const heldBalance = _getLargestBalanceUSD(
+  const heldBalance = getLargestBalanceUSD(
     Object.values(liquidAccount.balances),
     false,
     marketMap,
+    balanceMap,
     lastBlockTimestamp,
     isExpiring,
   );
@@ -244,6 +251,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     owedPriceAdj,
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
+    balanceMap[heldBalance.marketId] ?? INTEGERS.MAX_UINT,
   );
   /* eslint-disable @typescript-eslint/indent */
   const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])
@@ -413,17 +421,19 @@ async function _liquidateExpiredAccountInternalSimple(
     return memo
   }, []);
   const preferredBalances = [...preferredHeldBalances, ...preferredOwedBalances];
-  const owedBalance = _getLargestBalanceUSD(
+  const owedBalance = getLargestBalanceUSD(
     preferredBalances,
     true,
     marketMap,
+    {},
     lastBlockTimestamp,
     true,
   );
-  const heldBalance = _getLargestBalanceUSD(
+  const heldBalance = getLargestBalanceUSD(
     preferredBalances,
     false,
     marketMap,
+    {},
     lastBlockTimestamp,
     true,
   );

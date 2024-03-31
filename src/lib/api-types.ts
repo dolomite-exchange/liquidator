@@ -31,14 +31,15 @@ export interface ApiAccount {
 }
 
 export interface ApiMarket {
-  marketId: number
-  symbol: string
-  name: string
-  tokenAddress: address
-  decimals: number
-  oraclePrice: Integer
-  marginPremium: Integer
-  liquidationRewardPremium: Integer
+  marketId: number;
+  symbol: string;
+  name: string;
+  tokenAddress: address;
+  decimals: number;
+  oraclePrice: Integer;
+  marginPremium: Integer;
+  liquidationRewardPremium: Integer;
+  isBorrowingDisabled: boolean;
 }
 
 export interface ApiRiskParam {
