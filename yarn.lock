@@ -367,10 +367,10 @@
   resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.0.5.tgz#c234f9568da20be40617918753598db8a4827f0b"
   integrity sha512-Jbl5oAV/sAosLYEyO9kyOI5GVkpNXW5iMFt+GsNpt5RprjdQx22LYmtVgqwfsAIc7bo8etXIsgwNYATTB3LLXg==
 
-"@dolomite-exchange/zap-sdk@^0.2.35":
-  version "0.2.35"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.2.35.tgz#a72ae7ad189ad6da8a7d3f05e3e574ead784df88"
-  integrity sha512-NlEt0sN8eHFrFpLpN02+faRIYVGWrZTN2aFovA/gK0A80vtOq3Imxmb4fypBQCGWO6gESHyFxU87hfuOhQR5Mg==
+"@dolomite-exchange/zap-sdk@^0.2.36":
+  version "0.2.36"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.2.36.tgz#946d615c4efbaaa101dfb63a4d81986ad778b1fc"
+  integrity sha512-12hgTRm+WW2lxsr8phf2/q1BQCh/CxzdqcQGWr1Wb6Le0MLDjscJx68DtMBWZAGGogFPkUV20bkNnL3e3UN9jw==
   dependencies:
     "@dolomite-exchange/modules-deployments" "^0.0.5"
     "@pendle/sdk-v2" "^2.8.2"
