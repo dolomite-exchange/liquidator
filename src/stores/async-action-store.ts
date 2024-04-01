@@ -88,6 +88,7 @@ export default class AsyncActionStore {
     Logger.info({
       at: 'AsyncActionStore#_update',
       message: 'Finished updating async actions',
+      blockNumber,
     });
   };
 }

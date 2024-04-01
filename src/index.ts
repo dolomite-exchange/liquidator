@@ -176,6 +176,10 @@ async function start() {
   riskParamsStore.start();
   gasPriceUpdater.start();
 
+  if (process.env.ASYNC_ACTIONS_ENABLED === 'true') {
+    asyncActionStore.start();
+  }
+
   if (
     process.env.LIQUIDATIONS_ENABLED === 'true'
     || process.env.EXPIRATIONS_ENABLED === 'true'

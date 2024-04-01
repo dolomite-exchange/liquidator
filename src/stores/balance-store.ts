@@ -39,6 +39,8 @@ export default class BalanceStore {
   };
 
   _poll = async () => {
+    await delay(Number(process.env.MARKET_POLL_INTERVAL_MS));
+
     // noinspection InfiniteLoopJS
     for (; ;) {
       try {

@@ -519,7 +519,8 @@ export async function getRetryableAsyncDeposits(
     subgraphUrl,
     {
       query: `query getAsyncDeposits(
-        $blockNumber: Int!
+        $blockNumber: Int,
+        $lastId: ID
       ) {
         asyncDeposits(
           where: { isRetryable: true, id_gt: $lastId }
@@ -598,7 +599,8 @@ export async function getRetryableAsyncWithdrawals(
     subgraphUrl,
     {
       query: `query getAsyncWithdrawals(
-        $blockNumber: Int!
+        $blockNumber: Int,
+        $lastId: ID
       ) {
         asyncWithdrawals(
           where: { isRetryable: true, id_gt: $lastId }
