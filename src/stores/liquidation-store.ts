@@ -14,7 +14,7 @@ export default class LiquidationStore {
     return `${account.owner.toLowerCase()}-${account.number}`;
   }
 
-  async add(account: ApiAccount) {
+  add(account: ApiAccount) {
     if (!account) {
       throw new Error('Must specify account');
     }

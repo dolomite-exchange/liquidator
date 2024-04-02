@@ -3,6 +3,7 @@ import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Consta
 import { liquidateAccount, liquidateExpiredAccount, retryAsyncAction } from '../helpers/dolomite-helpers';
 import { isExpired } from '../helpers/time-helpers';
 import AccountStore from '../stores/account-store';
+import AsyncActionRetryStore from '../stores/async-action-retry-store';
 import AsyncActionStore from '../stores/async-action-store';
 import BalanceStore from '../stores/balance-store';
 import BlockStore from '../stores/block-store';
@@ -20,6 +21,7 @@ export default class DolomiteLiquidator {
   constructor(
     private readonly accountStore: AccountStore,
     private readonly asyncActionStore: AsyncActionStore,
+    private readonly asyncActionRetryStore: AsyncActionRetryStore,
     private readonly blockStore: BlockStore,
     private readonly marketStore: MarketStore,
     private readonly balanceStore: BalanceStore,
@@ -110,22 +112,26 @@ export default class DolomiteLiquidator {
     if (retryableActions.length > 0) {
       for (let i = 0; i < retryableActions.length; i += 1) {
         const action = retryableActions[i][0];
-        try {
-          const result = await retryAsyncAction(action);
-          if (result) {
-            Logger.info({
-              message: 'Retry action transaction hash:',
-              transactionHash: result?.transactionHash,
+        if (!this.asyncActionRetryStore.contains(action)) {
+          this.asyncActionRetryStore.add(action);
+          try {
+            const result = await retryAsyncAction(action);
+            if (result) {
+              Logger.info({
+                message: 'Retry action transaction hash:',
+                transactionHash: result?.transactionHash,
+              });
+            }
+            await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
+          } catch (error: any) {
+            Logger.error({
+              at: 'DolomiteLiquidator#_liquidateAccounts',
+              message: 'Failed to retry action',
+              actions: action,
+              error,
             });
           }
-          await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
-        } catch (error: any) {
-          Logger.error({
-            at: 'DolomiteLiquidator#_liquidateAccounts',
-            message: 'Failed to retry action',
-            actions: action,
-            error,
-          });
+
         }
       }
     }

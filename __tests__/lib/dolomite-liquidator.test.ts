@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import { dolomite } from '../../src/helpers/web3';
 import AccountStore from '../../src/stores/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
+import AsyncActionRetryStore from '../../src/stores/async-action-retry-store';
 import AsyncActionStore from '../../src/stores/async-action-store';
 import BalanceStore from '../../src/stores/balance-store';
 import BlockStore from '../../src/stores/block-store';
@@ -18,6 +19,7 @@ describe('dolomite-liquidator', () => {
   let blockStore: BlockStore;
   let accountStore: AccountStore;
   let asyncActionStore: AsyncActionStore;
+  let asyncActionRetryStore: AsyncActionRetryStore;
   let marketStore: MarketStore;
   let balanceStore: BalanceStore;
   let liquidationStore: LiquidationStore;
@@ -35,11 +37,13 @@ describe('dolomite-liquidator', () => {
     balanceStore = new BalanceStore(marketStore);
     accountStore = new AccountStore(blockStore, marketStore);
     asyncActionStore = new AsyncActionStore(blockStore);
+    asyncActionRetryStore = new AsyncActionRetryStore();
     liquidationStore = new LiquidationStore();
     riskParamsStore = new RiskParamsStore(blockStore);
     dolomiteLiquidator = new DolomiteLiquidator(
       accountStore,
       asyncActionStore,
+      asyncActionRetryStore,
       blockStore,
       marketStore,
       balanceStore,

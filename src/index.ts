@@ -23,6 +23,7 @@ import {
 import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
 import Logger from './lib/logger';
 import AccountStore from './stores/account-store';
+import AsyncActionRetryStore from './stores/async-action-retry-store';
 import AsyncActionStore from './stores/async-action-store';
 import BalanceStore from './stores/balance-store';
 import BlockStore from './stores/block-store';
@@ -34,6 +35,7 @@ checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
 checkBooleanValue('ASYNC_ACTIONS_ENABLED');
+checkDuration('ASYNC_ACTIONS_KEY_EXPIRATION_SECONDS', 1, /* isMillis = */ false);
 checkDuration('ASYNC_ACTIONS_POLL_INTERVAL_MS', 1000);
 checkDuration('BALANCE_POLL_INTERVAL_MS', 1000);
 checkDuration('BLOCK_POLL_INTERVAL_MS', 1000);
@@ -75,12 +77,14 @@ async function start() {
   const marketStore = new MarketStore(blockStore);
   const accountStore = new AccountStore(blockStore, marketStore);
   const asyncActionStore = new AsyncActionStore(blockStore);
+  const asyncActionRetryStore = new AsyncActionRetryStore();
   const balanceStore = new BalanceStore(marketStore);
   const liquidationStore = new LiquidationStore();
   const riskParamsStore = new RiskParamsStore(blockStore);
   const dolomiteLiquidator = new DolomiteLiquidator(
     accountStore,
     asyncActionStore,
+    asyncActionRetryStore,
     blockStore,
     marketStore,
     balanceStore,
@@ -112,6 +116,8 @@ async function start() {
   Logger.info({
     message: 'DolomiteMargin data',
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
+    asyncActionsEnabled: process.env.ASYNC_ACTIONS_ENABLED,
+    asyncActionsKeyExpirationSeconds: process.env.ASYNC_ACTIONS_KEY_EXPIRATION_SECONDS,
     dolomiteAccountNumber: process.env.DOLOMITE_ACCOUNT_NUMBER,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
