@@ -345,10 +345,10 @@
     enabled "2.0.x"
     kuler "^2.0.0"
 
-"@dolomite-exchange/dolomite-margin@^0.11.3":
-  version "0.11.3"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.11.3.tgz#7af2aa9b2eea355f098a1622831a4f9ad551f383"
-  integrity sha512-PaeJ9ULwReHWmneSJXqSw18inoX2F9G7+eE5CIQTvTrdEDqI0eburFiXiXBxgn57DmPVBY7K/KpNUtqmqUNgDw==
+"@dolomite-exchange/dolomite-margin@^0.11.4":
+  version "0.11.4"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.11.4.tgz#faeb66fd200bd97987bd12e8216b7119fa7f6e01"
+  integrity sha512-OEb5+NJUC3spN6nnq9Lg3fryoGXKxSfp8+wfiSkRxx0k7Y///Yv0eaY1cg+/BfKMcBWWsuHsZs3eJwpU272dCQ==
   dependencies:
     "@openzeppelin/contracts" "^2.5.1"
     "@types/web3" "1.0.18"

@@ -147,10 +147,12 @@ async function start() {
 
   Logger.info({
     message: `Found ${smallLiquidBorrowCount} liquidatable accounts with small borrow positions`,
+    smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFixed(4)}`,
   });
 
   Logger.info({
     message: `Found ${smallAlmostLiquidBorrowCount} almost liquidatable accounts with small borrow positions`,
+    smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFixed(4)}`,
   });
 
   if (accountsWithBadDebt.length === 0) {
