@@ -17,6 +17,10 @@ const TEN = new BigNumber('10');
 const TICKERS_TO_IGNORE = ['djUSDC'];
 
 const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
+const MARGIN_PREMIUM_SPECULATIVE = undefined;
+// const MARGIN_PREMIUM_SPECULATIVE = new BigNumber('86956521739130434'); // 125% collateralization
+// const MARGIN_PREMIUM_SPECULATIVE = new BigNumber('156521739130434782'); // 133% collateralization
+// const MARGIN_PREMIUM_SPECULATIVE = new BigNumber('304347826086956521'); // 150% collateralization
 
 const ONE_DOLLAR = new BigNumber(10).pow(36);
 
@@ -87,7 +91,9 @@ async function start() {
       .reduce((acc, balance) => {
         const market = marketMap[balance.marketId.toString()];
         const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR);
-        const adjust = MARGIN_PREMIUM_BASE.plus(market.marginPremium);
+        const adjust = MARGIN_PREMIUM_BASE.plus(
+          (market.marketId === 30 && MARGIN_PREMIUM_SPECULATIVE) ? MARGIN_PREMIUM_SPECULATIVE : market.marginPremium,
+        );
         if (balance.wei.lt(INTEGERS.ZERO)) {
           // increase the borrow size by the premium
           acc.borrow = acc.borrow.plus(value.abs());

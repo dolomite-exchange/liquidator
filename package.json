@@ -17,6 +17,7 @@
     "execute:get-lp-yield": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-lp-yield.ts",
     "execute:get-yt-glp-balances": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-yt-glp-balances.ts",
     "execute:get-total-active-users": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/get-total-active-users.ts",
+    "execute:migrate-market": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum npx ts-node scripts/migrate-market.ts",
     "execute:verify-bad-debt": "npx ts-node scripts/verify-bad-debt.ts",
     "execute:verify-glp-balances": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/verify-glp-balances.ts",
     "execute:verify-plv-glp-balances": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/verify-plv-glp-balances.ts",
@@ -34,7 +35,7 @@
   "homepage": "https://github.com/dolomite-exchange/liquidator#readme",
   "dependencies": {
     "@dolomite-exchange/dolomite-margin": "^0.11.4",
-    "@dolomite-exchange/zap-sdk": "^0.2.41",
+    "@dolomite-exchange/zap-sdk": "^0.2.42",
     "axios": "^1.1.3",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",

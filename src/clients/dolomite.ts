@@ -1,5 +1,6 @@
 /* eslint-disable max-len */
 import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import {
   ApiAsyncAction,
@@ -8,12 +9,14 @@ import {
   ApiToken as ZapApiToken,
   BigNumber as ZapBigNumber,
 } from '@dolomite-exchange/zap-sdk';
+import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import axios from 'axios';
 import * as ethers from 'ethers';
 import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
   ApiBalance,
+  ApiIsolationModeVaultAccount,
   ApiMarket,
   ApiRiskParam,
   MarketIndex,
@@ -21,20 +24,26 @@ import {
 } from '../lib/api-types';
 import { TEN_BI } from '../lib/constants';
 import {
+  GraphqlAccount,
   GraphqlAccountResult,
   GraphqlAmmDataForUserResult,
   GraphqlAmmLiquidityPosition,
   GraphqlAmmPairData,
   GraphqlAsyncDepositResult,
   GraphqlAsyncWithdrawalResult,
+  GraphqlInterestIndex,
   GraphqlInterestRate,
   GraphqlMarketResult,
+  GraphqlOraclePrice,
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
   GraphqlToken,
+  GraphqlTokenValue,
 } from '../lib/graphql-types';
+import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
 import '../lib/env';
+import { chunkArray } from '../lib/utils';
 
 const defaultAxiosConfig = {
   headers: { 'Accept-Encoding': 'gzip,deflate,compress' },
@@ -45,13 +54,31 @@ if (!subgraphUrl) {
   throw new Error('SUBGRAPH_URL is not set')
 }
 
+const marginAccountFields = `
+                  id
+                  user {
+                    id
+                  }
+                  accountNumber
+                  tokenValues {
+                    token {
+                      id
+                      marketId
+                      decimals
+                      symbol
+                    }
+                    valuePar
+                    expirationTimestamp
+                    expiryAddress
+                  }
+`
+
 async function getAccounts(
-  marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } },
+  marketIndexMap: { [marketId: string]: MarketIndex },
   query: string,
   blockNumber: number,
   lastId: string | undefined,
 ): Promise<{ accounts: ApiAccount[] }> {
-  const decimalBase = new BigNumber('1000000000000000000');
   const accounts: ApiAccount[] = await axios.post(
     subgraphUrl,
     {
@@ -72,33 +99,7 @@ async function getAccounts(
       }
     })
     .then(graphqlAccounts => graphqlAccounts.map<ApiAccount>(account => {
-      const balances = account.tokenValues.reduce<{ [marketNumber: string]: ApiBalance }>((memo, value) => {
-        const tokenBase = TEN_BI.pow(value.token.decimals);
-        const valuePar = new BigNumber(value.valuePar).times(tokenBase);
-        const indexObject = marketIndexMap[value.token.marketId];
-        const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply).times(decimalBase);
-        memo[value.token.marketId] = {
-          marketId: Number(value.token.marketId),
-          tokenName: value.token.name,
-          tokenSymbol: value.token.symbol,
-          tokenDecimals: Number.parseInt(value.token.decimals, 10),
-          tokenAddress: value.token.id,
-          par: valuePar,
-          wei: new BigNumber(valuePar).times(index)
-            .div(decimalBase)
-            .integerValue(BigNumber.ROUND_HALF_UP),
-          expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
-          expiryAddress: value.expiryAddress,
-        };
-        return memo;
-      }, {});
-      return {
-        id: `${account.user.id.toLowerCase()}-${account.accountNumber}`,
-        owner: account.user.id.toLowerCase(),
-        number: new BigNumber(account.accountNumber),
-        effectiveUser: account.user.effectiveUser?.id.toLowerCase(), // unavailable on the Liquidator subgraph
-        balances,
-      };
+      return mapGraphqlAccountToApiAccount(account, marketIndexMap)
     }));
 
   return { accounts };
@@ -117,23 +118,7 @@ export async function getLiquidatableDolomiteAccounts(
                   orderBy: id
                   first: ${Pageable.MAX_PAGE_SIZE}
                 ) {
-                  id
-                  user {
-                    id
-                  }
-                  accountNumber
-                  tokenValues {
-                    token {
-                      id
-                      marketId
-                      decimals
-                      symbol
-                    }
-                    valuePar
-                    expirationTimestamp
-                    expiryAddress
-                  }
-                }
+                ${marginAccountFields}
               }`;
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
@@ -175,6 +160,100 @@ export async function getAllDolomiteAccountsWithSupplyValue(
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
 
+export async function getAllIsolationModeVaultAddresses(
+  isolationModeTokenAddress: string,
+  blockNumber: number,
+  lastId: string | undefined,
+): Promise<{ vaultAccounts: ApiIsolationModeVaultAccount[] }> {
+  const query = `
+    query getAllAccountsByIsolationModeToken($blockNumber: Int, $isolationModeToken: String, $lastId: ID) {
+      isolationModeVaultReverseLookups(
+        where: { token: $isolationModeToken, id_gt: $lastId }
+        block: { number: $blockNumber }
+        orderBy: id
+        first: 1000
+      ) {
+        id
+        vault {
+          id
+        }
+      }
+    }
+`;
+  const vaultAccounts = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        blockNumber,
+        isolationModeToken: isolationModeTokenAddress.toLowerCase(),
+        lastId: lastId ?? '',
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then((response: any) => {
+      if (response.errors && typeof response.errors === 'object') {
+        return Promise.reject((response.errors as any)[0]);
+      } else {
+        return (response as any).data.isolationModeVaultReverseLookups as any[];
+      }
+    })
+    .then(graphqlAccounts => graphqlAccounts.map<ApiIsolationModeVaultAccount>(account => ({
+      id: account.id,
+      vault: account.vault.id,
+    })));
+  return { vaultAccounts };
+}
+
+export async function getApiAccountsFromAddresses(
+  isolationModeVaults: string[],
+  marketIndexMap: { [marketId: string]: MarketIndex },
+  blockNumber: number,
+): Promise<{ accounts: ApiAccount[] }> {
+  const query = `
+    query getAccountsByAddresses($blockNumber: Int) {
+      ${isolationModeVaults.map((vault, i) => {
+    return `
+          account_${i}:marginAccounts(
+            where: { user: "${vault.toLowerCase()}" }
+            block: { number: $blockNumber }
+            first: 1000
+          ) {
+            ${marginAccountFields}
+          }
+          `
+  }).join('')}
+    }
+`;
+  const accounts = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        blockNumber,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then((response: any) => {
+      if (response.errors && typeof response.errors === 'object') {
+        return Promise.reject((response.errors as any)[0]);
+      } else {
+        const graphAccounts: GraphqlAccount[] = [];
+        isolationModeVaults.forEach((_, i) => graphAccounts.push(...(response as any).data[`account_${i}`]));
+        return graphAccounts;
+      }
+    })
+    .then(graphqlAccounts => graphqlAccounts.map<ApiAccount>(account => {
+      return mapGraphqlAccountToApiAccount(account, marketIndexMap);
+    }));
+
+  return { accounts };
+}
+
 export async function getExpiredAccounts(
   marketIndexMap: { [marketId: string]: MarketIndex },
   blockNumber: number,
@@ -188,24 +267,7 @@ export async function getExpiredAccounts(
                   orderBy: id
                   first: ${Pageable.MAX_PAGE_SIZE}
                 ) {
-                  id
-                  user {
-                    id
-                  }
-                  accountNumber
-                  tokenValues {
-                    token {
-                      id
-                      marketId
-                      name
-                      symbol
-                      decimals
-                    }
-                    valuePar
-                    expirationTimestamp
-                    expiryAddress
-                  }
-                }
+                ${marginAccountFields}
               }`;
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
@@ -321,7 +383,7 @@ export async function getTimestampToBlockNumberMap(timestamps: number[]): Promis
   let queries = '';
   timestamps.forEach(timestamp => {
     queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 15}, timestamp_lt: ${timestamp
-    + 15} } first: 1) { number }`
+    + 15} } first: 1) { number }\n`
   });
   const result = await axios.post(
     `${process.env.SUBGRAPH_BLOCKS_URL}`,
@@ -344,16 +406,18 @@ export async function getTimestampToBlockNumberMap(timestamps: number[]): Promis
 export interface TotalYield {
   totalEntries: number
   swapYield: Decimal
+  lpLendingYield: Decimal
   lendingYield: Decimal
   totalYield: Decimal
 }
 
-export async function getTotalAmmPairYield(blockNumbers: number[], user: address): Promise<TotalYield> {
-  const queryChunks = blockNumbers.reduce<string[]>((memo, blockNumber, i) => {
-    if (!memo[Math.floor(i / 100)]) {
-      memo[Math.floor(i / 100)] = '';
-    }
-    memo[Math.floor(i / 100)] += `
+const chunkCount = 25;
+
+export async function getTotalYield(blockNumbers: number[], user: address): Promise<TotalYield> {
+  const blockNumberChunks = chunkArray(blockNumbers, chunkCount);
+  const queryChunks = blockNumberChunks.reduce<string[]>((memo, blockNumberChunk) => {
+    memo.push(
+      blockNumberChunk.map(blockNumber => `
       ammPair_${blockNumber}:ammPairs(where: { id: "0xb77a493a4950cad1b049e222d62bce14ff423c6f" } block: { number: ${blockNumber} }) {
         volumeUSD
         reserveUSD
@@ -361,22 +425,42 @@ export async function getTotalAmmPairYield(blockNumbers: number[], user: address
         reserve1
         totalSupply
       }
-      wethInterestRate_${blockNumber}:interestRates(where: {id: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1" } block: { number: ${blockNumber} }) {
+      interestRates_${blockNumber}:interestRates(block: { number: ${blockNumber} }) {
         supplyInterestRate
+        token {
+          id
+        }
       }
-      usdcInterestRate_${blockNumber}:interestRates(where: {id: "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8" } block: { number: ${blockNumber} }) {
-        supplyInterestRate
+      interestIndexes_${blockNumber}:interestIndexes(block: { number: ${blockNumber} }) {
+        supplyIndex
+        token {
+          id
+        }
       }
-      ammLiquidityPosition_${blockNumber}:ammLiquidityPositions(where: { user: "${user}"} block: { number: ${blockNumber} }) {
+      oraclePrices_${blockNumber}:oraclePrices(block: { number: ${blockNumber} }) {
+        price
+        token {
+          id
+        }
+      }
+      ammLiquidityPosition_${blockNumber}:ammLiquidityPositions(where: { user: "${user}" } block: { number: ${blockNumber} }) {
         liquidityTokenBalance
       }
-    `
+      marginAccounts_${blockNumber}:marginAccountTokenValues(where: { effectiveUser: "${user}" } block: { number: ${blockNumber} }) {
+        valuePar
+        token {
+          id
+        }
+      }
+    `).join('\n'),
+    );
     return memo;
   }, []);
 
   const totalYield: TotalYield = {
     totalEntries: 0,
     swapYield: new BigNumber(0),
+    lpLendingYield: new BigNumber(0),
     lendingYield: new BigNumber(0),
     totalYield: new BigNumber(0),
   }
@@ -392,11 +476,15 @@ export async function getTotalAmmPairYield(blockNumbers: number[], user: address
     )
       .then(response => response.data)
       .then(json => json as GraphqlAmmDataForUserResult);
-    const tempTotalYield = reduceResultIntoTotalYield(result, blockNumbers);
+    const tempTotalYield = reduceResultIntoTotalYield(result, blockNumberChunks[i]);
     totalYield.totalEntries += tempTotalYield.totalEntries;
     totalYield.swapYield = totalYield.swapYield.plus(tempTotalYield.swapYield);
     totalYield.lendingYield = totalYield.lendingYield.plus(tempTotalYield.lendingYield);
     totalYield.totalYield = totalYield.totalYield.plus(tempTotalYield.totalYield);
+    Logger.info({
+      message: 'Sleeping for 3s to reduce rate limiting...',
+    })
+    await sleep(3000);
   }
 
   return totalYield;
@@ -671,6 +759,40 @@ export async function getRetryableAsyncWithdrawals(
   return { withdrawals };
 }
 
+function mapGraphqlAccountToApiAccount(
+  account: GraphqlAccount,
+  marketIndexMap: { [marketId: string]: MarketIndex },
+): ApiAccount {
+  const decimalBase = new BigNumber('1000000000000000000');
+  const balances = account.tokenValues.reduce<{ [marketNumber: string]: ApiBalance }>((memo, value) => {
+    const tokenBase = TEN_BI.pow(value.token.decimals);
+    const valuePar = new BigNumber(value.valuePar).times(tokenBase);
+    const indexObject = marketIndexMap[value.token.marketId];
+    const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply).times(decimalBase);
+    memo[value.token.marketId] = {
+      marketId: Number(value.token.marketId),
+      tokenName: value.token.name,
+      tokenSymbol: value.token.symbol,
+      tokenDecimals: Number.parseInt(value.token.decimals, 10),
+      tokenAddress: value.token.id,
+      par: valuePar,
+      wei: new BigNumber(valuePar).times(index)
+        .div(decimalBase)
+        .integerValue(BigNumber.ROUND_HALF_UP),
+      expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
+      expiryAddress: value.expiryAddress,
+    };
+    return memo;
+  }, {});
+  return {
+    id: `${account.user.id.toLowerCase()}-${account.accountNumber}`,
+    owner: account.user.id.toLowerCase(),
+    number: new BigNumber(account.accountNumber),
+    effectiveUser: account.user.effectiveUser?.id.toLowerCase(), // unavailable on the Liquidator subgraph
+    balances,
+  };
+}
+
 function reduceResultIntoTotalYield(
   result: GraphqlAmmDataForUserResult,
   blockNumbers: number[],
@@ -681,29 +803,72 @@ function reduceResultIntoTotalYield(
     const blockNumberYesterday = i === 0 ? undefined : blockNumbersAsc[i - 1];
     const ammPair = result.data[`ammPair_${blockNumber}`]?.[0] as GraphqlAmmPairData | undefined;
     const ammPairYesterday = result.data[`ammPair_${blockNumberYesterday}`]?.[0] as GraphqlAmmPairData | undefined;
-    const wethInterestRateStruct = result.data[`wethInterestRate_${blockNumber}`]?.[0] as GraphqlInterestRate | undefined;
-    const usdcInterestRateStruct = result.data[`usdcInterestRate_${blockNumber}`]?.[0] as GraphqlInterestRate | undefined;
+    const interestRateMap = (result.data[`interestRates_${blockNumber}`] as GraphqlInterestRate[])?.reduce<Record<string, BigNumber>>(
+      (map, interestRate) => {
+        map[interestRate.token.id] = new BigNumber(interestRate.supplyInterestRate).div(365);
+        return map;
+      },
+      {},
+    );
+    const interestIndexMap = (result.data[`interestIndexes_${blockNumber}`] as GraphqlInterestIndex[])?.reduce<Record<string, BigNumber>>(
+      (map, interestIndex) => {
+        map[interestIndex.token.id] = new BigNumber(interestIndex.supplyIndex);
+        return map;
+      },
+      {},
+    );
+    const oraclePriceMap = (result.data[`oraclePrices_${blockNumber}`] as GraphqlOraclePrice[])?.reduce<Record<string, BigNumber>>(
+      (map, price) => {
+        map[price.token.id] = new BigNumber(price.price);
+        return map;
+      },
+      {},
+    );
     const ammLiquidityPosition = result.data[`ammLiquidityPosition_${blockNumber}`]?.[0] as GraphqlAmmLiquidityPosition | undefined;
-    if (!ammPair || !ammPairYesterday || !wethInterestRateStruct || !usdcInterestRateStruct || !ammLiquidityPosition) {
+    if (!ammPair || !interestRateMap || !interestIndexMap || !oraclePriceMap) {
       return memo
     }
-    const wethInterestRate = new BigNumber(wethInterestRateStruct.supplyInterestRate).div(365);
-    const usdcInterestRate = new BigNumber(usdcInterestRateStruct.supplyInterestRate).div(365);
 
-    const ratio = new BigNumber(ammLiquidityPosition.liquidityTokenBalance).div(ammPair.totalSupply);
-    const lendingYield = wethInterestRate.plus(usdcInterestRate).div(2).times(ratio).times(ammPair.reserveUSD);
-    const volumeUSD = new BigNumber(ammPair.volumeUSD).minus(ammPairYesterday.volumeUSD);
-    const swapYield = volumeUSD.times(ratio).times(0.003);
-    const totalYield = lendingYield.plus(swapYield);
+    const wethInterestRate = interestRateMap['0x82af49447d8a07e3bd95bd0d56f35241523fbab1'];
+    const bridgedUsdcInterestRate = interestRateMap['0xff970a61a04b1ca14834a43f5de4533ebddb5cc8'];
+    const equityPercent = ammLiquidityPosition
+      ? new BigNumber(ammLiquidityPosition.liquidityTokenBalance).div(ammPair.totalSupply)
+      : INTEGERS.ZERO;
+    const lpLendingYield = wethInterestRate.plus(bridgedUsdcInterestRate)
+      .div(2)
+      .times(equityPercent)
+      .times(ammPair.reserveUSD);
+    const volumeUSD = ammPairYesterday
+      ? new BigNumber(ammPair.volumeUSD).minus(ammPairYesterday.volumeUSD)
+      : INTEGERS.ZERO;
+    const swapYield = volumeUSD.times(equityPercent).times(0.003);
+
+    const lendingYield = (result.data[`marginAccounts_${blockNumber}`] as GraphqlTokenValue[]).reduce((
+      valueUsd,
+      tokenValue,
+    ) => {
+      const valuePar = new BigNumber(tokenValue.valuePar);
+      if (valuePar.eq(INTEGERS.ZERO)) {
+        return valueUsd;
+      }
+
+      const index = interestIndexMap[tokenValue.token.id];
+      const interestRate = interestRateMap[tokenValue.token.id];
+      const price = oraclePriceMap[tokenValue.token.id];
+      return valueUsd.plus(valuePar.times(index).times(interestRate).times(price));
+    }, INTEGERS.ZERO);
+    const totalYield = lpLendingYield.plus(swapYield).plus(lendingYield);
     return {
       totalEntries: memo.totalEntries + 1,
       swapYield: memo.swapYield.plus(swapYield),
+      lpLendingYield: memo.lpLendingYield.plus(lpLendingYield),
       lendingYield: memo.lendingYield.plus(lendingYield),
       totalYield: memo.totalYield.plus(totalYield),
     }
   }, {
     totalEntries: 0,
     swapYield: new BigNumber(0),
+    lpLendingYield: new BigNumber(0),
     lendingYield: new BigNumber(0),
     totalYield: new BigNumber(0),
   });

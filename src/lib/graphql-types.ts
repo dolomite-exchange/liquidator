@@ -163,7 +163,28 @@ export interface GraphqlInterestRate {
   supplyInterestRate: string
 }
 
-type GraphqlAmmDataForUserResultSubResult = GraphqlAmmPairData | GraphqlInterestRate | GraphqlAmmLiquidityPosition
+export interface GraphqlInterestIndex {
+  token: {
+    id: string
+  }
+  supplyIndex: string;
+  borrowIndex: string;
+}
+
+export interface GraphqlOraclePrice {
+  token: {
+    id: string
+  }
+  price: string;
+}
+
+type GraphqlAmmDataForUserResultSubResult =
+  GraphqlAmmPairData
+  | GraphqlInterestRate
+  | GraphqlAmmLiquidityPosition
+  | GraphqlInterestIndex
+  | GraphqlOraclePrice
+  | GraphqlTokenValue
 
 export interface GraphqlAmmDataForUserResult {
   data: Record<string, GraphqlAmmDataForUserResultSubResult[]>

@@ -3,13 +3,13 @@ import '../src/lib/env';
 /** @formatter:on */
 import { address, BigNumber } from '@dolomite-exchange/dolomite-margin';
 import v8 from 'v8';
-import { getTimestampToBlockNumberMap, getTotalAmmPairYield } from '../src/clients/dolomite';
+import { getTimestampToBlockNumberMap, getTotalYield } from '../src/clients/dolomite';
 import Logger from '../src/lib/logger';
 
 async function start() {
   let userAddress: address;
   if (process.env.USER_ADDRESS) {
-    userAddress = process.env.USER_ADDRESS as address;
+    userAddress = (process.env.USER_ADDRESS as address).toLowerCase();
   } else {
     const message = 'No USER_ADDRESS specified!';
     Logger.error({ message });
@@ -24,14 +24,16 @@ async function start() {
     userAddress,
   });
 
-  const currentDate = Math.floor(new Date().getTime() / 1000 / 86400) * 86400;
-  const startTimestamp = 1665619200; // October 13, 2022 at 12:00:00 AM UTC
+  // const currentDate = Math.floor(new Date().getTime() / 1000 / 86400) * 86400;
+  // const launchTimestamp = 1665619200; // October 13, 2022 at 12:00:00 AM UTC
+  const startTimestamp = 1672531200; // January 1, 2023 (00:00:00 UTC)
+  const endTimestamp = 1704067200; // December 31, 2023 (00:00:00 UTC)
   const timestamps: number[] = [];
-  for (let i = startTimestamp; i < currentDate; i += 86400) {
+  for (let i = startTimestamp; i < endTimestamp; i += 86400) {
     timestamps.push(i);
   }
   const timestampToBlockNumberMap = await getTimestampToBlockNumberMap(timestamps);
-  const result = await getTotalAmmPairYield(
+  const result = await getTotalYield(
     Object.values(timestampToBlockNumberMap),
     userAddress,
   );
@@ -40,6 +42,7 @@ async function start() {
   console.log('----------------------------------------------------')
   console.log('-------------------- Yield Data --------------------');
   console.log('----------------------------------------------------')
+  console.log('LP Lending yield:', `$${result.lpLendingYield.toFixed(2)}`);
   console.log('Lending yield:', `$${result.lendingYield.toFixed(2)}`);
   console.log('Swap yield:', `$${result.swapYield.toFixed(2)}`);
   console.log('Total yield:', `$${result.totalYield.toFixed(2)}`);

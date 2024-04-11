@@ -20,6 +20,11 @@ export interface ApiBalance {
   expiryAddress: string | null;
 }
 
+export interface ApiIsolationModeVaultAccount {
+  id: string;
+  vault: string;
+}
+
 export interface ApiAccount {
   id: string;
   owner: string;
