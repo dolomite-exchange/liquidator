@@ -68,6 +68,10 @@ async function start() {
   await marketStore._update();
   await accountStore._update();
 
+  Logger.info({
+    message: 'Finished updating accounts and markets',
+  });
+
   const marketMap = marketStore.getMarketMap();
 
   // These accounts are not actually liquidatable, but rather accounts that have ANY debt.
@@ -75,6 +79,7 @@ async function start() {
 
   let smallLiquidBorrowCount = 0;
   let smallAlmostLiquidBorrowCount = 0;
+  const liquidAccounts: any[] = [];
   const accountsWithBadDebt = accounts.reduce((memo, account) => {
     const initial = {
       borrow: INTEGERS.ZERO,
@@ -126,12 +131,10 @@ async function start() {
       if (borrowAdj.lt(SMALL_BORROW_THRESHOLD)) {
         smallLiquidBorrowCount += 1;
       } else {
-        Logger.warn({
-          message: 'Found liquid account!',
-          account: account.id,
-          markets: Object.values(account.balances).map(formatApiBalance),
-          supplyUSD: supply.toFixed(6),
-          borrowUSD: borrow.toFixed(6),
+        liquidAccounts.push({
+          ...account,
+          supplyUSD: supply,
+          borrowUSD: borrow,
         });
       }
     } else if (borrowAdj.times('1.155').gt(supplyAdj) && !shouldIgnoreAccount(account)) {
@@ -151,8 +154,21 @@ async function start() {
     return memo
   }, [] as any[]);
 
+  liquidAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1)).forEach(account => {
+    Logger.warn({
+      message: 'Found liquid account!',
+      account: account.id,
+      markets: Object.values(account.balances as any[]).map(formatApiBalance),
+      supplyUSD: account.supplyUSD.toFixed(6),
+      borrowUSD: account.borrowUSD.toFixed(6),
+    });
+  });
   Logger.info({
-    message: `Found ${smallLiquidBorrowCount} liquidatable accounts with small borrow positions`,
+    message: `Found ${liquidAccounts.length} regular liquidatable accounts`,
+  });
+
+  Logger.info({
+    message: `Found ${smallLiquidBorrowCount} small liquidatable accounts`,
     smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFixed(4)}`,
   });
 

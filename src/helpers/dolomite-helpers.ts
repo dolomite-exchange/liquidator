@@ -45,7 +45,6 @@ const zap = new DolomiteZap({
   defaultBlockTag: BLOCK_TAG,
   referralInfo: undefined,
   useProxyServer: USE_PROXY_SERVER,
-  usePendleV3: false,
   gasMultiplier: new ZapBigNumber(2),
 });
 

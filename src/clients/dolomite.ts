@@ -119,6 +119,7 @@ export async function getLiquidatableDolomiteAccounts(
                   first: ${Pageable.MAX_PAGE_SIZE}
                 ) {
                 ${marginAccountFields}
+                }
               }`;
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
@@ -208,23 +209,25 @@ export async function getAllIsolationModeVaultAddresses(
 }
 
 export async function getApiAccountsFromAddresses(
-  isolationModeVaults: string[],
+  isolationModeToken: string,
   marketIndexMap: { [marketId: string]: MarketIndex },
   blockNumber: number,
+  lastId: string,
 ): Promise<{ accounts: ApiAccount[] }> {
   const query = `
-    query getAccountsByAddresses($blockNumber: Int) {
-      ${isolationModeVaults.map((vault, i) => {
-    return `
-          account_${i}:marginAccounts(
-            where: { user: "${vault.toLowerCase()}" }
-            block: { number: $blockNumber }
-            first: 1000
-          ) {
-            ${marginAccountFields}
-          }
-          `
-  }).join('')}
+    query getAccountsByAddresses($blockNumber: Int, $lastId: ID) {
+      marginAccounts(
+        where: { user_: {
+          isolationModeVault: "${isolationModeToken.toLowerCase()}" }
+          hasSupplyValue: true
+          id_gt: $lastId
+        }
+        orderBy: id
+        first: ${Pageable.MAX_PAGE_SIZE}
+        block: { number: $blockNumber }
+      ) {
+        ${marginAccountFields}
+      }
     }
 `;
   const accounts = await axios.post(
@@ -233,6 +236,7 @@ export async function getApiAccountsFromAddresses(
       query,
       variables: {
         blockNumber,
+        lastId,
       },
     },
     defaultAxiosConfig,
@@ -242,9 +246,7 @@ export async function getApiAccountsFromAddresses(
       if (response.errors && typeof response.errors === 'object') {
         return Promise.reject((response.errors as any)[0]);
       } else {
-        const graphAccounts: GraphqlAccount[] = [];
-        isolationModeVaults.forEach((_, i) => graphAccounts.push(...(response as any).data[`account_${i}`]));
-        return graphAccounts;
+        return response.data.marginAccounts as GraphqlAccount[];
       }
     })
     .then(graphqlAccounts => graphqlAccounts.map<ApiAccount>(account => {
@@ -267,7 +269,8 @@ export async function getExpiredAccounts(
                   orderBy: id
                   first: ${Pageable.MAX_PAGE_SIZE}
                 ) {
-                ${marginAccountFields}
+                  ${marginAccountFields}
+                }
               }`;
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
