@@ -1,7 +1,7 @@
 import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
+import axios from 'axios';
 import { ChainId, isArbitrum } from '../lib/chain-id';
 import Logger from '../lib/logger';
-import axios from 'axios';
 
 let lastPriceWei: string;
 resetGasPriceWei();
