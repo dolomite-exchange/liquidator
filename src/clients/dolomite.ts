@@ -559,6 +559,35 @@ export async function getTotalValueLockedAndFees(blockNumbers: number[]): Promis
   return allTvlAndFees;
 }
 
+export async function getTotalTradeVolume(startBlockNumber: number, endBlockNumber: number): Promise<BigNumber> {
+  const query = `
+      start:dolomiteMargins(
+        block: { number: ${startBlockNumber} }
+      ) {
+        totalTradeVolumeUSD
+      }
+      end:dolomiteMargins(
+        block: { number: ${endBlockNumber} }
+      ) {
+        totalTradeVolumeUSD
+      }
+    `;
+
+  const { start, end } = await axios.post(
+    subgraphUrl,
+    {
+      query: `query getTotalTradeVolume { ${query} }`,
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => {
+      return (json.data) as { start: { totalTradeVolumeUSD: string }[], end: { totalTradeVolumeUSD: string }[] }
+    });
+
+  return new BigNumber(end[0].totalTradeVolumeUSD).minus(start[0].totalTradeVolumeUSD);
+}
+
 export async function getTotalTransactions(startBlockNumber: number, endBlockNumber: number): Promise<BigNumber> {
   const query = `
       start:dolomiteMargins(
@@ -586,6 +615,35 @@ export async function getTotalTransactions(startBlockNumber: number, endBlockNum
     });
 
   return new BigNumber(end[0].transactionCount).minus(start[0].transactionCount);
+}
+
+export async function getTotalUniqueUsers(startBlockNumber: number, endBlockNumber: number): Promise<BigNumber> {
+  const query = `
+      start:dolomiteMargins(
+        block: { number: ${startBlockNumber} }
+      ) {
+        userCount
+      }
+      end:dolomiteMargins(
+        block: { number: ${endBlockNumber} }
+      ) {
+        userCount
+      }
+    `;
+
+  const { start, end } = await axios.post(
+    subgraphUrl,
+    {
+      query: `query getTotalTransactions { ${query} }`,
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => {
+      return (json.data) as { start: { userCount: string }[], end: { userCount: string }[] }
+    });
+
+  return new BigNumber(end[0].userCount).minus(start[0].userCount);
 }
 
 function mapGraphqlTokenToZapApiToken(token: GraphqlToken): ZapApiToken {

@@ -89,6 +89,7 @@ async function start() {
     DolomiteMigratorAbi,
     ModuleDeployments.DolomiteMigratorV2[networkId].address,
   );
+  const nonce = await dolomite.web3.eth.getTransactionCount(dolomite.web3.eth.defaultAccount);
   for (let i = 0; i < accountChunks.length; i += 1) {
     try {
       await dolomite.contracts.callContractFunction(
@@ -105,6 +106,7 @@ async function start() {
           gas: 40_000_000,
           from: dolomite.web3.eth.defaultAccount,
           gasPrice: 100_000_000,
+          nonce: i + nonce,
         },
       );
     } catch (e) {
