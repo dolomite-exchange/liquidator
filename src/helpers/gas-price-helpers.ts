@@ -61,10 +61,20 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }>
   if (networkId === ChainId.PolygonZkEvm) {
     const response = await axios.get('https://gasstation.polygon.technology/zkevm');
     return response.data;
+  } else if (networkId === ChainId.XLayer) {
+    const response = await axios.get('https://rpc.xlayer.tech/gasstation');
+    return response.data;
   } else if (isArbitrum(networkId)) {
     const result = await dolomite.arbitrumGasInfo.getPricesInWei();
     return {
       fast: result.perArbGasTotal.dividedBy('1000000000').toFixed(), // convert to gwei
+    };
+  } else if (networkId === ChainId.Mantle) {
+    // TODO: replace with SDK
+    const contract = new dolomite.web3.eth.Contract([], '0x420000000000000000000000000000000000000F');
+    const result = await dolomite.contracts.callConstantContractFunction(contract.methods.gasPrice());
+    return {
+      fast: result[0].dividedBy('1000000000').toFixed(), // convert to gwei
     };
   } else {
     const errorMessage = `Could not find network ID ${networkId}`;
