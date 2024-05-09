@@ -9,12 +9,11 @@ import Pageable from '../lib/pageable';
 
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };
-
   private ignoredMarketIds: number[];
 
   constructor(private readonly blockStore: BlockStore) {
     this.marketMap = {};
-    this.ignoredMarketIds = this._getIgnoredMarketIds('IGNORED_MARKETS');
+    this.ignoredMarketIds = process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [];
   }
 
   public getMarketMap(): { [marketId: string]: ApiMarket } {
@@ -108,13 +107,4 @@ export default class MarketStore {
       blockNumber,
     });
   };
-
-  private _getIgnoredMarketIds(key: string): number[] {
-    const values = process.env[key];
-    if (!values) {
-      return [];
-    }
-
-    return values.split(',').map(m => parseInt(m, 10));
-  }
 }
