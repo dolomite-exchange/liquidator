@@ -1,5 +1,7 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import { getDolomiteMarkets } from '../clients/dolomite';
+import { isMarketIgnored } from '../helpers/market-helpers';
 import { dolomite } from '../helpers/web3';
 import { ApiMarket, MarketIndex } from '../lib/api-types';
 import BlockStore from './block-store';
@@ -9,11 +11,9 @@ import Pageable from '../lib/pageable';
 
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };
-  private ignoredMarketIds: number[];
 
   constructor(private readonly blockStore: BlockStore) {
     this.marketMap = {};
-    this.ignoredMarketIds = process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [];
   }
 
   public getMarketMap(): { [marketId: string]: ApiMarket } {
@@ -39,8 +39,8 @@ export default class MarketStore {
       const decodedResults = dolomite.web3.eth.abi.decodeParameters(['uint256', 'uint256', 'uint256'], rawIndexResult);
       memo[marketIds[i]] = {
         marketId: Number(marketIds[i]),
-        borrow: new BigNumber(decodedResults[0]).div('1000000000000000000'),
-        supply: new BigNumber(decodedResults[1]).div('1000000000000000000'),
+        borrow: new BigNumber(decodedResults[0]).div(INTEGERS.INTEREST_RATE_BASE),
+        supply: new BigNumber(decodedResults[1]).div(INTEGERS.INTEREST_RATE_BASE),
       };
       return memo;
     }, {});
@@ -92,7 +92,7 @@ export default class MarketStore {
     });
 
     this.marketMap = nextDolomiteMarkets.reduce<{ [marketId: string]: ApiMarket }>((memo, market) => {
-      if (this.ignoredMarketIds.some(m => m === market.marketId)) {
+      if (isMarketIgnored(market.marketId)) {
         // If any of the market IDs are ignored, then just return
         return memo;
       }
