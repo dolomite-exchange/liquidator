@@ -12,12 +12,13 @@ import {
   checkBigNumber,
   checkBigNumberAndGreaterThan,
   checkBooleanValue,
+  checkConditionally,
   checkDuration,
   checkEthereumAddress,
   checkExists,
   checkJsNumber,
   checkLiquidationModeConditionally,
-  checkPreferences,
+  checkMarketIdList,
   checkPrivateKey,
 } from './lib/invariants';
 import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
@@ -41,7 +42,7 @@ checkDuration('BALANCE_POLL_INTERVAL_MS', 1000);
 checkDuration('BLOCK_POLL_INTERVAL_MS', 1000);
 checkLiquidationModeConditionally(
   LiquidationMode.Simple,
-  () => checkPreferences('COLLATERAL_PREFERENCES'),
+  () => checkMarketIdList('COLLATERAL_PREFERENCES', 1),
 );
 checkBigNumber('DOLOMITE_ACCOUNT_NUMBER');
 checkExists('ETHEREUM_NODE_URL');
@@ -50,6 +51,7 @@ checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
+checkConditionally(!!process.env.IGNORED_MARKETS, () => checkMarketIdList('IGNORED_MARKETS', 0));
 checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkDuration('LIQUIDATE_POLL_INTERVAL_MS', 1000);
 checkDuration('LIQUIDATION_KEY_EXPIRATION_SECONDS', 1, /* isMillis = */ false);
@@ -59,7 +61,7 @@ checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
 checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED', '1000000000000000000000000'); // 1e24
 checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL', process.env.MIN_VALUE_LIQUIDATED!);
 checkJsNumber('NETWORK_ID');
-checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkPreferences('OWED_PREFERENCES'));
+checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkMarketIdList('OWED_PREFERENCES', 1));
 checkDuration('RISK_PARAMS_POLL_INTERVAL_MS', 1000);
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 10);
 checkExists('SUBGRAPH_URL');
@@ -127,6 +129,7 @@ async function start() {
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPriceAddition: process.env.GAS_PRICE_ADDITION,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
+    ignoredMarketsList: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)),
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
     liquidationKeyExpirationSeconds: process.env.LIQUIDATION_KEY_EXPIRATION_SECONDS,
     liquidationMode,

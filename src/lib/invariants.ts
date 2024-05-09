@@ -25,15 +25,10 @@ export function checkBooleanValue(key: string) {
   }
 }
 
-export function checkPreferences(key: string) {
-  if (!process.env[key]) {
-    throw new Error(`${key} is not provided`);
-  }
-  const preferences = process.env[key]!.split(',');
-  if (preferences.length === 0) {
-    throw new Error(`${key} length is 0`);
-  }
-  preferences.forEach((preference, i) => {
+export function checkMarketIdList(key: string, minLength: number) {
+  const list = _checkList(key, minLength);
+
+  list.forEach((preference, i) => {
     if (new BigNumber(preference.trim()).isNaN()) {
       throw new Error(`${key} at index=${i} is invalid`);
     }
@@ -71,10 +66,30 @@ export function checkLiquidationModeIsSet(enumKey: string = 'LIQUIDATION_MODE') 
   }
 }
 
+export function checkConditionally(condition: boolean, checker: () => void) {
+  if (condition) {
+    checker();
+  }
+}
+
 export function checkLiquidationModeConditionally(value: LiquidationMode, checker: () => void) {
   const enumKey = 'LIQUIDATION_MODE';
   checkLiquidationModeIsSet(enumKey);
-  if (process.env[enumKey] === value) {
-    checker();
+  checkConditionally(process.env[enumKey] === value, checker);
+}
+
+// =================================================
+// =============== Private Functions ===============
+// =================================================
+
+function _checkList(key: string, minLength: number): string[] {
+  if (!process.env[key]) {
+    throw new Error(`${key} is not provided`);
   }
+  const list = process.env[key]!.split(',');
+  if (list.length < minLength) {
+    throw new Error(`${key} length is less than ${minLength}`);
+  }
+
+  return list;
 }

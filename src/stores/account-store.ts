@@ -2,9 +2,9 @@ import { getExpiredAccounts, getLiquidatableDolomiteAccounts } from '../clients/
 import { ApiAccount } from '../lib/api-types';
 import { delay } from '../lib/delay';
 import Logger from '../lib/logger';
-import MarketStore from './market-store';
 import Pageable from '../lib/pageable';
 import BlockStore from './block-store';
+import MarketStore from './market-store';
 
 export default class AccountStore {
   public liquidatableDolomiteAccounts: ApiAccount[];

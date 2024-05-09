@@ -16,7 +16,6 @@ import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
   ApiBalance,
-  ApiIsolationModeVaultAccount,
   ApiMarket,
   ApiRiskParam,
   MarketIndex,
@@ -98,9 +97,13 @@ async function getAccounts(
         return (response as GraphqlAccountResult).data.marginAccounts;
       }
     })
-    .then(graphqlAccounts => graphqlAccounts.map<ApiAccount>(account => {
-      return mapGraphqlAccountToApiAccount(account, marketIndexMap)
-    }));
+    .then(graphqlAccounts => graphqlAccounts.reduce((memo, account) => {
+      const apiAccount = mapGraphqlAccountToApiAccount(account, marketIndexMap)
+      if (apiAccount) {
+        memo.push(apiAccount);
+      }
+      return memo;
+    }, [] as ApiAccount[]));
 
   return { accounts };
 }
@@ -161,53 +164,6 @@ export async function getAllDolomiteAccountsWithSupplyValue(
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
 
-export async function getAllIsolationModeVaultAddresses(
-  isolationModeTokenAddress: string,
-  blockNumber: number,
-  lastId: string | undefined,
-): Promise<{ vaultAccounts: ApiIsolationModeVaultAccount[] }> {
-  const query = `
-    query getAllAccountsByIsolationModeToken($blockNumber: Int, $isolationModeToken: String, $lastId: ID) {
-      isolationModeVaultReverseLookups(
-        where: { token: $isolationModeToken, id_gt: $lastId }
-        block: { number: $blockNumber }
-        orderBy: id
-        first: 1000
-      ) {
-        id
-        vault {
-          id
-        }
-      }
-    }
-`;
-  const vaultAccounts = await axios.post(
-    subgraphUrl,
-    {
-      query,
-      variables: {
-        blockNumber,
-        isolationModeToken: isolationModeTokenAddress.toLowerCase(),
-        lastId: lastId ?? '',
-      },
-    },
-    defaultAxiosConfig,
-  )
-    .then(response => response.data)
-    .then((response: any) => {
-      if (response.errors && typeof response.errors === 'object') {
-        return Promise.reject((response.errors as any)[0]);
-      } else {
-        return (response as any).data.isolationModeVaultReverseLookups as any[];
-      }
-    })
-    .then(graphqlAccounts => graphqlAccounts.map<ApiIsolationModeVaultAccount>(account => ({
-      id: account.id,
-      vault: account.vault.id,
-    })));
-  return { vaultAccounts };
-}
-
 export async function getApiAccountsFromAddresses(
   isolationModeToken: string,
   marketIndexMap: { [marketId: string]: MarketIndex },
@@ -249,9 +205,13 @@ export async function getApiAccountsFromAddresses(
         return response.data.marginAccounts as GraphqlAccount[];
       }
     })
-    .then(graphqlAccounts => graphqlAccounts.map<ApiAccount>(account => {
-      return mapGraphqlAccountToApiAccount(account, marketIndexMap);
-    }));
+    .then(graphqlAccounts => graphqlAccounts.reduce((memo, account) => {
+      const apiAccount = mapGraphqlAccountToApiAccount(account, marketIndexMap)
+      if (apiAccount) {
+        memo.push(apiAccount);
+      }
+      return memo;
+    }, [] as ApiAccount[]));
 
   return { accounts };
 }
@@ -317,9 +277,10 @@ export async function getDolomiteMarkets(
   }
 
   const marketPriceCalls = result.data.marketRiskInfos.map(market => {
+    const actualValue = market.token.marketId === '10' ? '43' : market.token.marketId;
     return {
       target: dolomite.address,
-      callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.token.marketId).encodeABI(),
+      callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(actualValue).encodeABI(),
     };
   });
 
@@ -822,13 +783,19 @@ export async function getRetryableAsyncWithdrawals(
 
 function mapGraphqlAccountToApiAccount(
   account: GraphqlAccount,
-  marketIndexMap: { [marketId: string]: MarketIndex },
-): ApiAccount {
+  marketIndexMap: { [marketId: string]: MarketIndex | undefined },
+): ApiAccount | undefined {
+  let skip = false;
   const decimalBase = new BigNumber('1000000000000000000');
   const balances = account.tokenValues.reduce<{ [marketNumber: string]: ApiBalance }>((memo, value) => {
     const tokenBase = TEN_BI.pow(value.token.decimals);
     const valuePar = new BigNumber(value.valuePar).times(tokenBase);
     const indexObject = marketIndexMap[value.token.marketId];
+    if (!indexObject) {
+      skip = true;
+      return memo;
+    }
+
     const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply).times(decimalBase);
     memo[value.token.marketId] = {
       marketId: Number(value.token.marketId),
@@ -845,6 +812,11 @@ function mapGraphqlAccountToApiAccount(
     };
     return memo;
   }, {});
+
+  if (skip) {
+    return undefined;
+  }
+
   return {
     id: `${account.user.id.toLowerCase()}-${account.accountNumber}`,
     owner: account.user.id.toLowerCase(),

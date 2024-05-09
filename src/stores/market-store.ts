@@ -10,8 +10,11 @@ import Pageable from '../lib/pageable';
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };
 
+  private ignoredMarketIds: number[];
+
   constructor(private readonly blockStore: BlockStore) {
     this.marketMap = {};
+    this.ignoredMarketIds = this._getIgnoredMarketIds('IGNORED_MARKETS');
   }
 
   public getMarketMap(): { [marketId: string]: ApiMarket } {
@@ -90,6 +93,11 @@ export default class MarketStore {
     });
 
     this.marketMap = nextDolomiteMarkets.reduce<{ [marketId: string]: ApiMarket }>((memo, market) => {
+      if (this.ignoredMarketIds.some(m => m === market.marketId)) {
+        // If any of the market IDs are ignored, then just return
+        return memo;
+      }
+
       memo[market.marketId.toString()] = market;
       return memo;
     }, {});
@@ -100,4 +108,13 @@ export default class MarketStore {
       blockNumber,
     });
   };
+
+  private _getIgnoredMarketIds(key: string): number[] {
+    const values = process.env[key];
+    if (!values) {
+      return [];
+    }
+
+    return values.split(',').map(m => parseInt(m, 10));
+  }
 }
