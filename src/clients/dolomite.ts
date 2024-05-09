@@ -790,7 +790,6 @@ function mapGraphqlAccountToApiAccount(
   marketIndexMap: { [marketId: string]: MarketIndex | undefined },
 ): ApiAccount | undefined {
   let skip = false;
-  const decimalBase = new BigNumber('1000000000000000000');
   const balances = account.tokenValues.reduce<{ [marketNumber: string]: ApiBalance }>((memo, value) => {
     const tokenBase = TEN_BI.pow(value.token.decimals);
     const valuePar = new BigNumber(value.valuePar).times(tokenBase);
@@ -800,7 +799,8 @@ function mapGraphqlAccountToApiAccount(
       return memo;
     }
 
-    const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply).times(decimalBase);
+    const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply)
+      .times(INTEGERS.INTEREST_RATE_BASE);
     memo[value.token.marketId] = {
       marketId: Number(value.token.marketId),
       tokenName: value.token.name,
@@ -809,7 +809,7 @@ function mapGraphqlAccountToApiAccount(
       tokenAddress: value.token.id,
       par: valuePar,
       wei: new BigNumber(valuePar).times(index)
-        .div(decimalBase)
+        .div(INTEGERS.INTEREST_RATE_BASE)
         .integerValue(BigNumber.ROUND_HALF_UP),
       expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
       expiryAddress: value.expiryAddress,
