@@ -61,6 +61,7 @@ async function start() {
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
+    ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     networkId,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });

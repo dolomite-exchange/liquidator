@@ -129,7 +129,7 @@ async function start() {
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPriceAddition: process.env.GAS_PRICE_ADDITION,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
-    ignoredMarketsList: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
+    ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
     liquidationKeyExpirationSeconds: process.env.LIQUIDATION_KEY_EXPIRATION_SECONDS,
     liquidationMode,
