@@ -308,6 +308,17 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     Object.keys(marketIdToActionsMap).length === 0
     && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
   ) {
+    Logger.info({
+      message: 'Performing async liquidation preparation',
+      owedMarketId: owedMarket.marketId,
+      heldMarketId: heldMarket.marketId,
+      owedBalance: owedBalance.wei.abs().toFixed(),
+      heldBalance: heldBalance.wei.abs().toFixed(),
+      owedWeiForLiquidation: owedWei.toFixed(),
+      heldWeiForLiquidation: heldWei.toFixed(),
+      owedPriceAdj: owedPriceAdj.toFixed(),
+      heldPrice: heldMarket.oraclePrice.toFixed(),
+    });
     return _prepareLiquidationForAsyncMarket(
       liquidAccount,
       heldMarket,
@@ -483,7 +494,7 @@ async function _prepareLiquidationForAsyncMarket(
       const outputMarket = marketMap[outputMarketId.toFixed()];
       if (!outputMarket) {
         Logger.error({
-          message: 'Could not retrieve oracle prices for async liquidation',
+          message: 'Could not retrieve output market for async liquidation',
           heldMarket: heldMarket.marketId.toString(),
           outputMarket: outputMarketId.toFixed(),
         })
@@ -508,6 +519,7 @@ async function _prepareLiquidationForAsyncMarket(
           gasPriceInWei: new ZapBigNumber(getGasPriceWei().toFixed()),
           subAccountNumber: new ZapBigNumber(liquidAccount.number.toFixed()),
           disallowAggregator: true,
+          slippageTolerance: 0.06,
         },
       );
     }),
@@ -566,7 +578,7 @@ async function _prepareLiquidationForAsyncMarket(
     new BigNumber(heldMarket.marketId),
     heldBalance.wei,
     new BigNumber(bestZapResult.marketIdsPath[bestZapResult.marketIdsPath.length - 1].toFixed()),
-    new BigNumber(bestZapResult.amountWeisPath[bestZapResult.marketIdsPath.length - 1].toFixed()),
+    new BigNumber('2'), // can't use 1 because GMX V2 subtracts '1' from the min to get 'half' when checking outputs
     undefined,
     bestZapResult.traderParams[0].tradeData,
     {

@@ -1,6 +1,6 @@
 import { ContractCallOptions, Integer } from '@dolomite-exchange/dolomite-margin';
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
+// import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { ApiAsyncAction, ApiAsyncActionType } from '@dolomite-exchange/zap-sdk';
 import { ApiMarketConverter } from '@dolomite-exchange/zap-sdk/dist/src/lib/Constants';
 import AsyncUnwrapperAbi from '../abis/async-unwrapper-trader.json';
@@ -14,7 +14,8 @@ const solidAccountOwner = process.env.ACCOUNT_WALLET_ADDRESS as string;
 
 const isolationModeFreezableLiquidatorProxy = new dolomite.web3.eth.Contract(
   IsolationModeFreezableLiquidatorProxyAbi,
-  ModuleDeployments.LiquidatorProxyV4WithGenericTraderOld[process.env.NETWORK_ID as string].address,
+  // ModuleDeployments.IsolationModeFreezableLiquidatorProxyV3[process.env.NETWORK_ID as string].address,
+  '0x76Ac5542eE033A15f78D1f8B4aD48af618a33E44',
 );
 
 export async function retryDepositOrWithdrawalAction(
@@ -72,6 +73,7 @@ export async function prepareForLiquidation(
     {
       ...options,
       gasPrice: getGasPriceWei().toFixed(),
+      gas: 10_000_000,
       from: solidAccountOwner,
       confirmationType: ConfirmationType.Hash,
     },
