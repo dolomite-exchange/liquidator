@@ -22,7 +22,7 @@ export async function retryDepositOrWithdrawalAction(
   action: ApiAsyncAction,
   converter: ApiMarketConverter,
   options: ContractCallOptions = {},
-): Promise<TxResult> {
+): Promise<TxResult | undefined> {
   if (action.actionType === ApiAsyncActionType.DEPOSIT) {
     const wrapper = new dolomite.web3.eth.Contract(AsyncWrapperAbi, converter.wrapper);
     return dolomite.contracts.callContractFunction(
@@ -35,6 +35,11 @@ export async function retryDepositOrWithdrawalAction(
       },
     );
   } else if (action.actionType === ApiAsyncActionType.WITHDRAWAL) {
+    // Skip this for now
+    if (action.id.toLowerCase() === 'D15E32608C12165DC3D687D0A0A39B2BA387762FC743462D9EC1C04DC02B2104'.toLowerCase()) {
+      return undefined;
+    }
+
     const unwrapper = new dolomite.web3.eth.Contract(AsyncUnwrapperAbi, converter.unwrapper);
     return dolomite.contracts.callContractFunction(
       unwrapper.methods.executeWithdrawalForRetry(action.key),
