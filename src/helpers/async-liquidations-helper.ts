@@ -36,7 +36,7 @@ export async function retryDepositOrWithdrawalAction(
     );
   } else if (action.actionType === ApiAsyncActionType.WITHDRAWAL) {
     // Skip this for now
-    if (action.id.toLowerCase() === '0xD15E32608C12165DC3D687D0A0A39B2BA387762FC743462D9EC1C04DC02B2104'.toLowerCase()) {
+    if (action.key.toLowerCase() === '0xD15E32608C12165DC3D687D0A0A39B2BA387762FC743462D9EC1C04DC02B2104'.toLowerCase()) {
       return undefined;
     }
 
