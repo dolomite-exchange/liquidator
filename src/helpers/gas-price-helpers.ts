@@ -52,6 +52,10 @@ export function getGasPriceWei(): Integer {
   return new BigNumber(lastPriceWei);
 }
 
+export function isGasSpikeProtectionEnabled(): boolean {
+  return process.env.GAS_SPIKE_PROTECTION === 'true';
+}
+
 async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }> {
   Logger.info({
     message: '#getGasPrices: Fetching gas prices',

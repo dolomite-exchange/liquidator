@@ -799,7 +799,7 @@ function mapGraphqlAccountToApiAccount(
       return memo;
     }
 
-    const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply)
+    const index = (valuePar.lt('0') ? indexObject.borrow : indexObject.supply)
       .times(INTEGERS.INTEREST_RATE_BASE);
     memo[value.token.marketId] = {
       marketId: Number(value.token.marketId),

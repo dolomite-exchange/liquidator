@@ -16,7 +16,7 @@ export default class Pageable {
 
       lastValue = (queryResults[queryResults.length - 1] as any).id;
       results = results.concat(queryResults);
-    } while (queryResults.length !== 0 && queryResults.length === Pageable.MAX_PAGE_SIZE);
+    } while (queryResults.length !== 0 && queryResults.length >= Pageable.MAX_PAGE_SIZE - 1);
 
     return results
   }

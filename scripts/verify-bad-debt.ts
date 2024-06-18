@@ -1,8 +1,10 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { AmountDenomination, AmountReference, BigNumber, ConfirmationType } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
+import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import v8 from 'v8';
 import { getDolomiteRiskParams } from '../src/clients/dolomite';
-import { dolomite } from '../src/helpers/web3';
+import { getGasPriceWei, updateGasPrice } from '../src/helpers/gas-price-helpers';
+import { dolomite, loadAccounts } from '../src/helpers/web3';
 import { ApiAccount, ApiBalance } from '../src/lib/api-types';
 import '../src/lib/env';
 import Logger from '../src/lib/logger';
@@ -10,7 +12,7 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const SMALL_BORROW_THRESHOLD = new BigNumber('0.001');
+const SMALL_BORROW_THRESHOLD = new BigNumber('0.01');
 
 const TEN = new BigNumber('10');
 
@@ -68,6 +70,7 @@ async function start() {
 
   await marketStore._update();
   await accountStore._update();
+  await updateGasPrice(dolomite);
 
   Logger.info({
     message: 'Finished updating accounts and markets',
@@ -81,7 +84,9 @@ async function start() {
   let smallLiquidBorrowCount = 0;
   let smallAlmostLiquidBorrowCount = 0;
   const liquidAccounts: any[] = [];
-  const accountsWithBadDebt = accounts.reduce((memo, account) => {
+  const totalAccountsWithBadDebt = [] as (ApiAccount & { borrow: BigNumber; supply: BigNumber; })[];
+  for (let i = 0; i < accounts.length; i += 1) {
+    const account = accounts[i];
     const initial = {
       borrow: INTEGERS.ZERO,
       supply: INTEGERS.ZERO,
@@ -113,7 +118,7 @@ async function start() {
       }, initial);
 
     if (borrow.gt(supply)) {
-      if (borrow.gt(SMALL_BORROW_THRESHOLD.times(ONE_DOLLAR))) {
+      if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
         Logger.warn({
           message: 'Found bad debt for more than $0.01',
           account: account.id,
@@ -121,9 +126,39 @@ async function start() {
           supplyUSD: supply.toFixed(6),
           borrowUSD: borrow.toFixed(6),
         });
+
+        if (process.env.VAPORIZE_EXCESS === 'true') {
+          await loadAccounts();
+          const vaporMarket = Object.values(account.balances).find(b => b.wei.lt(INTEGERS.ZERO));
+          const txResult = await dolomite.operation.initiate()
+            .vaporize({
+              primaryAccountOwner: dolomite.getDefaultAccount(),
+              primaryAccountId: INTEGERS.ZERO,
+              vaporAccountOwner: account.owner,
+              vaporAccountId: account.number,
+              vaporMarketId: new BigNumber(vaporMarket!.marketId),
+              payoutMarketId: new BigNumber(vaporMarket!.marketId !== 0 ? 0 : 2),
+              amount: {
+                value: INTEGERS.ZERO,
+                denomination: AmountDenomination.Principal,
+                reference: AmountReference.Target,
+              },
+            })
+            .commit({
+              gasPrice: getGasPriceWei().toFixed(),
+              confirmationType: ConfirmationType.Hash,
+            });
+
+          Logger.info({
+            message: 'Vaporization transaction hash:',
+            transactionHash: txResult.transactionHash,
+          });
+
+          await sleep(3_000);
+        }
       }
 
-      return memo.concat({
+      totalAccountsWithBadDebt.push({
         ...account,
         borrow,
         supply,
@@ -151,9 +186,7 @@ async function start() {
         });
       }
     }
-
-    return memo
-  }, [] as any[]);
+  }
 
   liquidAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1)).forEach(account => {
     Logger.warn({
@@ -178,14 +211,17 @@ async function start() {
     smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFixed(4)}`,
   });
 
-  if (accountsWithBadDebt.length === 0) {
+  if (totalAccountsWithBadDebt.length === 0) {
     Logger.info({
       message: `No bad debt found across ${accounts.length} active margin accounts!`,
     });
   } else {
     Logger.info({
-      accountsWithBadDebtLength: accountsWithBadDebt.length,
-      totalBadDebt: accountsWithBadDebt.reduce((memo, account) => memo.plus(account.borrow), INTEGERS.ZERO).toFixed(),
+      accountsWithBadDebtLength: totalAccountsWithBadDebt.length,
+      totalBadDebt: totalAccountsWithBadDebt.reduce(
+        (memo, account) => memo.plus(account.supply.minus(account.borrow)),
+        INTEGERS.ZERO,
+      ).toFixed(),
     });
   }
 

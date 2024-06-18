@@ -51,6 +51,7 @@ checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
+checkBooleanValue('GAS_SPIKE_PROTECTION');
 checkConditionally(!!process.env.IGNORED_MARKETS, () => checkMarketIdList('IGNORED_MARKETS', 0));
 checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkDuration('LIQUIDATE_POLL_INTERVAL_MS', 1000);
@@ -128,6 +129,7 @@ async function start() {
     expiry: dolomite.contracts.expiry.options.address,
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPriceAddition: process.env.GAS_PRICE_ADDITION,
+    gasSpikeProtection: process.env.GAS_SPIKE_PROTECTION,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,

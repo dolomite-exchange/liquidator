@@ -1,4 +1,4 @@
-import { ApiAsyncAction } from '@dolomite-exchange/zap-sdk';
+import { ApiAsyncAction, ApiAsyncWithdrawalStatus } from '@dolomite-exchange/zap-sdk';
 import { getRetryableAsyncDeposits, getRetryableAsyncWithdrawals } from '../clients/dolomite';
 import { delay } from '../lib/delay';
 import Logger from '../lib/logger';
@@ -77,6 +77,10 @@ export default class AsyncActionStore {
     ];
 
     this.marginAccountToRetryableAsyncActions = allActions.reduce<Record<string, ApiAsyncAction[]>>((acc, action) => {
+      if (action.status === ApiAsyncWithdrawalStatus.WITHDRAWAL_CANCELLED) {
+        return acc;
+      }
+
       const marginAccount = `${action.owner}-${action.accountNumber.toFixed()}`;
       if (!acc[marginAccount]) {
         acc[marginAccount] = [];

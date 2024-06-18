@@ -325,10 +325,10 @@
     enabled "2.0.x"
     kuler "^2.0.0"
 
-"@dolomite-exchange/dolomite-margin@^0.12.3":
-  version "0.12.3"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.12.3.tgz#9c51c2aca1419ed9cf33a9a4c2227bc04b98ec34"
-  integrity sha512-pUlzdE+SGePVPV9CeAAGNrT9vkMDTy/u0NAw5etbWXCe5WW8lFdJ6EdDIxxtxghbotVe628iyeWiE/yeQuuN9w==
+"@dolomite-exchange/dolomite-margin@^0.12.4":
+  version "0.12.4"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.12.4.tgz#4fd9b1e0c08422562138978c9112c92609e933b7"
+  integrity sha512-mVBH33cQieJI0D3vnoqpW9hvKIcIllA4U4MgPNk0B8wik7Wtul3hYLXI+FJB9Dz6ohhXV/6g4yegrnIZRDYeFQ==
   dependencies:
     "@openzeppelin/contracts" "^2.5.1"
     "@poanet/solidity-flattener" "^3.0.9"
@@ -343,17 +343,17 @@
     query-string "^6.9.0"
     web3 "1.2.1"
 
-"@dolomite-exchange/modules-deployments@^0.0.18":
-  version "0.0.18"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.0.18.tgz#852e889f755b46db4114f1b7f432ed410566af67"
-  integrity sha512-7JmQP1U0HYwc2wyzdq8nplxd8X31ObpC3C90LVgjlI05qiChs3QLkFx89rX34rlonEUXl8/8pr1+n787/irVAg==
+"@dolomite-exchange/modules-deployments@^0.0.21":
+  version "0.0.21"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.0.21.tgz#a02c7b17b4d6d22b7fe2af8f682ed6c2e8aa6f2e"
+  integrity sha512-auxCYgBJIw7UFkZG8bEKWZ9dE0nx9LqRdhHzde19DS9DmkE8mzsd0bsgM4NGs1Ux+gbrx1Szdd5Djw4f+TFJsA==
 
-"@dolomite-exchange/zap-sdk@^0.3.7":
-  version "0.3.7"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.3.7.tgz#f74b0aab3cac2859a4d55672e6c248608145d256"
-  integrity sha512-wWOpdrVHXk4/9As+EEbHzcvfO0ts0eZ0ZBdqsWCmKJ2YHw9UDqoHDielVklXhqYYUv5wip7Vsm9jA6/UDkXxFw==
+"@dolomite-exchange/zap-sdk@^0.3.9":
+  version "0.3.9"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.3.9.tgz#8da3a80116cad463fd50e614e7c5e6fbe2e4b401"
+  integrity sha512-ffRs8m8DwDIpSnX595vFrQR+HHuE7BhbbuvZhDlfie4hYQ6dROfhI+rE/DNGwg0HiLLmv1zldPaAeaqvAM1KIw==
   dependencies:
-    "@dolomite-exchange/modules-deployments" "^0.0.18"
+    "@dolomite-exchange/modules-deployments" "^0.0.21"
     axios "^1.6.2"
     bignumber.js "^9.1.1"
     dotenv-flow "^0.4.0"

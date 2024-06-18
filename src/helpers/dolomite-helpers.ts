@@ -15,7 +15,7 @@ import Logger from '../lib/logger';
 import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/utils';
 import { prepareForLiquidation, retryDepositOrWithdrawalAction } from './async-liquidations-helper';
 import { getLargestBalanceUSD } from './balance-helpers';
-import { getGasPriceWei } from './gas-price-helpers';
+import { getGasPriceWei, isGasSpikeProtectionEnabled } from './gas-price-helpers';
 import { dolomite } from './web3';
 
 const solidAccount = {
@@ -139,7 +139,7 @@ export async function liquidateAccount(
       false,
     );
   } else if (liquidationMode === LiquidationMode.Simple) {
-    return _liquidateAccountSimple(liquidAccount, marginAccountToActionsMap);
+    return _liquidateAccountSimple(liquidAccount, marginAccountToActionsMap, marketMap);
   } else {
     throw new Error(`Unknown liquidation mode: ${liquidationMode}`);
   }
@@ -190,31 +190,76 @@ export async function liquidateExpiredAccount(
 async function _liquidateAccountSimple(
   liquidAccount: ApiAccount,
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
+  marketMap: { [marketId: string]: ApiMarket },
   owedMarkets: Integer[] = owedPreferences,
   collateralMarkets: Integer[] = collateralPreferences,
   minValueLiquidated: Integer = new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string),
-): Promise<TxResult> {
+): Promise<TxResult | undefined> {
   if (marginAccountToActionsMap[liquidAccount.id]) {
     return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple liquidations on async account'));
   }
 
   const gasPrice = getGasPriceWei();
 
-  return dolomite.liquidatorProxyV1.liquidate(
-    solidAccount.owner,
-    solidAccount.number,
-    liquidAccount.owner,
-    liquidAccount.number,
-    new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
-    minValueLiquidated,
-    owedMarkets.map((p) => new BigNumber(p)),
-    collateralMarkets.map((p) => new BigNumber(p)),
-    {
-      gasPrice: gasPrice.toFixed(),
-      from: solidAccount.owner,
-      confirmationType: ConfirmationType.Hash,
-    },
-  );
+  if (isGasSpikeProtectionEnabled()) {
+    const { gasEstimate } = await dolomite.liquidatorProxyV1.liquidate(
+      solidAccount.owner,
+      solidAccount.number,
+      liquidAccount.owner,
+      liquidAccount.number,
+      new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
+      minValueLiquidated,
+      owedMarkets.map((p) => new BigNumber(p)),
+      collateralMarkets.map((p) => new BigNumber(p)),
+      {
+        gasPrice: gasPrice.toFixed(),
+        from: solidAccount.owner,
+        confirmationType: ConfirmationType.Simulate,
+      },
+    );
+    const debtAmountUsd: Integer = owedMarkets.reduce((acc, m) => {
+      const amountWei = liquidAccount.balances[m.toFixed()].wei;
+      const priceUsd = marketMap[m.toFixed()].oraclePrice;
+      return acc.plus(amountWei.times(priceUsd))
+    }, INTEGERS.ZERO);
+
+    if (_isGasSpikeFound(gasPrice, gasEstimate, debtAmountUsd, marketMap)) {
+      return undefined;
+    }
+
+    return dolomite.liquidatorProxyV1.liquidate(
+      solidAccount.owner,
+      solidAccount.number,
+      liquidAccount.owner,
+      liquidAccount.number,
+      new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
+      minValueLiquidated,
+      owedMarkets.map((p) => new BigNumber(p)),
+      collateralMarkets.map((p) => new BigNumber(p)),
+      {
+        gas: _convertGasEstimateToGas(gasEstimate!),
+        gasPrice: gasPrice.toFixed(),
+        from: solidAccount.owner,
+        confirmationType: ConfirmationType.Hash,
+      },
+    );
+  } else {
+    return dolomite.liquidatorProxyV1.liquidate(
+      solidAccount.owner,
+      solidAccount.number,
+      liquidAccount.owner,
+      liquidAccount.number,
+      new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
+      minValueLiquidated,
+      owedMarkets.map((p) => new BigNumber(p)),
+      collateralMarkets.map((p) => new BigNumber(p)),
+      {
+        gasPrice: gasPrice.toFixed(),
+        from: solidAccount.owner,
+        confirmationType: ConfirmationType.Hash,
+      },
+    );
+  }
 }
 
 async function _liquidateAccountAndSellWithGenericLiquidity(
@@ -225,7 +270,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
   isExpiring: boolean,
-): Promise<TxResult> {
+): Promise<TxResult | undefined> {
   const owedBalance = getLargestBalanceUSD(
     Object.values(liquidAccount.balances),
     true,
@@ -270,40 +315,31 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     );
   /* eslint-enable @typescript-eslint/indent */
 
-  const hasIsolationModeMarket = zap.getIsolationModeConverterByMarketId(new ZapBigNumber(owedMarket.marketId))
-    || zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId));
   const owedValueUsd = owedBalance.wei.abs().times(owedMarket.oraclePrice);
-  if (!hasIsolationModeMarket && owedValueUsd.isLessThan(minValueLiquidatedForGenericSell)) {
+  if (owedValueUsd.isLessThan(minValueLiquidatedForGenericSell)) {
     Logger.info({
-      message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
+      message: 'Skipping generic sell because owed value is too small',
+      liquidAccount: liquidAccount.id,
       owedMarketId: owedMarket.marketId,
       heldMarketId: heldMarket.marketId,
       owedBalance: owedBalance.wei.abs().toFixed(),
       heldBalance: heldBalance.wei.abs().toFixed(),
-      owedWeiForLiquidation: owedWei.toFixed(),
-      heldWeiForLiquidation: heldWei.toFixed(),
-      owedPriceAdj: owedPriceAdj.toFixed(),
-      heldPrice: heldMarket.oraclePrice.toFixed(),
     });
-
-    if (isExpiring) {
-      return _liquidateExpiredAccountInternalSimple(
-        liquidAccount,
-        marketMap,
-        marginAccountToActionsMap,
-        lastBlockTimestamp,
-        [new BigNumber(heldBalance.marketId)],
-        [new BigNumber(owedBalance.marketId)],
-      );
-    } else {
-      return _liquidateAccountSimple(
-        liquidAccount,
-        marginAccountToActionsMap,
-        [new BigNumber(owedBalance.marketId)],
-        [new BigNumber(heldBalance.marketId)],
-        INTEGERS.ZERO,
-      );
-    }
+    return undefined;
+    // return _performSimpleLiquidationForSkippedGenericLiquidation(
+    //   liquidAccount,
+    //   owedMarket,
+    //   heldMarket,
+    //   owedBalance,
+    //   heldBalance,
+    //   owedWei,
+    //   heldWei,
+    //   owedPriceAdj,
+    //   marketMap,
+    //   marginAccountToActionsMap,
+    //   lastBlockTimestamp,
+    //   isExpiring,
+    // );
   } else if (
     Object.keys(marketIdToActionsMap).length === 0
     && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
@@ -373,29 +409,83 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       );
     }
 
+    const gasPrice = getGasPriceWei();
+
     let firstError: unknown;
-    for (let i = 0; i < outputs.length; i += 1) {
-      try {
-        return await dolomite.liquidatorProxyV4WithGenericTrader.liquidate(
-          solidAccount.owner,
-          solidAccount.number,
-          liquidAccount.owner,
-          liquidAccount.number,
-          outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
-          INTEGERS.MAX_UINT,
-          INTEGERS.MAX_UINT,
-          outputs[i].traderParams,
-          outputs[i].makerAccounts,
-          isExpiring ? (owedBalance.expiresAt ?? null) : null,
-          {
-            gasPrice: getGasPriceWei().toFixed(),
-            from: solidAccount.owner,
-            confirmationType: ConfirmationType.Hash,
-          },
-        );
-      } catch (e) {
-        if (!firstError) {
-          firstError = e;
+    if (isGasSpikeProtectionEnabled()) {
+      for (let i = 0; i < outputs.length; i += 1) {
+        try {
+          const { gasEstimate } = await dolomite.liquidatorProxyV4WithGenericTrader.liquidate(
+            solidAccount.owner,
+            solidAccount.number,
+            liquidAccount.owner,
+            liquidAccount.number,
+            outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
+            INTEGERS.MAX_UINT,
+            INTEGERS.MAX_UINT,
+            outputs[i].traderParams,
+            outputs[i].makerAccounts,
+            isExpiring ? (owedBalance.expiresAt ?? null) : null,
+            {
+              gasPrice: gasPrice.toFixed(),
+              from: solidAccount.owner,
+              confirmationType: ConfirmationType.Simulate,
+            },
+          );
+
+          const debtAmountUsd = owedWei.times(owedMarket.oraclePrice);
+          if (_isGasSpikeFound(gasPrice, gasEstimate, debtAmountUsd, marketMap)) {
+            return undefined;
+          }
+
+          return await dolomite.liquidatorProxyV4WithGenericTrader.liquidate(
+            solidAccount.owner,
+            solidAccount.number,
+            liquidAccount.owner,
+            liquidAccount.number,
+            outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
+            INTEGERS.MAX_UINT,
+            INTEGERS.MAX_UINT,
+            outputs[i].traderParams,
+            outputs[i].makerAccounts,
+            isExpiring ? (owedBalance.expiresAt ?? null) : null,
+            {
+              gas: _convertGasEstimateToGas(gasEstimate!),
+              gasPrice: gasPrice.toFixed(),
+              from: solidAccount.owner,
+              confirmationType: ConfirmationType.Hash,
+            },
+          );
+        } catch (e) {
+          if (!firstError) {
+            firstError = e;
+          }
+        }
+      }
+    } else {
+      for (let i = 0; i < outputs.length; i += 1) {
+        try {
+          return await dolomite.liquidatorProxyV4WithGenericTrader.liquidate(
+            solidAccount.owner,
+            solidAccount.number,
+            liquidAccount.owner,
+            liquidAccount.number,
+            outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
+            INTEGERS.MAX_UINT,
+            INTEGERS.MAX_UINT,
+            outputs[i].traderParams,
+            outputs[i].makerAccounts,
+            isExpiring ? (owedBalance.expiresAt ?? null) : null,
+            {
+              gasPrice: getGasPriceWei().toFixed(),
+              from: solidAccount.owner,
+              confirmationType: ConfirmationType.Hash,
+            },
+          );
+        } catch (e) {
+          if (!firstError) {
+            firstError = e;
+          }
         }
       }
     }
@@ -403,6 +493,59 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     return Promise.reject(firstError);
   }
 }
+
+// async function _performSimpleLiquidationForSkippedGenericLiquidation(
+//   liquidAccount: ApiAccount,
+//   owedMarket: ApiMarket,
+//   heldMarket: ApiMarket,
+//   owedBalance: ApiBalance,
+//   heldBalance: ApiBalance,
+//   owedWei: Integer,
+//   heldWei: Integer,
+//   owedPriceAdj: Integer,
+//   marketMap: { [marketId: string]: ApiMarket },
+//   marginAccountToActionsMap: { [marginAccountId: string]: ApiAsyncAction[] | undefined },
+//   lastBlockTimestamp: DateTime,
+//   isExpiring: boolean,
+// ): Promise<TxResult | undefined> {
+//   const hasIsolationModeMarket = zap.getIsolationModeConverterByMarketId(new ZapBigNumber(owedMarket.marketId))
+//     || zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId));
+//   if (hasIsolationModeMarket) {
+//     return undefined;
+//   }
+//
+//   Logger.info({
+//     message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
+//     owedMarketId: owedMarket.marketId,
+//     heldMarketId: heldMarket.marketId,
+//     owedBalance: owedBalance.wei.abs().toFixed(),
+//     heldBalance: heldBalance.wei.abs().toFixed(),
+//     owedWeiForLiquidation: owedWei.toFixed(),
+//     heldWeiForLiquidation: heldWei.toFixed(),
+//     owedPriceAdj: owedPriceAdj.toFixed(),
+//     heldPrice: heldMarket.oraclePrice.toFixed(),
+//   });
+//
+//   if (isExpiring) {
+//     return _liquidateExpiredAccountInternalSimple(
+//       liquidAccount,
+//       marketMap,
+//       marginAccountToActionsMap,
+//       lastBlockTimestamp,
+//       [new BigNumber(heldBalance.marketId)],
+//       [new BigNumber(owedBalance.marketId)],
+//     );
+//   } else {
+//     return _liquidateAccountSimple(
+//       liquidAccount,
+//       marginAccountToActionsMap,
+//       marketMap,
+//       [new BigNumber(owedBalance.marketId)],
+//       [new BigNumber(heldBalance.marketId)],
+//       INTEGERS.ZERO,
+//     );
+//   }
+// }
 
 async function _liquidateExpiredAccountInternalSimple(
   expiredAccount: ApiAccount,
@@ -585,4 +728,42 @@ async function _prepareLiquidationForAsyncMarket(
       value: bestZapResult.executionFee.toFixed(),
     },
   );
+}
+
+function _convertGasEstimateToGas(gasEstimate: number): number {
+  return Math.floor(gasEstimate * 1.5);
+}
+
+const ONE_DOLLAR = new BigNumber('1000000000000000000000000000000000000');
+
+function _isGasSpikeFound(
+  gasPrice: BigNumber,
+  gasEstimate: number | undefined,
+  debtAmountUsd: Integer,
+  marketMap: { [marketId: string]: ApiMarket },
+): boolean {
+  if (gasEstimate === undefined) {
+    throw new Error('No gas estimate was found! Check that ConfirmationType.Simulate was used!')
+  }
+
+  const payablePriceUsd: Integer = Object.values(marketMap)
+    .find(m => m.tokenAddress.toLowerCase() === dolomite.weth.address.toLowerCase())!.oraclePrice;
+  const rewardAmountUsd = debtAmountUsd.times('5').dividedToIntegerBy('100');
+  if (gasPrice.times(gasEstimate).times(payablePriceUsd).gt(rewardAmountUsd)) {
+    Logger.info({
+      at: 'dolomite-helpers#_isGasSpikeFound',
+      message: 'Skipping liquidation due to gas spike',
+      transactionCostUsd: `$${gasPrice.times(gasEstimate).times(payablePriceUsd).div(ONE_DOLLAR).toFixed(6)}`,
+      rewardAmountUsd: `$${rewardAmountUsd.div(ONE_DOLLAR).toFixed(6)}`,
+    });
+    return true;
+  }
+
+  Logger.info({
+    at: 'dolomite-helpers#_isGasSpikeFound',
+    message: 'Gas spike not found',
+    transactionCostUsd: `$${gasPrice.times(gasEstimate).times(payablePriceUsd).div(ONE_DOLLAR).toFixed(6)}`,
+    rewardAmountUsd: `$${rewardAmountUsd.div(ONE_DOLLAR).toFixed(6)}`,
+  });
+  return false;
 }
