@@ -343,17 +343,17 @@
     query-string "^6.9.0"
     web3 "1.2.1"
 
-"@dolomite-exchange/modules-deployments@^0.0.21":
-  version "0.0.21"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.0.21.tgz#a02c7b17b4d6d22b7fe2af8f682ed6c2e8aa6f2e"
-  integrity sha512-auxCYgBJIw7UFkZG8bEKWZ9dE0nx9LqRdhHzde19DS9DmkE8mzsd0bsgM4NGs1Ux+gbrx1Szdd5Djw4f+TFJsA==
+"@dolomite-exchange/modules-deployments@^0.0.22":
+  version "0.0.22"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.0.22.tgz#3e7104dadd2f9c05c44113ad45871368988488db"
+  integrity sha512-4IqrXyOI1VQ5uCeArDHX1UADD4/VF0HeZr7Gnve0JZZHI2EIY86NH1/AiNPt1vReQs6TFdr8Kgk3MKKWydIFlQ==
 
-"@dolomite-exchange/zap-sdk@^0.3.9":
-  version "0.3.9"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.3.9.tgz#8da3a80116cad463fd50e614e7c5e6fbe2e4b401"
-  integrity sha512-ffRs8m8DwDIpSnX595vFrQR+HHuE7BhbbuvZhDlfie4hYQ6dROfhI+rE/DNGwg0HiLLmv1zldPaAeaqvAM1KIw==
+"@dolomite-exchange/zap-sdk@^0.3.10":
+  version "0.3.10"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.3.10.tgz#1054900d7b9ca2e273105b45a0957ecbdb295710"
+  integrity sha512-ThvNS62P5qCRWWyPwNSRhExLlt5L66Rb/LJ+OUSHxn9UvrBDVtHNjT/UTNKGUH72zk65qCF35bF8xJoyKp04Xg==
   dependencies:
-    "@dolomite-exchange/modules-deployments" "^0.0.21"
+    "@dolomite-exchange/modules-deployments" "^0.0.22"
     axios "^1.6.2"
     bignumber.js "^9.1.1"
     dotenv-flow "^0.4.0"
