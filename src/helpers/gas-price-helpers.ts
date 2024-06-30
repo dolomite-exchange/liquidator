@@ -52,6 +52,15 @@ export function getGasPriceWei(): Integer {
   return new BigNumber(lastPriceWei);
 }
 
+/**
+ * @return The gas price without any additions or multiplications to the original #
+ */
+export function getRawGasPriceWei(): Integer {
+  const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
+  const addition = new BigNumber(process.env.GAS_PRICE_ADDITION as string);
+  return new BigNumber(lastPriceWei).minus(addition).div(multiplier);
+}
+
 export function isGasSpikeProtectionEnabled(): boolean {
   return process.env.GAS_SPIKE_PROTECTION === 'true';
 }
