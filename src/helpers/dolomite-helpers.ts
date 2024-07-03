@@ -15,7 +15,7 @@ import Logger from '../lib/logger';
 import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/utils';
 import { prepareForLiquidation, retryDepositOrWithdrawalAction } from './async-liquidations-helper';
 import { getLargestBalanceUSD } from './balance-helpers';
-import { getGasPriceWei, isGasSpikeProtectionEnabled } from './gas-price-helpers';
+import { getGasPriceWei, getRawGasPriceWei, isGasSpikeProtectionEnabled } from './gas-price-helpers';
 import { dolomite } from './web3';
 
 const solidAccount = {
@@ -223,7 +223,7 @@ async function _liquidateAccountSimple(
       return acc.plus(amountWei.times(priceUsd))
     }, INTEGERS.ZERO);
 
-    if (_isGasSpikeFound(gasPrice, gasEstimate, debtAmountUsd, marketMap)) {
+    if (_isGasSpikeFound(gasEstimate, debtAmountUsd, marketMap)) {
       return undefined;
     }
 
@@ -436,7 +436,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
           );
 
           const debtAmountUsd = owedWei.times(owedMarket.oraclePrice);
-          if (_isGasSpikeFound(gasPrice, gasEstimate, debtAmountUsd, marketMap)) {
+          if (_isGasSpikeFound(gasEstimate, debtAmountUsd, marketMap)) {
             return undefined;
           }
 
@@ -739,7 +739,6 @@ function _convertGasEstimateToGas(gasEstimate: number): number {
 const ONE_DOLLAR = new BigNumber('1000000000000000000000000000000000000');
 
 function _isGasSpikeFound(
-  gasPrice: BigNumber,
   gasEstimate: number | undefined,
   debtAmountUsd: Integer,
   marketMap: { [marketId: string]: ApiMarket },
@@ -748,6 +747,7 @@ function _isGasSpikeFound(
     throw new Error('No gas estimate was found! Check that ConfirmationType.Simulate was used!')
   }
 
+  const gasPrice = getRawGasPriceWei();
   const payablePriceUsd: Integer = Object.values(marketMap)
     .find(m => m.tokenAddress.toLowerCase() === dolomite.weth.address.toLowerCase())!.oraclePrice;
   const rewardAmountUsd = debtAmountUsd.times('5').dividedToIntegerBy('100');
