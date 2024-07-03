@@ -12,7 +12,7 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const SMALL_BORROW_THRESHOLD = new BigNumber('0.01');
+const SMALL_BORROW_THRESHOLD = new BigNumber('1.00');
 
 const TEN = new BigNumber('10');
 
@@ -120,7 +120,7 @@ async function start() {
     if (borrow.gt(supply)) {
       if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
         Logger.warn({
-          message: 'Found bad debt for more than $0.01',
+          message: `Found bad debt for more than $${SMALL_BORROW_THRESHOLD.toFixed(2)}`,
           account: account.id,
           markets: Object.values(account.balances).map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
           supplyUSD: supply.toFixed(6),

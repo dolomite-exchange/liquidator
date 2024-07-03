@@ -47,9 +47,9 @@ export function getAmountsForLiquidation(
   owedPriceAdj: Integer,
   heldWei: Integer,
   heldPrice: Integer,
-  heldBalance: Integer,
+  heldProtocolBalance: Integer,
 ): { owedWei: Integer, heldWei: Integer, isVaporizable: boolean } {
-  const maxHeldWei = heldBalance.lt(heldWei) ? heldBalance : heldWei;
+  const maxHeldWei = heldProtocolBalance.lt(heldWei) ? heldProtocolBalance : heldWei;
   if (owedWei.times(owedPriceAdj).gt(maxHeldWei.times(heldPrice))) {
     return { owedWei: heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj), heldWei: maxHeldWei, isVaporizable: true };
   } else {

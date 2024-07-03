@@ -33,7 +33,7 @@ export default class BalanceStore {
   start = () => {
     Logger.info({
       at: 'BalanceStore#start',
-      message: 'Starting market store',
+      message: 'Starting balance store',
     });
     this._poll();
   };
@@ -92,9 +92,8 @@ export default class BalanceStore {
 
       const { results } = await dolomite.multiCall.aggregate(calls);
       results.forEach((result, j) => {
-        nextBalanceMap[calls[j].market.marketId] = new BigNumber(
-          ethers.utils.defaultAbiCoder.decode(['uint256'], result)[0].toString(),
-        );
+        const balanceString = ethers.utils.defaultAbiCoder.decode(['uint256'], result)[0].toString();
+        nextBalanceMap[calls[j].market.marketId] = new BigNumber(balanceString).times(99).dividedToIntegerBy(100);
       });
     }
 

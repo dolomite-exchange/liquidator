@@ -73,7 +73,7 @@ export async function retryAsyncAction(action: ApiAsyncAction): Promise<TxResult
 export async function liquidateAccount(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
-  balanceMap: { [marketId: string]: Integer },
+  protocolBalanceMap: { [marketId: string]: Integer },
   riskParams: ApiRiskParam,
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
@@ -132,7 +132,7 @@ export async function liquidateAccount(
     return _liquidateAccountAndSellWithGenericLiquidity(
       liquidAccount,
       marketMap,
-      balanceMap,
+      protocolBalanceMap,
       riskParams,
       marginAccountToActionsMap,
       lastBlockTimestamp,
@@ -148,7 +148,7 @@ export async function liquidateAccount(
 export async function liquidateExpiredAccount(
   expiredAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
-  balanceMap: { [marketId: string]: Integer },
+  protocolBalanceMap: { [marketId: string]: Integer },
   riskParams: ApiRiskParam,
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
@@ -169,7 +169,7 @@ export async function liquidateExpiredAccount(
     return _liquidateAccountAndSellWithGenericLiquidity(
       expiredAccount,
       marketMap,
-      balanceMap,
+      protocolBalanceMap,
       riskParams,
       marginAccountToActionsMap,
       lastBlockTimestamp,
@@ -265,7 +265,7 @@ async function _liquidateAccountSimple(
 async function _liquidateAccountAndSellWithGenericLiquidity(
   liquidAccount: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
-  balanceMap: { [marketId: string]: Integer },
+  protocolBalanceMap: { [marketId: string]: Integer },
   riskParams: ApiRiskParam,
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
@@ -275,7 +275,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     Object.values(liquidAccount.balances),
     true,
     marketMap,
-    balanceMap,
+    protocolBalanceMap,
     lastBlockTimestamp,
     isExpiring,
   );
@@ -283,7 +283,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     Object.values(liquidAccount.balances),
     false,
     marketMap,
-    balanceMap,
+    protocolBalanceMap,
     lastBlockTimestamp,
     isExpiring,
   );
@@ -295,7 +295,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     owedPriceAdj,
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
-    balanceMap[heldBalance.marketId] ?? INTEGERS.MAX_UINT,
+    protocolBalanceMap[heldBalance.marketId] ?? INTEGERS.MAX_UINT,
   );
   /* eslint-disable @typescript-eslint/indent */
   const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])
@@ -410,6 +410,8 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     }
 
     const gasPrice = getGasPriceWei();
+    const inputAmount = owedWei.eq(owedBalance.wei.abs()) ? INTEGERS.MAX_UINT : heldWei;
+    const outputAmount = owedWei.eq(owedBalance.wei.abs()) ? INTEGERS.MAX_UINT : owedWei;
 
     let firstError: unknown;
     if (isGasSpikeProtectionEnabled()) {
@@ -421,8 +423,8 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
             liquidAccount.owner,
             liquidAccount.number,
             outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
-            INTEGERS.MAX_UINT,
-            INTEGERS.MAX_UINT,
+            inputAmount,
+            outputAmount,
             outputs[i].traderParams,
             outputs[i].makerAccounts,
             isExpiring ? (owedBalance.expiresAt ?? null) : null,
@@ -444,8 +446,8 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
             liquidAccount.owner,
             liquidAccount.number,
             outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
-            INTEGERS.MAX_UINT,
-            INTEGERS.MAX_UINT,
+            inputAmount,
+            outputAmount,
             outputs[i].traderParams,
             outputs[i].makerAccounts,
             isExpiring ? (owedBalance.expiresAt ?? null) : null,
