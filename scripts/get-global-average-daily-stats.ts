@@ -7,6 +7,7 @@ import {
   getTotalTransactions,
   getTotalValueLockedAndFees,
 } from '../src/clients/dolomite';
+import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 import '../src/lib/env';
 
@@ -20,8 +21,8 @@ async function start() {
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
 
-  const startTimestamp = 1710374400;
-  const endTimestamp = 1711584000;
+  const startTimestamp = 1718841600;
+  const endTimestamp = 1720051200;
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   }
@@ -31,7 +32,10 @@ async function start() {
     timestamps.push(i);
   }
   const timestampToBlockNumberMap = await getTimestampToBlockNumberMap(timestamps);
-  const tvlAndFees = await getTotalValueLockedAndFees(Object.values(timestampToBlockNumberMap));
+  const tvlAndFees = await getTotalValueLockedAndFees(
+    dolomite.networkId,
+    Object.values(timestampToBlockNumberMap),
+  );
   const totalTransactions = await getTotalTransactions(
     timestampToBlockNumberMap[startTimestamp],
     timestampToBlockNumberMap[endTimestamp - ONE_DAY_SECONDS],

@@ -154,6 +154,7 @@ export interface GraphqlAmmPairData {
 export interface GraphqlInterestRate {
   token: {
     id: string
+    marketId: string
     symbol: string
     decimals: string
     supplyLiquidity: string

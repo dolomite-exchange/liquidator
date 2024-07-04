@@ -22,6 +22,7 @@ import {
   MarketIndex,
   TotalValueLockedAndFees,
 } from '../lib/api-types';
+import { ChainId } from '../lib/chain-id';
 import { TEN_BI } from '../lib/constants';
 import {
   GraphqlAccount,
@@ -458,7 +459,10 @@ export async function getTotalYield(blockNumbers: number[], user: address): Prom
   return totalYield;
 }
 
-export async function getTotalValueLockedAndFees(blockNumbers: number[]): Promise<TotalValueLockedAndFees> {
+export async function getTotalValueLockedAndFees(
+  chainId: number,
+  blockNumbers: number[],
+): Promise<TotalValueLockedAndFees> {
   const queryChunks = blockNumbers.map(blockNumber => {
     return `
       interestRates(
@@ -468,6 +472,7 @@ export async function getTotalValueLockedAndFees(blockNumbers: number[]): Promis
       ) {
         token {
           id
+          marketId
           decimals
           supplyLiquidity
           borrowLiquidity
@@ -486,12 +491,18 @@ export async function getTotalValueLockedAndFees(blockNumbers: number[]): Promis
     const numberOfMarkets = await dolomite.getters.getNumMarkets({ blockNumber });
     const allMarkets: BigNumber[] = []
     for (let j = 0; j < numberOfMarkets.toNumber(); j += 1) {
-      allMarkets.push(new BigNumber(j));
+      if (chainId !== ChainId.ArbitrumOne || j !== 10) {
+        allMarkets.push(new BigNumber(j));
+      }
     }
 
     const allPrices = await Promise.all(
       allMarkets.map(market => dolomite.getters.getMarketPrice(market, { blockNumber })),
     );
+    const allPricesMap = allMarkets.reduce((memo, market, i) => {
+      memo[market.toFixed()] = allPrices[i];
+      return memo;
+    }, {})
 
     const interestRates = await axios.post(
       subgraphUrl,
@@ -503,7 +514,11 @@ export async function getTotalValueLockedAndFees(blockNumbers: number[]): Promis
       .then(response => response.data)
       .then(json => (json.data.interestRates) as GraphqlInterestRate[]);
 
-    interestRates.forEach((rate, j) => {
+    interestRates.forEach(rate => {
+      if (chainId === ChainId.ArbitrumOne && rate.token.marketId === '10') {
+        return;
+      }
+
       if (!allTvlAndFees.totalValueLocked[i]) {
         allTvlAndFees.totalValueLocked[i] = new BigNumber(0);
         allTvlAndFees.borrowFees[i] = new BigNumber(0);
@@ -512,7 +527,7 @@ export async function getTotalValueLockedAndFees(blockNumbers: number[]): Promis
       const supplyLiquidity = new BigNumber(rate.token.supplyLiquidity);
       const borrowLiquidity = new BigNumber(rate.token.borrowLiquidity);
       const scaleFactor = new BigNumber(10).pow(new BigNumber(36).minus(rate.token.decimals))
-      const priceUsd = allPrices[j].div(scaleFactor);
+      const priceUsd = allPricesMap[rate.token.marketId].div(scaleFactor);
 
       allTvlAndFees.totalValueLocked[i] = allTvlAndFees.totalValueLocked[i].plus(supplyLiquidity.times(priceUsd));
 

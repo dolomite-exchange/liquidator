@@ -4,10 +4,13 @@ import {BigNumber} from '@dolomite-exchange/dolomite-margin';
 import { writeFileSync } from 'node:fs';
 import v8 from 'v8';
 import {
-  getTimestampToBlockNumberMap, getTotalTradeVolume,
-  getTotalTransactions, getTotalUniqueUsers,
+  getTimestampToBlockNumberMap,
+  getTotalTradeVolume,
+  getTotalTransactions,
+  getTotalUniqueUsers,
   getTotalValueLockedAndFees,
 } from '../src/clients/dolomite';
+import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 import '../src/lib/env';
 
@@ -39,7 +42,7 @@ async function start() {
   ];
   const timestamps: number[] = timestampWithDescription.map(value => value[0] as number);
   const timestampToBlockNumberMap = await getTimestampToBlockNumberMap(timestamps);
-  const tvlAndFees = await getTotalValueLockedAndFees(Object.values(timestampToBlockNumberMap));
+  const tvlAndFees = await getTotalValueLockedAndFees(dolomite.networkId, Object.values(timestampToBlockNumberMap));
 
   const totalTradeVolumes: BigNumber[] = [];
   const totalTransactions: BigNumber[] = [];
