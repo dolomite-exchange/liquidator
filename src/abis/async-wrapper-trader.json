@@ -46,6 +46,19 @@
   },
   {
     "inputs": [],
+    "name": "DOLOMITE_MARGIN_OWNER",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "HANDLER_REGISTRY",
     "outputs": [
       {
@@ -247,6 +260,19 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_key",
+        "type": "bytes32"
+      }
+    ],
+    "name": "emitDepositCancelled",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

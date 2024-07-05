@@ -1,6 +1,11 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
-import { liquidateAccount, liquidateExpiredAccount, retryAsyncAction } from '../helpers/dolomite-helpers';
+import {
+  emitDepositCancelled, emitWithdrawalExecuted,
+  liquidateAccount,
+  liquidateExpiredAccount,
+  retryAsyncAction,
+} from '../helpers/dolomite-helpers';
 import { isExpired } from '../helpers/time-helpers';
 import AccountStore from '../stores/account-store';
 import AsyncActionRetryStore from '../stores/async-action-retry-store';
@@ -102,12 +107,14 @@ export default class DolomiteLiquidator {
     // Do not put an account in both liquidatable and expired; prioritize liquidation
     expirableAccounts = expirableAccounts.filter((ea) => !liquidatableAccounts.find((la) => la.id === ea.id));
 
-    const marginAccountToActionsMap = this.asyncActionStore.getMarginAccountToRetryableActionsMap();
+    const marginAccountToRetryableActionsMap = this.asyncActionStore.getMarginAccountToRetryableActionsMap();
     const retryableActions = Object.values(
       liquidatableAccounts.reduce((acc, account) => {
-        delete acc[account.id];
+        if (acc[account.id]) {
+          delete acc[account.id];
+        }
         return acc;
-      }, { ...marginAccountToActionsMap }),
+      }, { ...marginAccountToRetryableActionsMap }),
     );
     if (retryableActions.length > 0) {
       for (let i = 0; i < retryableActions.length; i += 1) {
@@ -121,15 +128,30 @@ export default class DolomiteLiquidator {
                 message: 'Retry action transaction hash:',
                 transactionHash: result?.transactionHash,
               });
+              await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
             }
-            await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
           } catch (error: any) {
-            Logger.error({
-              at: 'DolomiteLiquidator#_liquidateAccounts',
-              message: 'Failed to retry action',
-              actions: action,
-              error,
-            });
+            try {
+              if (error.message?.includes('Invalid withdrawal key')) {
+                await emitWithdrawalExecuted(action);
+              } else if (error.message?.includes('Invalid deposit key')) {
+                await emitDepositCancelled(action);
+              } else {
+                Logger.error({
+                  at: 'DolomiteLiquidator#_liquidateAccounts',
+                  message: 'Failed to retry action',
+                  actions: action,
+                  error,
+                });
+              }
+            } catch (innerError: any) {
+              Logger.error({
+                at: 'DolomiteLiquidator#_liquidateAccounts',
+                message: 'Failed to emit action',
+                actions: action,
+                error,
+              });
+            }
           }
         }
       }
@@ -155,7 +177,7 @@ export default class DolomiteLiquidator {
           marketMap,
           this.balanceStore.getMarketBalancesMap(),
           riskParams,
-          marginAccountToActionsMap,
+          marginAccountToRetryableActionsMap,
           lastBlockTimestamp,
         );
         if (result) {
@@ -183,7 +205,7 @@ export default class DolomiteLiquidator {
           marketMap,
           this.balanceStore.getMarketBalancesMap(),
           riskParams,
-          marginAccountToActionsMap,
+          marginAccountToRetryableActionsMap,
           lastBlockTimestamp,
         );
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));

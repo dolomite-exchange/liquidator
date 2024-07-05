@@ -2,6 +2,7 @@ import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
 import {
   ApiAsyncAction,
+  ApiOraclePrice,
   BigNumber as ZapBigNumber,
   DolomiteZap,
   MinimalApiToken,
@@ -13,7 +14,11 @@ import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-type
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
 import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/utils';
-import { prepareForLiquidation, retryDepositOrWithdrawalAction } from './async-liquidations-helper';
+import {
+  emitEventFinalizingEvent,
+  prepareForLiquidation,
+  retryDepositOrWithdrawalAction,
+} from './async-liquidations-helper';
 import { getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei, getRawGasPriceWei, isGasSpikeProtectionEnabled } from './gas-price-helpers';
 import { dolomite } from './web3';
@@ -48,12 +53,59 @@ const zap = new DolomiteZap({
   gasMultiplier: new ZapBigNumber(2),
 });
 
+export async function emitWithdrawalExecuted(action: ApiAsyncAction): Promise<TxResult | undefined> {
+  Logger.info({
+    at: 'dolomite-helpers#retryAsyncAction',
+    message: 'Emitting withdrawal executed for action',
+    accountOwner: action.owner,
+    accountNumber: action.accountNumber.toFixed(),
+    key: action.key,
+  });
+
+  const converter = zap.getIsolationModeConverterByMarketId(action.inputToken.marketId);
+  if (!converter) {
+    Logger.error({
+      at: 'dolomite-helpers#retryAsyncAction',
+      message: 'Could not find converter',
+      id: action.id,
+      marketId: action.inputToken.marketId.toFixed(),
+    });
+    return undefined;
+  }
+
+  return emitEventFinalizingEvent(action, converter);
+}
+
+export async function emitDepositCancelled(action: ApiAsyncAction): Promise<TxResult | undefined> {
+  Logger.info({
+    at: 'dolomite-helpers#retryAsyncAction',
+    message: 'Emitting deposit cancelled for action',
+    accountOwner: action.owner,
+    accountNumber: action.accountNumber.toFixed(),
+    key: action.key,
+  });
+
+  const converter = zap.getIsolationModeConverterByMarketId(action.inputToken.marketId);
+  if (!converter) {
+    Logger.error({
+      at: 'dolomite-helpers#retryAsyncAction',
+      message: 'Could not find converter',
+      id: action.id,
+      marketId: action.inputToken.marketId.toFixed(),
+    });
+    return undefined;
+  }
+
+  return emitEventFinalizingEvent(action, converter);
+}
+
 export async function retryAsyncAction(action: ApiAsyncAction): Promise<TxResult | undefined> {
   Logger.info({
     at: 'dolomite-helpers#retryAsyncAction',
     message: 'Starting retry for async action',
     accountOwner: action.owner,
     accountNumber: action.accountNumber.toFixed(),
+    key: action.key,
   });
 
   const converter = zap.getIsolationModeConverterByMarketId(action.inputToken.marketId);
@@ -290,12 +342,14 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   const owedMarket = marketMap[owedBalance.marketId];
   const heldMarket = marketMap[heldBalance.marketId];
   const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskParams);
+  const heldProtocolBalance = protocolBalanceMap[heldBalance.marketId] ?? INTEGERS.MAX_UINT;
+  const isHeldBalanceLargerThanProtocol = heldBalance.wei.abs().gt(heldProtocolBalance);
   const { owedWei, heldWei, isVaporizable } = getAmountsForLiquidation(
     owedBalance.wei.abs(),
     owedPriceAdj,
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
-    protocolBalanceMap[heldBalance.marketId] ?? INTEGERS.MAX_UINT,
+    heldProtocolBalance,
   );
   /* eslint-disable @typescript-eslint/indent */
   const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])
@@ -394,9 +448,16 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       );
     } else {
       const marketToOracleMap = Object.keys(marketMap).reduce((acc, marketId) => {
-        acc[marketId] = new ZapBigNumber(marketMap[marketId].oraclePrice.toFixed());
+        acc[marketId] = {
+          oraclePrice: new ZapBigNumber(marketMap[marketId].oraclePrice.toFixed()),
+        };
         return acc;
-      }, {});
+      }, {} as Record<string, ApiOraclePrice>);
+      Object.values(marketIdToActionsMap)[0][0].outputAmount = new ZapBigNumber('728107079396983524938');
+      Logger.info({
+        message: 'Performing async liquidation...',
+        actions: Object.values(marketIdToActionsMap),
+      })
       outputs = await zap.getSwapExactAsyncTokensForTokensParamsForLiquidation(
         heldToken,
         new ZapBigNumber(heldWei),
@@ -410,8 +471,8 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     }
 
     const gasPrice = getGasPriceWei();
-    const inputAmount = owedWei.eq(owedBalance.wei.abs()) ? INTEGERS.MAX_UINT : heldWei;
-    const outputAmount = owedWei.eq(owedBalance.wei.abs()) ? INTEGERS.MAX_UINT : owedWei;
+    const inputAmount = !isHeldBalanceLargerThanProtocol ? INTEGERS.MAX_UINT : heldWei;
+    const outputAmount = !isHeldBalanceLargerThanProtocol ? INTEGERS.MAX_UINT : owedWei;
 
     let firstError: unknown;
     if (isGasSpikeProtectionEnabled()) {
@@ -621,7 +682,7 @@ async function _prepareLiquidationForAsyncMarket(
   heldMarket: ApiMarket,
   heldBalance: ApiBalance,
   marketMap: Record<string, ApiMarket>,
-): Promise<TxResult> {
+): Promise<TxResult | undefined> {
   const outputMarketIds = zap.getAsyncAssetOutputMarketsByMarketId(new ZapBigNumber(heldMarket.marketId));
   if (!outputMarketIds) {
     Logger.error({
@@ -716,6 +777,21 @@ async function _prepareLiquidationForAsyncMarket(
       message,
     });
     return Promise.reject(new Error(message));
+  }
+
+  const debtAmountUsd: Integer = Object.keys(liquidAccount.balances).reduce((acc, m) => {
+    const amountWei = liquidAccount.balances[m].wei;
+    if (amountWei.gt(INTEGERS.ZERO)) {
+      return acc;
+    }
+
+    const priceUsd = marketMap[m].oraclePrice;
+    return acc.plus(amountWei.times(priceUsd))
+  }, INTEGERS.ZERO);
+
+  const gasPrice = getGasPriceWei();
+  if (_isGasSpikeFound(bestZapResult.executionFee.dividedToIntegerBy(gasPrice).toNumber(), debtAmountUsd, marketMap)) {
+    return undefined;
   }
 
   return prepareForLiquidation(

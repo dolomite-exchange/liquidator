@@ -1,4 +1,10 @@
-import { AmountDenomination, AmountReference, BigNumber, ConfirmationType } from '@dolomite-exchange/dolomite-margin';
+import {
+  AmountDenomination,
+  AmountReference,
+  BigNumber,
+  ConfirmationType,
+  Decimal,
+} from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import v8 from 'v8';
@@ -12,7 +18,7 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const SMALL_BORROW_THRESHOLD = new BigNumber('1.00');
+const SMALL_BORROW_THRESHOLD = new BigNumber('10.00');
 
 const TEN = new BigNumber('10');
 
@@ -83,7 +89,7 @@ async function start() {
 
   let smallLiquidBorrowCount = 0;
   let smallAlmostLiquidBorrowCount = 0;
-  const liquidAccounts: any[] = [];
+  const liquidAccounts: (ApiAccount & { borrowUSD: Decimal; supplyUSD: Decimal })[] = [];
   const totalAccountsWithBadDebt = [] as (ApiAccount & { borrow: BigNumber; supply: BigNumber; })[];
   for (let i = 0; i < accounts.length; i += 1) {
     const account = accounts[i];
@@ -192,13 +198,16 @@ async function start() {
     Logger.warn({
       message: 'Found liquid account!',
       account: account.id,
-      markets: Object.values(account.balances as any[]).map(formatApiBalance),
+      markets: Object.values(account.balances).map(formatApiBalance),
       supplyUSD: account.supplyUSD.toFixed(6),
       borrowUSD: account.borrowUSD.toFixed(6),
     });
   });
+
+  const totalRegularDebtAmount = liquidAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO).toFixed(2);
   Logger.info({
     message: `Found ${liquidAccounts.length} regular liquidatable accounts`,
+    debtAmount: `$${totalRegularDebtAmount}`,
   });
 
   Logger.info({
