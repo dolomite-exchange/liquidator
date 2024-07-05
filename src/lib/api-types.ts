@@ -53,6 +53,11 @@ export interface ApiRiskParam {
   liquidationReward: Integer;
 }
 
+export interface ApiLiquidation {
+  owedAmountUSD: Decimal;
+  heldAmountUSD: Decimal;
+}
+
 export interface MarketIndex {
   marketId: number
   borrow: Integer

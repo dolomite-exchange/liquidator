@@ -17,6 +17,7 @@ import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
   ApiBalance,
+  ApiLiquidation,
   ApiMarket,
   ApiRiskParam,
   MarketIndex,
@@ -34,6 +35,7 @@ import {
   GraphqlAsyncWithdrawalResult,
   GraphqlInterestIndex,
   GraphqlInterestRate,
+  GraphqlLiquidationsResult,
   GraphqlMarketResult,
   GraphqlOraclePrice,
   GraphqlRiskParamsResult,
@@ -348,6 +350,54 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
   return { riskParams: riskParams[0] };
 }
 
+export async function getLiquidationsBetweenTimestamps(
+  lowerTimestamp: number,
+  upperTimestamp: number,
+  lastId: string,
+): Promise<{ liquidations: ApiLiquidation[] }> {
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query: `query getLiquidationsBetweenTimestamps($lowerTimestamp: BigInt, $upperTimestamp: BigInt, $lastId: ID) {
+        liquidations(
+          where: { 
+            transaction_: { timestamp_gte: $lowerTimestamp timestamp_lte: $upperTimestamp }
+            id_gt: $lastId
+          }
+          first: 1000
+          orderBy: id
+          orderDirection: asc
+        ) {
+          heldTokenAmountUSD
+          borrowedTokenAmountUSD
+        }
+      }`,
+      variables: {
+        lowerTimestamp,
+        upperTimestamp,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidationsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    // noinspection JSPotentiallyInvalidTargetOfIndexedPropertyAccess
+    return Promise.reject(result.errors[0]);
+  }
+
+  const liquidations: ApiLiquidation[] = result.data.liquidations.map(liquidation => {
+    return {
+      owedAmountUSD: new BigNumber(liquidation.borrowedTokenAmountUSD),
+      heldAmountUSD: new BigNumber(liquidation.heldTokenAmountUSD),
+    };
+  });
+
+  return { liquidations };
+}
+
 export async function getTimestampToBlockNumberMap(timestamps: number[]): Promise<Record<string, number>> {
   let queries = '';
   timestamps.forEach(timestamp => {
@@ -499,8 +549,8 @@ export async function getTotalValueLockedAndFees(
     const allPrices = await Promise.all(
       allMarkets.map(market => dolomite.getters.getMarketPrice(market, { blockNumber })),
     );
-    const allPricesMap = allMarkets.reduce((memo, market, i) => {
-      memo[market.toFixed()] = allPrices[i];
+    const allPricesMap = allMarkets.reduce((memo, market, j) => {
+      memo[market.toFixed()] = allPrices[j];
       return memo;
     }, {})
 

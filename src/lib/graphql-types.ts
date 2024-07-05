@@ -135,6 +135,18 @@ export interface GraphqlRiskParams {
   liquidationReward: string
 }
 
+export interface GraphqlLiquidationsResult {
+  data: {
+    liquidations: GraphqlLiquidations[]
+  }
+  errors: any
+}
+
+export interface GraphqlLiquidations {
+  heldTokenAmountUSD: string
+  borrowedTokenAmountUSD: string
+}
+
 interface GraphqlBlockResult {
   number: string
 }
