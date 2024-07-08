@@ -825,7 +825,7 @@ function _isGasSpikeFound(
 
   const gasPrice = getRawGasPriceWei();
   const payablePriceUsd: Integer = Object.values(marketMap)
-    .find(m => m.tokenAddress.toLowerCase() === dolomite.weth.address.toLowerCase())!.oraclePrice;
+    .find(m => m.tokenAddress.toLowerCase() === dolomite.payableToken.address.toLowerCase())!.oraclePrice;
   const rewardAmountUsd = debtAmountUsd.times('5').dividedToIntegerBy('100');
   if (gasPrice.times(gasEstimate).times(payablePriceUsd).gt(rewardAmountUsd)) {
     Logger.info({

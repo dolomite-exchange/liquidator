@@ -84,7 +84,7 @@ export default class BalanceStore {
           acc.push({
             market,
             target: market.tokenAddress,
-            callData: dolomite.contracts.weth.methods.balanceOf(dolomite.address).encodeABI(),
+            callData: dolomite.contracts.payableToken.methods.balanceOf(dolomite.address).encodeABI(),
           })
         }
         return acc;

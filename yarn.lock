@@ -325,10 +325,10 @@
     enabled "2.0.x"
     kuler "^2.0.0"
 
-"@dolomite-exchange/dolomite-margin@^0.12.4":
-  version "0.12.4"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.12.4.tgz#4fd9b1e0c08422562138978c9112c92609e933b7"
-  integrity sha512-mVBH33cQieJI0D3vnoqpW9hvKIcIllA4U4MgPNk0B8wik7Wtul3hYLXI+FJB9Dz6ohhXV/6g4yegrnIZRDYeFQ==
+"@dolomite-exchange/dolomite-margin@^0.12.6":
+  version "0.12.6"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.12.6.tgz#1e031c7d08a79b2594ad2712ce6295ef604009bf"
+  integrity sha512-2T+oTHEPgW7a3GJgebEQQqWjl7HUH8CIhCLJgMUMcFLPD3Me8tCffaRb2xzZbpViLcjFkoCxxupS3JFjEwvv6Q==
   dependencies:
     "@openzeppelin/contracts" "^2.5.1"
     "@poanet/solidity-flattener" "^3.0.9"
