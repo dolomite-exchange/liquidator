@@ -88,7 +88,7 @@ async function start() {
   const accounts = accountStore.getLiquidatableDolomiteAccounts();
 
   let smallLiquidBorrowCount = 0;
-  let smallAlmostLiquidBorrowCount = 0;
+  let smallLiquidDebtAmount = INTEGERS.ZERO;
   const liquidAccounts: (ApiAccount & { borrowUSD: Decimal; supplyUSD: Decimal })[] = [];
   const totalAccountsWithBadDebt = [] as (ApiAccount & { borrow: BigNumber; supply: BigNumber; })[];
   for (let i = 0; i < accounts.length; i += 1) {
@@ -172,6 +172,7 @@ async function start() {
     } else if (borrowAdj.times('1.15').gt(supplyAdj) && !shouldIgnoreAccount(account)) {
       if (borrowAdj.lt(SMALL_BORROW_THRESHOLD)) {
         smallLiquidBorrowCount += 1;
+        smallLiquidDebtAmount = smallLiquidDebtAmount.plus(borrow);
       } else {
         liquidAccounts.push({
           ...account,
@@ -180,9 +181,7 @@ async function start() {
         });
       }
     } else if (borrowAdj.times('1.155').gt(supplyAdj) && !shouldIgnoreAccount(account)) {
-      if (borrowAdj.lt(SMALL_BORROW_THRESHOLD)) {
-        smallAlmostLiquidBorrowCount += 1;
-      } else {
+      if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
         Logger.info({
           message: 'Found almost liquid account!',
           account: account.id,
@@ -207,17 +206,15 @@ async function start() {
   const totalRegularDebtAmount = liquidAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO).toFixed(2);
   Logger.info({
     message: `Found ${liquidAccounts.length} regular liquidatable accounts`,
+    liquidCount: liquidAccounts.length,
     debtAmount: `$${totalRegularDebtAmount}`,
   });
 
   Logger.info({
     message: `Found ${smallLiquidBorrowCount} small liquidatable accounts`,
     smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFixed(4)}`,
-  });
-
-  Logger.info({
-    message: `Found ${smallAlmostLiquidBorrowCount} almost liquidatable accounts with small borrow positions`,
-    smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFixed(4)}`,
+    liquidCount: smallLiquidBorrowCount,
+    debtAmount: `$${smallLiquidDebtAmount.toFixed(2)}`,
   });
 
   if (totalAccountsWithBadDebt.length === 0) {
