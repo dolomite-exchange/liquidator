@@ -453,7 +453,6 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
         };
         return acc;
       }, {} as Record<string, ApiOraclePrice>);
-      Object.values(marketIdToActionsMap)[0][0].outputAmount = new ZapBigNumber('728107079396983524938');
       Logger.info({
         message: 'Performing async liquidation...',
         actions: Object.values(marketIdToActionsMap),
@@ -786,7 +785,7 @@ async function _prepareLiquidationForAsyncMarket(
     }
 
     const priceUsd = marketMap[m].oraclePrice;
-    return acc.plus(amountWei.times(priceUsd))
+    return acc.plus(amountWei.abs().times(priceUsd))
   }, INTEGERS.ZERO);
 
   const gasPrice = getGasPriceWei();
