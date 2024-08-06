@@ -261,7 +261,7 @@ export default class DolomiteLiquidator {
     const collateralization = supply.times(this.BASE)
       .div(borrow)
       .integerValue(BigNumber.ROUND_FLOOR);
-    return collateralization.gte(riskParams.liquidationRatio);
+    return collateralization.gte(riskParams.liquidationRatio) || supply.eq(INTEGERS.ZERO);
   }
 
   isSufficientDebt = (

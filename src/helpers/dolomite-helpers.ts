@@ -789,7 +789,10 @@ async function _prepareLiquidationForAsyncMarket(
   }, INTEGERS.ZERO);
 
   const gasPrice = getGasPriceWei();
-  if (_isGasSpikeFound(bestZapResult.executionFee.dividedToIntegerBy(gasPrice).toNumber(), debtAmountUsd, marketMap)) {
+  if (
+    isGasSpikeProtectionEnabled()
+    && _isGasSpikeFound(bestZapResult.executionFee.dividedToIntegerBy(gasPrice).toNumber(), debtAmountUsd, marketMap)
+  ) {
     return undefined;
   }
 
