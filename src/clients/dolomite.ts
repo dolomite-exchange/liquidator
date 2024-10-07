@@ -41,7 +41,7 @@ import {
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
   GraphqlToken,
-  GraphqlTokenValue,
+  GraphqlTokenValue, GraphqlUserResult,
 } from '../lib/graphql-types';
 import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
@@ -129,6 +129,45 @@ export async function getLiquidatableDolomiteAccounts(
                 }
               }`;
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
+}
+
+export async function getAllDolomiteUsersWithPositions(
+  blockNumber: number,
+  lastId: string | undefined,
+): Promise<{ accounts: string[] }> {
+  const query = `
+            query getUsers($blockNumber: Int, $lastId: ID) {
+                users(
+                  where: { totalBorrowPositionCount_gt: 0 id_gt: $lastId  }
+                  block: { number: $blockNumber }
+                  orderBy: id
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                ) {
+                  id
+                }
+              }`;
+  const accounts = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        blockNumber,
+        lastId: lastId ?? '',
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then((response: any) => {
+      if (response.errors && typeof response.errors === 'object') {
+        return Promise.reject((response.errors as any)[0]);
+      } else {
+        return (response as GraphqlUserResult).data.users;
+      }
+    })
+    .then(graphqlAccounts => graphqlAccounts.map(account => account.id, [] as string[]));
+
+  return { accounts };
 }
 
 export async function getAllDolomiteAccountsWithSupplyValue(

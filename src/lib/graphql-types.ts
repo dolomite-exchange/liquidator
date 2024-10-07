@@ -60,6 +60,12 @@ export interface GraphqlAccountResult {
   }
 }
 
+export interface GraphqlUserResult {
+  data: {
+    users: { id: string }[]
+  }
+}
+
 export interface GraphqlTokenValue {
   token: GraphqlToken
   valuePar: string

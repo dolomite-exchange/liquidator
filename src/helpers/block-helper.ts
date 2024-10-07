@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import Logger from '../lib/logger';
 import { dolomite } from './web3';
 
-const SUBGRAPH_URL = process.env.SUBGRAPH_URL ?? '';
+export const SUBGRAPH_URL = process.env.SUBGRAPH_URL ?? '';
 if (!SUBGRAPH_URL) {
   throw new Error('SUBGRAPH_URL is not defined');
 }
