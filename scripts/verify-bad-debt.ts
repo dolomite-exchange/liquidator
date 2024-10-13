@@ -203,18 +203,34 @@ async function start() {
     });
   });
 
-  const totalRegularDebtAmount = liquidAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO).toFixed(2);
+  const totalAccountDebt = accounts.reduce((acc, account) => {
+    const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
+      if (balance.wei.gte(INTEGERS.ZERO)) {
+        return memo;
+      }
+      const market = marketMap[balance.marketId.toString()];
+      return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
+    }, INTEGERS.ZERO);
+    return acc.plus(totalBorrowUsd);
+  }, INTEGERS.ZERO).toNumber();
+  Logger.info({
+    message: `Found ${accounts.length} accounts with debt`,
+    debtCount: accounts.length,
+    debtAmount: `$${formatNumber(totalAccountDebt)}`,
+  });
+
+  const totalLiquidDebtAmount = liquidAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO).toNumber();
   Logger.info({
     message: `Found ${liquidAccounts.length} regular liquidatable accounts`,
     liquidCount: liquidAccounts.length,
-    debtAmount: `$${totalRegularDebtAmount}`,
+    debtAmount: `$${formatNumber(totalLiquidDebtAmount)}`,
   });
 
   Logger.info({
     message: `Found ${smallLiquidBorrowCount} small liquidatable accounts`,
     smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFixed(4)}`,
     liquidCount: smallLiquidBorrowCount,
-    debtAmount: `$${smallLiquidDebtAmount.toFixed(2)}`,
+    debtAmount: `$${formatNumber(smallLiquidDebtAmount.toNumber())}`,
   });
 
   if (totalAccountsWithBadDebt.length === 0) {
@@ -222,16 +238,21 @@ async function start() {
       message: `No bad debt found across ${accounts.length} active margin accounts!`,
     });
   } else {
+    const totalBadDebt = totalAccountsWithBadDebt.reduce(
+      (memo, account) => memo.plus(account.supply.minus(account.borrow)),
+      INTEGERS.ZERO,
+    ).abs().toNumber();
     Logger.info({
       accountsWithBadDebtLength: totalAccountsWithBadDebt.length,
-      totalBadDebt: totalAccountsWithBadDebt.reduce(
-        (memo, account) => memo.plus(account.supply.minus(account.borrow)),
-        INTEGERS.ZERO,
-      ).toFixed(),
+      totalBadDebt: `$${formatNumber(totalBadDebt)}`,
     });
   }
 
   return true;
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString('en-US', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 start().catch(error => {
