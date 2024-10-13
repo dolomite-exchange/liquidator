@@ -31,6 +31,7 @@ import BlockStore from './stores/block-store';
 import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
 import RiskParamsStore from './stores/risk-params-store';
+import { ISOLATION_MODE_CONVERSION_MARKET_ID_MAP } from '@dolomite-exchange/zap-sdk/dist/src/lib/Constants';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -152,6 +153,11 @@ async function start() {
     liquidatePollIntervalMillis: process.env.LIQUIDATE_POLL_INTERVAL_MS,
     marketPollIntervalMillis: process.env.MARKET_POLL_INTERVAL_MS,
     riskParamsPollIntervalMillis: process.env.RISK_PARAMS_POLL_INTERVAL_MS,
+  });
+
+  Logger.info({
+    message: 'Isolation mode assets',
+    data: Object.keys(ISOLATION_MODE_CONVERSION_MARKET_ID_MAP[networkId]),
   });
 
   if (liquidationMode === LiquidationMode.Simple) {
