@@ -24,8 +24,8 @@ async function start() {
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
 
-  const startTimestamp = 1721260800;
-  const endTimestamp = 1722470400;
+  const startTimestamp = 1704067200;
+  const endTimestamp = 1729641600;
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   }
@@ -51,6 +51,8 @@ async function start() {
 
   const liquidatedDebtUsd = allLiquidations.reduce((acc, l) => acc.plus(l.owedAmountUSD), INTEGERS.ZERO)
 
+  const reserveFactor = INTEGERS.ONE.minus(await dolomite.getters.getEarningsRate());
+
   const averageTvl = tvlAndFees.totalValueLocked
     .reduce((acc, value) => acc.plus(value), new BigNumber(0))
     .div(timestamps.length);
@@ -61,17 +63,25 @@ async function start() {
   console.log('----------------------------------------------------')
   console.log('-------------------- TVL Data --------------------');
   console.log('----------------------------------------------------')
-  console.log('Average TVL:', `$${averageTvl.toFixed(2)}`);
-  console.log('Average Daily Transactions:', `${totalTransactions.div(timestamps.length).toFixed(2)}`);
-  console.log('Liquidation Count:', allLiquidations.length);
-  console.log('Liquidated Debt:', `$${liquidatedDebtUsd.toFixed(2)}`);
-  console.log('Total Transactions:', `${totalTransactions.toFixed(2)}`);
-  console.log('Total Borrow Fees:', `$${borrowFees.toFixed(2)}`);
-  console.log('Average Borrow Fees:', `$${borrowFees.div(timestamps.length).toFixed(2)}`);
-  console.log('Tabulation period:', `${timestamps} days (${startTimestampString} - ${endTimestampString})`);
+  console.log('Average TVL (per Day):', `$${averageTvl.toFormat(2)}`);
+  console.log('Average Daily Transactions (per Day):', `${totalTransactions.div(timestamps.length).toFormat(2)}`);
+  console.log('Liquidation Count:', `${allLiquidations.length}`);
+  console.log('Liquidated Debt:', `$${liquidatedDebtUsd.toFormat(2)}`);
+  console.log('Total Transactions:', `${totalTransactions.toFormat(2)}`);
+  console.log('Total Borrow Fees:', `$${borrowFees.toFormat(2)}`);
+  console.log('Total Revenue:', `$${borrowFees.times(reserveFactor).toFormat(2)}`);
+  console.log('Average Borrow Fees (per Day):', `$${borrowFees.div(timestamps.length).toFixed(2)}`);
+  console.log('Average Revenue (per Day):', `$${borrowFees.times(reserveFactor).div(timestamps.length).toFixed(2)}`);
+  console.log(
+    'Tabulation period:',
+    `${timestamps.length} days; ${startTimestampString} through ${endTimestampString}`,
+  );
   console.log();
-  const annualizedData = new BigNumber(365).div(timestamps.length)
-  console.log('Annualized borrow fees:', `$${borrowFees.times(annualizedData).toFixed(2)}`);
+  const annualizedData = new BigNumber(365).div(timestamps.length);
+  const annualizedBorrowFees = borrowFees.times(annualizedData);
+  console.log('Annualized Borrow Fees:', `$${annualizedBorrowFees.toFormat(2)}`);
+  console.log('Reserve Factor:', `${reserveFactor.times(100).toFormat(2)}%`);
+  console.log('Annualized Revenue:', `$${annualizedBorrowFees.times(reserveFactor).toFormat(2)}`);
   console.log('----------------------------------------------------')
 
   return true
@@ -81,6 +91,6 @@ start().catch(error => {
   Logger.error({
     message: `Found error while starting: ${error.toString()}`,
     error,
-  })
-  process.exit(1)
+  });
+  process.exit(1);
 });

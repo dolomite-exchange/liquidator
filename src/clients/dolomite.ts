@@ -407,6 +407,7 @@ export async function getLiquidationsBetweenTimestamps(
           orderBy: id
           orderDirection: asc
         ) {
+          id
           heldTokenAmountUSD
           borrowedTokenAmountUSD
         }
@@ -429,6 +430,7 @@ export async function getLiquidationsBetweenTimestamps(
 
   const liquidations: ApiLiquidation[] = result.data.liquidations.map(liquidation => {
     return {
+      id: liquidation.id,
       owedAmountUSD: new BigNumber(liquidation.borrowedTokenAmountUSD),
       heldAmountUSD: new BigNumber(liquidation.heldTokenAmountUSD),
     };
@@ -586,7 +588,10 @@ export async function getTotalValueLockedAndFees(
     }
 
     const allPrices = await Promise.all(
-      allMarkets.map(market => dolomite.getters.getMarketPrice(market, { blockNumber })),
+      allMarkets.map(async market => {
+        await sleep(250);
+        return dolomite.getters.getMarketPrice(market, { blockNumber });
+      }),
     );
     const allPricesMap = allMarkets.reduce((memo, market, j) => {
       memo[market.toFixed()] = allPrices[j];

@@ -149,6 +149,7 @@ export interface GraphqlLiquidationsResult {
 }
 
 export interface GraphqlLiquidations {
+  id: string;
   heldTokenAmountUSD: string
   borrowedTokenAmountUSD: string
 }
