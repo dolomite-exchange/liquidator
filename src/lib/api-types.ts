@@ -65,6 +65,7 @@ export interface MarketIndex {
 }
 
 export interface TotalValueLockedAndFees {
-  totalValueLocked: Decimal[]
+  totalSupplyLiquidity: Decimal[]
+  totalBorrowLiquidity: Decimal[]
   borrowFees: Decimal[]
 }

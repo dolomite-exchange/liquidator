@@ -71,7 +71,7 @@ async function start() {
     totalUniqueUsers.push(totalUniqueUserGrowth);
   }
 
-  const tvlData = tvlAndFees.totalValueLocked.map((value, i) => {
+  const tvlData = tvlAndFees.totalSupplyLiquidity.map((value, i) => {
     return `${timestampWithDescription[i][1]},${value.toFixed(2)}`
   }).join('\n');
   writeFileSync(`${__dirname}/output/tvl-data.csv`, tvlData);

@@ -574,7 +574,8 @@ export async function getTotalValueLockedAndFees(
   }, []);
 
   const allTvlAndFees: TotalValueLockedAndFees = {
-    totalValueLocked: [],
+    totalSupplyLiquidity: [],
+    totalBorrowLiquidity: [],
     borrowFees: [],
   };
   for (let i = 0; i < queryChunks.length; i += 1) {
@@ -613,8 +614,9 @@ export async function getTotalValueLockedAndFees(
         return;
       }
 
-      if (!allTvlAndFees.totalValueLocked[i]) {
-        allTvlAndFees.totalValueLocked[i] = new BigNumber(0);
+      if (!allTvlAndFees.totalSupplyLiquidity[i]) {
+        allTvlAndFees.totalSupplyLiquidity[i] = new BigNumber(0);
+        allTvlAndFees.totalBorrowLiquidity[i] = new BigNumber(0);
         allTvlAndFees.borrowFees[i] = new BigNumber(0);
       }
 
@@ -623,7 +625,8 @@ export async function getTotalValueLockedAndFees(
       const scaleFactor = new BigNumber(10).pow(new BigNumber(36).minus(rate.token.decimals))
       const priceUsd = allPricesMap[rate.token.marketId].div(scaleFactor);
 
-      allTvlAndFees.totalValueLocked[i] = allTvlAndFees.totalValueLocked[i].plus(supplyLiquidity.times(priceUsd));
+      allTvlAndFees.totalSupplyLiquidity[i] = allTvlAndFees.totalSupplyLiquidity[i].plus(supplyLiquidity.times(priceUsd));
+      allTvlAndFees.totalBorrowLiquidity[i] = allTvlAndFees.totalBorrowLiquidity[i].plus(borrowLiquidity.times(priceUsd));
 
       const feesDaily = borrowLiquidity.times(priceUsd).times(rate.borrowInterestRate).div(365);
       allTvlAndFees.borrowFees[i] = allTvlAndFees.borrowFees[i].plus(feesDaily);

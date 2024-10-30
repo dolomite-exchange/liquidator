@@ -24,8 +24,8 @@ async function start() {
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
 
-  const startTimestamp = 1704067200;
-  const endTimestamp = 1729641600;
+  const startTimestamp = 1727827200; // October 2, 2024
+  const endTimestamp = 1729641600; // October 23, 2024
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   }
@@ -53,7 +53,10 @@ async function start() {
 
   const reserveFactor = INTEGERS.ONE.minus(await dolomite.getters.getEarningsRate());
 
-  const averageTvl = tvlAndFees.totalValueLocked
+  const averageSupplyTvl = tvlAndFees.totalSupplyLiquidity
+    .reduce((acc, value) => acc.plus(value), new BigNumber(0))
+    .div(timestamps.length);
+  const averageBorrowTvl = tvlAndFees.totalBorrowLiquidity
     .reduce((acc, value) => acc.plus(value), new BigNumber(0))
     .div(timestamps.length);
   const borrowFees = tvlAndFees.borrowFees.reduce((acc, value) => acc.plus(value), new BigNumber(0));
@@ -63,7 +66,8 @@ async function start() {
   console.log('----------------------------------------------------')
   console.log('-------------------- TVL Data --------------------');
   console.log('----------------------------------------------------')
-  console.log('Average TVL (per Day):', `$${averageTvl.toFormat(2)}`);
+  console.log('Average Supply TVL:', `$${averageSupplyTvl.toFormat(2)}`);
+  console.log('Average Borrow TVL:', `$${averageBorrowTvl.toFormat(2)}`);
   console.log('Average Daily Transactions (per Day):', `${totalTransactions.div(timestamps.length).toFormat(2)}`);
   console.log('Liquidation Count:', `${allLiquidations.length}`);
   console.log('Liquidated Debt:', `$${liquidatedDebtUsd.toFormat(2)}`);
