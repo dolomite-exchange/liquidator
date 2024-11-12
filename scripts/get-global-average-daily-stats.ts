@@ -20,12 +20,13 @@ async function start() {
   Logger.info({
     message: 'Get Average TVL Configuration:',
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
+    networkId: dolomite.networkId,
     subgraphUrl: process.env.SUBGRAPH_URL,
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
 
-  const startTimestamp = 1727827200; // October 2, 2024
-  const endTimestamp = 1729641600; // October 23, 2024
+  const startTimestamp = 1731283200; // November 11, 2024
+  const endTimestamp = 1731369600; // November 12, 2024
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   }
