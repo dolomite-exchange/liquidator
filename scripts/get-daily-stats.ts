@@ -25,8 +25,8 @@ async function start() {
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
 
-  const startTimestamp = 1731628800; // November 15, 2024
-  const endTimestamp = 1732233600; // November 22, 2024
+  const startTimestamp = 1732233600; // November 22, 2024
+  const endTimestamp = 1733270400; // December 4, 2024
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   }
