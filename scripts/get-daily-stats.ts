@@ -1,8 +1,7 @@
 /** @formatter:off */
 /** @formatter:on */
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import v8 from 'v8';
-import { INTEGERS } from '../../dolomite-zap-sdk';
 import {
   getLiquidationsBetweenTimestamps,
   getTimestampToBlockNumberMap,
@@ -24,11 +23,12 @@ async function start() {
     subgraphUrl: process.env.SUBGRAPH_URL,
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
-
-  const startTimestamp = 1732233600; // November 22, 2024
-  const endTimestamp = 1733270400; // December 4, 2024
+  const startTimestamp: number = 1733443200; // December 6, 2024
+  const endTimestamp: number = 1733875200; // December 11, 2024
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
+  } else if (startTimestamp === endTimestamp) {
+    return Promise.reject(new Error('start timestamp cannot equal end timestamp'));
   }
 
   const timestamps: number[] = [];
@@ -36,6 +36,15 @@ async function start() {
     timestamps.push(i);
   }
   const timestampToBlockNumberMap = await getTimestampToBlockNumberMap(timestamps);
+
+  Logger.info({
+    message: 'Get timestamp information:',
+    startTimestamp: new Date(startTimestamp * 1000).toISOString(),
+    startBlock: timestampToBlockNumberMap[startTimestamp],
+    endTimestamp: new Date(endTimestamp * 1000).toISOString(),
+    endBlock: timestampToBlockNumberMap[endTimestamp - ONE_DAY_SECONDS],
+  });
+
   const tvlAndFees = await getTotalValueLockedAndFees(
     dolomite.networkId,
     Object.values(timestampToBlockNumberMap),

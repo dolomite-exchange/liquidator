@@ -687,9 +687,7 @@ export async function getTotalTransactions(startBlockNumber: number, endBlockNum
     defaultAxiosConfig,
   )
     .then(response => response.data)
-    .then(json => {
-      return (json.data) as { start: { transactionCount: string }[], end: { transactionCount: string }[] }
-    });
+    .then(json => ((json.data) as { start: { transactionCount: string }[], end: { transactionCount: string }[] }));
 
   return new BigNumber(end[0].transactionCount).minus(start[0].transactionCount);
 }
