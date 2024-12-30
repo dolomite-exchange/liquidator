@@ -41,7 +41,8 @@ import {
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
   GraphqlToken,
-  GraphqlTokenValue, GraphqlUserResult,
+  GraphqlTokenValue,
+  GraphqlUserResult,
 } from '../lib/graphql-types';
 import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
@@ -588,16 +589,21 @@ export async function getTotalValueLockedAndFees(
       }
     }
 
-    const allPrices = await Promise.all(
-      allMarkets.map(async market => {
-        await sleep(250);
-        return dolomite.getters.getMarketPrice(market, { blockNumber });
-      }),
-    );
+    const callDatas = allMarkets.map(market => {
+      return {
+        target: dolomite.address,
+        callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.toNumber()).encodeABI(),
+      };
+    });
+    const { results: allPricesRaw } = await dolomite.multiCall.aggregate(callDatas, { blockNumber });
+    const allPrices = allPricesRaw.map(priceEncoded => {
+      return new BigNumber(dolomite.web3.eth.abi.decodeParameter('uint256', priceEncoded).toString());
+    })
+
     const allPricesMap = allMarkets.reduce((memo, market, j) => {
       memo[market.toFixed()] = allPrices[j];
       return memo;
-    }, {})
+    }, {} as Record<string, BigNumber>)
 
     const interestRates = await axios.post(
       subgraphUrl,
@@ -625,8 +631,10 @@ export async function getTotalValueLockedAndFees(
       const scaleFactor = new BigNumber(10).pow(new BigNumber(36).minus(rate.token.decimals))
       const priceUsd = allPricesMap[rate.token.marketId].div(scaleFactor);
 
-      allTvlAndFees.totalSupplyLiquidity[i] = allTvlAndFees.totalSupplyLiquidity[i].plus(supplyLiquidity.times(priceUsd));
-      allTvlAndFees.totalBorrowLiquidity[i] = allTvlAndFees.totalBorrowLiquidity[i].plus(borrowLiquidity.times(priceUsd));
+      allTvlAndFees.totalSupplyLiquidity[i]
+        = allTvlAndFees.totalSupplyLiquidity[i].plus(supplyLiquidity.times(priceUsd));
+      allTvlAndFees.totalBorrowLiquidity[i]
+        = allTvlAndFees.totalBorrowLiquidity[i].plus(borrowLiquidity.times(priceUsd));
 
       const feesDaily = borrowLiquidity.times(priceUsd).times(rate.borrowInterestRate).div(365);
       allTvlAndFees.borrowFees[i] = allTvlAndFees.borrowFees[i].plus(feesDaily);
