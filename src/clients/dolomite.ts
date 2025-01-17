@@ -443,8 +443,7 @@ export async function getLiquidationsBetweenTimestamps(
 export async function getTimestampToBlockNumberMap(timestamps: number[]): Promise<Record<string, number>> {
   let queries = '';
   timestamps.forEach(timestamp => {
-    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 15}, timestamp_lt: ${timestamp
-    + 15} } first: 1) { number }\n`
+    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 30}, timestamp_lte: ${timestamp} } first: 1 orderDirection: desc orderBy: number) { number }\n`
   });
   const result = await axios.post(
     `${process.env.SUBGRAPH_BLOCKS_URL}`,
