@@ -90,6 +90,7 @@ async function start() {
   let smallLiquidBorrowCount = 0;
   let smallLiquidDebtAmount = INTEGERS.ZERO;
   const liquidAccounts: (ApiAccount & { borrowUSD: Decimal; supplyUSD: Decimal })[] = [];
+  const allAccounts: (ApiAccount & { borrowUSD: Decimal; supplyUSD: Decimal })[] = [];
   const totalAccountsWithBadDebt = [] as (ApiAccount & { borrow: BigNumber; supply: BigNumber; })[];
   for (let i = 0; i < accounts.length; i += 1) {
     const account = accounts[i];
@@ -122,6 +123,14 @@ async function start() {
         }
         return acc;
       }, initial);
+
+    if (supply.gt(INTEGERS.ZERO)) {
+      allAccounts.push({
+        ...account,
+        supplyUSD: supply,
+        borrowUSD: borrow,
+      });
+    }
 
     if (borrow.gt(supply)) {
       if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
@@ -192,6 +201,26 @@ async function start() {
       }
     }
   }
+
+  allAccounts.sort((a, b) => (a.borrowUSD.gt(b.borrowUSD) ? 1 : -1));
+  Logger.info({
+    message: 'Stats on accounts with debt',
+    medianAccountDebt: allAccounts[Math.floor(allAccounts.length / 2)].borrowUSD.toFormat(2),
+    biggestAccountDebt: allAccounts[allAccounts.length - 1].borrowUSD.toFormat(2),
+    averageAccountDebt: allAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
+      .div(allAccounts.length)
+      .toFormat(2),
+  });
+
+  allAccounts.sort((a, b) => (a.supplyUSD.gt(b.supplyUSD) ? 1 : -1));
+  Logger.info({
+    message: 'Stats on accounts with supply',
+    medianAccountSupply: allAccounts[Math.floor(allAccounts.length / 2)].supplyUSD.toFormat(2),
+    biggestAccountSupply: allAccounts[allAccounts.length - 1].supplyUSD.toFormat(2),
+    averageAccountSupply: allAccounts.reduce((acc, b) => acc.plus(b.supplyUSD), INTEGERS.ZERO)
+      .div(allAccounts.length)
+      .toFormat(2),
+  });
 
   liquidAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1)).forEach(account => {
     Logger.warn({

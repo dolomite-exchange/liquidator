@@ -1,7 +1,9 @@
 import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import axios from 'axios';
-import { ChainId, isArbitrum, isMantle } from '../lib/chain-id';
+import { ChainId, isArbitrum, isBerachain, isMantle } from '../lib/chain-id';
 import Logger from '../lib/logger';
+
+const ONE_GWEI_IN_WEI_UNITS = new BigNumber('1000000000');
 
 let lastPriceWei: string;
 resetGasPriceWei();
@@ -80,12 +82,16 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }>
   } else if (isArbitrum(networkId)) {
     const result = await dolomite.arbitrumGasInfo!.getPricesInWei();
     return {
-      fast: result.perArbGasTotal.dividedBy('1000000000').toFixed(), // convert to gwei
+      fast: result.perArbGasTotal.dividedBy(ONE_GWEI_IN_WEI_UNITS).toFixed(), // convert to gwei
     };
+  } else if (isBerachain(networkId)) {
+    const response = await dolomite.web3.eth.getGasPrice();
+    const gasPrice = new BigNumber(response).div(ONE_GWEI_IN_WEI_UNITS).toFixed();
+    return { fast: gasPrice };
   } else if (isMantle(networkId)) {
     const result = await dolomite.mantleGasInfo!.getPriceInWei();
     return {
-      fast: result.dividedBy('1000000000').toFixed(), // convert to gwei
+      fast: result.dividedBy(ONE_GWEI_IN_WEI_UNITS).toFixed(), // convert to gwei
     };
   } else {
     const errorMessage = `Could not find network ID ${networkId}`;

@@ -1,3 +1,4 @@
+import { ISOLATION_MODE_CONVERSION_MARKET_ID_MAP } from '@dolomite-exchange/zap-sdk/dist/src/lib/MarketIds';
 import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import v8 from 'v8';
 // eslint-disable-next-line
@@ -31,7 +32,6 @@ import BlockStore from './stores/block-store';
 import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
 import RiskParamsStore from './stores/risk-params-store';
-import { ISOLATION_MODE_CONVERSION_MARKET_ID_MAP } from '@dolomite-exchange/zap-sdk/dist/src/lib/Constants';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');

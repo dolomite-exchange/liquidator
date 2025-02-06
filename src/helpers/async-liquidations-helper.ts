@@ -1,9 +1,8 @@
 import { ContractCallOptions, Integer } from '@dolomite-exchange/dolomite-margin';
 import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
-// import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { ApiAsyncAction, ApiAsyncActionType } from '@dolomite-exchange/zap-sdk';
-import { ApiMarketConverter } from '@dolomite-exchange/zap-sdk/dist/src/lib/Constants';
+import { ApiMarketConverter } from '@dolomite-exchange/zap-sdk/dist/src/lib/ApiTypes';
 import AsyncUnwrapperAbi from '../abis/async-unwrapper-trader.json';
 import AsyncWrapperAbi from '../abis/async-wrapper-trader.json';
 import IsolationModeFreezableLiquidatorProxyAbi from '../abis/isolation-mode-freezable-liquidator-proxy.json';

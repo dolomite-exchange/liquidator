@@ -325,10 +325,10 @@
     enabled "2.0.x"
     kuler "^2.0.0"
 
-"@dolomite-exchange/dolomite-margin@^0.12.15":
-  version "0.12.15"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.12.15.tgz#c97be40a71afe99469bdf1aa75efd99c3145a297"
-  integrity sha512-Kw67q3hFNPCGInRP4z9PgrSvw1pkKqX4LX9tVJ/SvRi6uCCpIaZXvYvQhX8uXVI3jKds4+u8ecXOPvhrZuFTmw==
+"@dolomite-exchange/dolomite-margin@^0.14.1":
+  version "0.14.1"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.14.1.tgz#77b5bd3f8a744054fa73061d09d675a050b92055"
+  integrity sha512-SFEOoX8EcC2voqpNFkYoPgh2dAspebj93fyG5eBjDV/hRlZwqJF4M7vBRumQPnYjyZss5Yn4meP+TdjAwftl+g==
   dependencies:
     "@openzeppelin/contracts" "^2.5.1"
     "@types/web3" "1.0.18"
@@ -342,21 +342,23 @@
     query-string "^6.9.0"
     web3 "1.2.1"
 
-"@dolomite-exchange/modules-deployments@^0.0.30":
-  version "0.0.30"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.0.30.tgz#e35b7ad5af29136f55b9e65ff33d77e84f2d8468"
-  integrity sha512-42bS5+q/WfhX6AsOGO9+eVS5kqv8GRCGu845lVmiEC7EPtpKC5viYHq2ExTeu84hMrRpxIKNHiOKyjCwiE1ljQ==
+"@dolomite-exchange/modules-deployments@^0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.1.1.tgz#193a4944f3a488436c8836d1140ae489e3812774"
+  integrity sha512-9i3RL3BAHXp5s+e/Dy4P7TOsb8RwZ27uLBD2r4wEwEX87qLEyN+M8eluj9vbd6BzZAsJgTYhDgzZvudvC8rpGA==
 
-"@dolomite-exchange/zap-sdk@^0.3.43":
-  version "0.3.43"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.3.43.tgz#eb8348149e81db403a26a2582a3bc391e349df9c"
-  integrity sha512-SEhi1XG8AjefMjFoIN3+OKLc07yioJ/tbYYN2x+59RQcjucsjM7WQzeUt6dFAvJHPSZYiYkWRJWwPQ4RfyaEwA==
+"@dolomite-exchange/zap-sdk@^0.4.2":
+  version "0.4.2"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.4.2.tgz#8f5ce4745c10ed758ff2c3cb76ba4c79f7bcfa22"
+  integrity sha512-g38eoMgl3NT6apc9rLRH+6gyhn+3ISx/jq6snTfQPISZrvDQlhz3KP5CghS7+2OK0J0l8n0bwQYHr7en+qYNxg==
   dependencies:
-    "@dolomite-exchange/modules-deployments" "^0.0.30"
+    "@dolomite-exchange/modules-deployments" "^0.1.1"
     axios "^0.29.0"
     bignumber.js "^9.1.1"
     dotenv-flow "^0.4.0"
     ethers "^5.5.3"
+    winston "^3.9.0"
+    winston-transport "^4.5.0"
 
 "@ethersproject/abi@5.7.0", "@ethersproject/abi@^5.7.0":
   version "5.7.0"
@@ -6267,6 +6269,18 @@ logform@^2.3.2, logform@^2.4.0:
     safe-stable-stringify "^2.3.1"
     triple-beam "^1.3.0"
 
+logform@^2.7.0:
+  version "2.7.0"
+  resolved "https://registry.yarnpkg.com/logform/-/logform-2.7.0.tgz#cfca97528ef290f2e125a08396805002b2d060d1"
+  integrity sha512-TFYA4jnP7PVbmlBIfhlSe+WKxs9dklXMTEGcBCIvLhE/Tn3H6Gk1norupVW7m5Cnd4bLcr08AytbyV/xj7f/kQ==
+  dependencies:
+    "@colors/colors" "1.6.0"
+    "@types/triple-beam" "^1.3.2"
+    fecha "^4.2.0"
+    ms "^2.1.1"
+    safe-stable-stringify "^2.3.1"
+    triple-beam "^1.3.0"
+
 loose-envify@^1.4.0:
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/loose-envify/-/loose-envify-1.4.0.tgz#71ee51fa7be4caec1a63839f7e682d8132d30caf"
@@ -7782,7 +7796,7 @@ readable-stream@^2.0.2, readable-stream@^2.3.0, readable-stream@^2.3.5, readable
     string_decoder "~1.1.1"
     util-deprecate "~1.0.1"
 
-readable-stream@^3.4.0, readable-stream@^3.6.0:
+readable-stream@^3.4.0, readable-stream@^3.6.0, readable-stream@^3.6.2:
   version "3.6.2"
   resolved "https://registry.yarnpkg.com/readable-stream/-/readable-stream-3.6.2.tgz#56a9b36ea965c00c5a93ef31eb111a0f11056967"
   integrity sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==
@@ -9811,6 +9825,15 @@ winston-transport@^4.3.0, winston-transport@^4.7.0:
     readable-stream "^3.6.0"
     triple-beam "^1.3.0"
 
+winston-transport@^4.5.0, winston-transport@^4.9.0:
+  version "4.9.0"
+  resolved "https://registry.yarnpkg.com/winston-transport/-/winston-transport-4.9.0.tgz#3bba345de10297654ea6f33519424560003b3bf9"
+  integrity sha512-8drMJ4rkgaPo1Me4zD/3WLfI/zPdA9o2IipKODunnGDcuqbHwjsbB79ylv04LCGGzU0xQ6vTznOMpQGaLhhm6A==
+  dependencies:
+    logform "^2.7.0"
+    readable-stream "^3.6.2"
+    triple-beam "^1.3.0"
+
 winston@^3.2.1:
   version "3.12.0"
   resolved "https://registry.yarnpkg.com/winston/-/winston-3.12.0.tgz#a5d965a41d3dc31be5408f8c66e927958846c0d0"
@@ -9827,6 +9850,23 @@ winston@^3.2.1:
     stack-trace "0.0.x"
     triple-beam "^1.3.0"
     winston-transport "^4.7.0"
+
+winston@^3.9.0:
+  version "3.17.0"
+  resolved "https://registry.yarnpkg.com/winston/-/winston-3.17.0.tgz#74b8665ce9b4ea7b29d0922cfccf852a08a11423"
+  integrity sha512-DLiFIXYC5fMPxaRg832S6F5mJYvePtmO5G9v9IgUFPhXm9/GkXarH/TUrBAVzhTCzAj9anE/+GjrgXp/54nOgw==
+  dependencies:
+    "@colors/colors" "^1.6.0"
+    "@dabh/diagnostics" "^2.0.2"
+    async "^3.2.3"
+    is-stream "^2.0.0"
+    logform "^2.7.0"
+    one-time "^1.0.0"
+    readable-stream "^3.4.0"
+    safe-stable-stringify "^2.3.1"
+    stack-trace "0.0.x"
+    triple-beam "^1.3.0"
+    winston-transport "^4.9.0"
 
 word-wrap@~1.2.3:
   version "1.2.5"
