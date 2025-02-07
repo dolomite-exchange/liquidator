@@ -8,6 +8,7 @@ import {
   MinimalApiToken,
   ZapOutputParam,
 } from '@dolomite-exchange/zap-sdk';
+import { ReferralOutput } from '@dolomite-exchange/zap-sdk/dist/src/lib/ApiTypes';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
@@ -35,6 +36,18 @@ const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split('
 const minValueLiquidatedForGenericSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL as string);
 
 const NETWORK_ID = Number(process.env.NETWORK_ID);
+let oogaBoogaReferralInfo: ReferralOutput | undefined;
+if (NETWORK_ID === 80094) {
+  oogaBoogaReferralInfo = {
+    odosReferralCode: undefined,
+    oogaBoogaApiKey: process.env.OOGA_BOOGA_API_KEY,
+    referralAddress: undefined,
+  };
+  if (!oogaBoogaReferralInfo.oogaBoogaApiKey) {
+    throw new Error('No API key found for Ooga Booga');
+  }
+}
+
 const ONE_HOUR = 60 * 60;
 const IS_LIQUIDATION = true;
 const THIRTY_BASIS_POINTS = 0.003;
@@ -48,7 +61,7 @@ const zap = new DolomiteZap({
   defaultIsLiquidation: IS_LIQUIDATION,
   defaultSlippageTolerance: THIRTY_BASIS_POINTS,
   defaultBlockTag: BLOCK_TAG,
-  referralInfo: undefined,
+  referralInfo: oogaBoogaReferralInfo,
   useProxyServer: USE_PROXY_SERVER,
   gasMultiplier: new ZapBigNumber(2),
 });
