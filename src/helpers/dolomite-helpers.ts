@@ -12,6 +12,7 @@ import { ReferralOutput } from '@dolomite-exchange/zap-sdk/dist/src/lib/ApiTypes
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
+import { ChainId } from '../lib/chain-id';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
 import { getAmountsForLiquidation, getOwedPriceForLiquidation } from '../lib/utils';
@@ -37,7 +38,7 @@ const minValueLiquidatedForGenericSell = new BigNumber(process.env.MIN_VALUE_LIQ
 
 const NETWORK_ID = Number(process.env.NETWORK_ID);
 let oogaBoogaReferralInfo: ReferralOutput | undefined;
-if (NETWORK_ID === 80094) {
+if (NETWORK_ID === ChainId.Berachain) {
   oogaBoogaReferralInfo = {
     odosReferralCode: undefined,
     oogaBoogaApiKey: process.env.OOGA_BOOGA_API_KEY,
@@ -53,7 +54,7 @@ const IS_LIQUIDATION = true;
 const THIRTY_BASIS_POINTS = 0.003;
 const BLOCK_TAG = 'latest';
 const USE_PROXY_SERVER = false;
-const zap = new DolomiteZap({
+export const zap = new DolomiteZap({
   network: NETWORK_ID,
   subgraphUrl: process.env.SUBGRAPH_URL!,
   web3Provider: new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, NETWORK_ID),
@@ -65,6 +66,10 @@ const zap = new DolomiteZap({
   useProxyServer: USE_PROXY_SERVER,
   gasMultiplier: new ZapBigNumber(2),
 });
+
+if (zap.validAggregators.length === 0) {
+  throw new Error('No zap aggregators found!');
+}
 
 export async function emitWithdrawalExecuted(action: ApiAsyncAction): Promise<TxResult | undefined> {
   Logger.info({
