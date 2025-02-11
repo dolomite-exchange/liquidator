@@ -14,6 +14,7 @@
     "migrate": "echo 'Nothing to migrate'",
     "seed": "echo 'Nothing to seed'",
     "execute:get-active-users-csv": "STATS=true npx ts-node scripts/get-active-users-csv.ts",
+    "execute:get-accrued-earnings": "STATS=true npx ts-node scripts/get-accrued-earnings.ts",
     "execute:get-daily-stats": "STATS=true npx ts-node scripts/get-daily-stats.ts",
     "execute:get-stats-per-frequency": "STATS=true npx ts-node scripts/get-stats-per-frequency.ts",
     "execute:get-lp-yield": "STATS=true npx ts-node scripts/get-lp-yield.ts",
@@ -38,7 +39,7 @@
   "homepage": "https://github.com/dolomite-exchange/liquidator#readme",
   "dependencies": {
     "@dolomite-exchange/dolomite-margin": "^0.14.2",
-    "@dolomite-exchange/zap-sdk": "^0.4.2",
+    "@dolomite-exchange/zap-sdk": "^0.4.3",
     "axios": "^0.29.0",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",
