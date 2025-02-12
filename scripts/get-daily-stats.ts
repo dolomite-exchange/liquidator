@@ -23,8 +23,9 @@ async function start() {
     subgraphUrl: process.env.SUBGRAPH_URL,
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
-  const startTimestamp: number = 1735776000; // January 2, 2025
-  const endTimestamp: number = 1737417600; // January 21, 2025
+  const startTimestamp: number = 1739232000; // February 11, 2025
+  // const endTimestamp: number = 1739318400; // February 12, 2025
+  const endTimestamp: number = Math.floor(Date.now() / 1000); // February 12, 2025
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   } else if (startTimestamp === endTimestamp) {
