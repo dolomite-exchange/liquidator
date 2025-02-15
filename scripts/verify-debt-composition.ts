@@ -10,14 +10,13 @@ import { updateGasPrice } from '../src/helpers/gas-price-helpers';
 import { dolomite } from '../src/helpers/web3';
 import { ApiAccount, ApiBalance, ApiMarket } from '../src/lib/api-types';
 import '../src/lib/env';
-import { ChainId } from '../src/lib/chain-id';
 import Logger from '../src/lib/logger';
 import Pageable from '../src/lib/pageable';
 import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${500_000}`);
+const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
 
 const TEN = new BigNumber('10');
 
@@ -25,17 +24,6 @@ const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
 const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
 
 const ONE_DOLLAR = new BigNumber(10).pow(36);
-
-const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | undefined>> = {
-  [ChainId.ArbitrumOne]: {},
-  [ChainId.Base]: {},
-  [ChainId.Berachain]: {
-    // 1: new BigNumber('6'), // BERA
-  },
-  [ChainId.Mantle]: {},
-  [ChainId.PolygonZkEvm]: {},
-  [ChainId.XLayer]: {},
-}
 
 interface TransformedApiBalance extends ApiBalance {
   amountUsd: Decimal;
@@ -63,6 +51,34 @@ function formatApiAccount(account: TransformedApiAccount): object {
 function formatApiBalance(balance: TransformedApiBalance): string {
   return `${balance.wei.div(TEN.pow(balance.tokenDecimals))
     .toFormat(6)} (${balance.amountUsd.toFormat(2)} USD) ${balance.tokenSymbol}`;
+}
+
+function formatAccountData(accounts: ApiAccount[], marketMap: Record<string, ApiMarket>, value: 'supply' | 'borrow') {
+  const transformedAccounts = getTransformedAccounts(accounts, marketMap);
+  transformedAccounts.sort((a, b) => (a.borrowUSD.gt(b.borrowUSD) ? 1 : -1));
+
+  const medianAccount = transformedAccounts[Math.floor(transformedAccounts.length / 2)];
+  const biggestAccount = transformedAccounts[transformedAccounts.length - 1];
+  const averageAccountDebt = transformedAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
+    .div(transformedAccounts.length);
+
+  if (accounts.length > 0) {
+    Logger.info({
+      message: `Stats on ${value} accounts`,
+      medianAccountDebt: `$${medianAccount.borrowUSD.toFormat(2)}`,
+      biggestAccountDebt: `$${biggestAccount.borrowUSD.toFormat(2)}`,
+      averageAccountDebt: `$${averageAccountDebt.toFormat(2)}`,
+      largeAccounts: {
+        thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
+        accounts: transformedAccounts.filter(a => a.borrowUSD.abs().gt(LARGE_AMOUNT_THRESHOLD_USD))
+          .map(formatApiAccount),
+      },
+    });
+  } else {
+    Logger.info({
+      message: `No stats on ${value} accounts found!`,
+    });
+  }
 }
 
 async function start() {
@@ -126,9 +142,9 @@ async function start() {
 
   const marketMap = marketStore.getMarketMap();
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
+  const { tokenAddress } = marketMap[marketId.toFixed()];
 
   const supplyAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const { tokenAddress } = marketMap[marketId.toFixed()];
     const { accounts: nextAccounts } = await getLiquidatableDolomiteAccountsWithCertainSupplyAsset(
       marketIndexMap,
       tokenAddress,
@@ -137,24 +153,9 @@ async function start() {
     );
     return nextAccounts;
   });
-  const allSupplyAccounts = getTransformedAccounts(supplyAccounts, marketMap, networkId);
-  allSupplyAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1));
-  Logger.info({
-    message: 'Stats on supply accounts',
-    medianAccountDebt: allSupplyAccounts[Math.floor(allSupplyAccounts.length / 2)].borrowUSD.toFormat(2),
-    biggestAccountDebt: allSupplyAccounts[allSupplyAccounts.length - 1].borrowUSD.toFormat(2),
-    averageAccountDebt: allSupplyAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
-      .div(allSupplyAccounts.length)
-      .toFormat(2),
-    largeAccounts: {
-      thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
-      accounts: allSupplyAccounts.filter(a => a.borrowUSD.abs().gt(LARGE_AMOUNT_THRESHOLD_USD))
-        .map(formatApiAccount),
-    },
-  });
+  formatAccountData(supplyAccounts, marketMap, 'supply');
 
   const borrowAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const { tokenAddress } = marketMap[marketId.toFixed()];
     const { accounts: nextAccounts } = await getLiquidatableDolomiteAccountsWithCertainBorrowAsset(
       marketIndexMap,
       tokenAddress,
@@ -163,21 +164,7 @@ async function start() {
     );
     return nextAccounts;
   });
-  const allBorrowAccounts = getTransformedAccounts(borrowAccounts, marketMap, networkId);
-  allBorrowAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1));
-  Logger.info({
-    message: 'Stats on debt accounts',
-    medianAccountDebt: allBorrowAccounts[Math.floor(allBorrowAccounts.length / 2)].borrowUSD.toFormat(2),
-    biggestAccountDebt: allBorrowAccounts[allBorrowAccounts.length - 1].borrowUSD.toFormat(2),
-    averageAccountDebt: allBorrowAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
-      .div(allBorrowAccounts.length)
-      .toFormat(2),
-    largeAccounts: {
-      thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
-      accounts: allBorrowAccounts.filter(a => a.borrowUSD.abs().gt(LARGE_AMOUNT_THRESHOLD_USD))
-        .map(formatApiAccount),
-    },
-  });
+  formatAccountData(borrowAccounts, marketMap, 'borrow');
 
   const totalSupplyAccountDebt = supplyAccounts.reduce((acc, account) => {
     const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
@@ -217,7 +204,6 @@ async function start() {
 function getTransformedAccounts(
   accounts: ApiAccount[],
   marketMap: Record<string, ApiMarket>,
-  networkId: number,
 ): TransformedApiAccount[] {
   const transformedAccounts: TransformedApiAccount[] = [];
   for (let i = 0; i < accounts.length; i += 1) {
@@ -236,10 +222,7 @@ function getTransformedAccounts(
     } = Object.values(account.balances)
       .reduce((acc, balance) => {
         const market = marketMap[balance.marketId.toString()];
-        const priceMultiplier = new BigNumber(10).pow(36 - balance.tokenDecimals);
-        const priceOverrideRaw = NETWORK_TO_PRICE_OVERRIDE_MAP[networkId as ChainId][market.marketId];
-        const priceOverride = priceOverrideRaw ? new BigNumber(priceOverrideRaw).times(priceMultiplier) : undefined;
-        const value = balance.wei.times(priceOverride ?? market.oraclePrice).div(ONE_DOLLAR);
+        const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR);
         const adjust = MARGIN_PREMIUM_BASE.plus(MARGIN_PREMIUM_SPECULATIVE ?? market.marginPremium);
         if (balance.wei.lt(INTEGERS.ZERO)) {
           // increase the borrow size by the premium
