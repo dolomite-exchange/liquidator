@@ -13,6 +13,7 @@ import { getGasPriceWei, updateGasPrice } from '../src/helpers/gas-price-helpers
 import { dolomite, loadAccounts } from '../src/helpers/web3';
 import { ApiAccount, ApiBalance } from '../src/lib/api-types';
 import '../src/lib/env';
+import { ChainId } from '../src/lib/chain-id';
 import Logger from '../src/lib/logger';
 import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
@@ -32,8 +33,19 @@ const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
 
 const ONE_DOLLAR = new BigNumber(10).pow(36);
 
+const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | undefined>> = {
+  [ChainId.ArbitrumOne]: {},
+  [ChainId.Base]: {},
+  [ChainId.Berachain]: {
+    // 1: new BigNumber('6'), // BERA
+  },
+  [ChainId.Mantle]: {},
+  [ChainId.PolygonZkEvm]: {},
+  [ChainId.XLayer]: {},
+}
+
 function formatApiBalance(balance: ApiBalance): string {
-  return `${balance.wei.div(TEN.pow(balance.tokenDecimals)).toFixed(6)} ${balance.tokenSymbol}`;
+  return `${balance.wei.div(TEN.pow(balance.tokenDecimals)).toFormat(6)} ${balance.tokenSymbol}`;
 }
 
 function shouldIgnoreAccount(account: ApiAccount): boolean {
@@ -108,7 +120,10 @@ async function start() {
     } = Object.values(account.balances)
       .reduce((acc, balance) => {
         const market = marketMap[balance.marketId.toString()];
-        const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR);
+        const priceMultiplier = new BigNumber(10).pow(36 - balance.tokenDecimals);
+        const priceOverrideRaw = NETWORK_TO_PRICE_OVERRIDE_MAP[networkId as ChainId][market.marketId];
+        const priceOverride = priceOverrideRaw ? new BigNumber(priceOverrideRaw).times(priceMultiplier) : undefined;
+        const value = balance.wei.times(priceOverride ?? market.oraclePrice).div(ONE_DOLLAR);
         const adjust = MARGIN_PREMIUM_BASE.plus(MARGIN_PREMIUM_SPECULATIVE ?? market.marginPremium);
         if (balance.wei.lt(INTEGERS.ZERO)) {
           // increase the borrow size by the premium
@@ -133,11 +148,11 @@ async function start() {
     if (borrow.gt(supply)) {
       if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
         Logger.warn({
-          message: `Found bad debt for more than $${SMALL_BORROW_THRESHOLD.toFixed(2)}`,
+          message: `Found bad debt for more than $${SMALL_BORROW_THRESHOLD.toFormat(2)}`,
           account: account.id,
           markets: Object.values(account.balances).map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
-          supplyUSD: supply.toFixed(6),
-          borrowUSD: borrow.toFixed(6),
+          supplyUSD: supply.toFormat(6),
+          borrowUSD: borrow.toFormat(6),
         });
 
         if (process.env.VAPORIZE_EXCESS === 'true') {
@@ -193,8 +208,8 @@ async function start() {
           message: 'Found almost liquid account!',
           account: account.id,
           markets: Object.values(account.balances).map(formatApiBalance),
-          supplyUSD: supply.toFixed(6),
-          borrowUSD: borrow.toFixed(6),
+          supplyUSD: supply.toFormat(6),
+          borrowUSD: borrow.toFormat(6),
         });
       }
     }
@@ -225,8 +240,8 @@ async function start() {
       message: 'Found liquid account!',
       account: account.id,
       markets: Object.values(account.balances).map(formatApiBalance),
-      supplyUSD: account.supplyUSD.toFixed(6),
-      borrowUSD: account.borrowUSD.toFixed(6),
+      supplyUSD: account.supplyUSD.toFormat(6),
+      borrowUSD: account.borrowUSD.toFormat(6),
     });
   });
 
@@ -255,7 +270,7 @@ async function start() {
 
   Logger.info({
     message: `Found ${smallLiquidBorrowCount} small liquidatable accounts`,
-    smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFixed(4)}`,
+    smallBorrowThreshold: `$${SMALL_BORROW_THRESHOLD.toFormat(4)}`,
     liquidCount: smallLiquidBorrowCount,
     debtAmount: `$${formatNumber(smallLiquidDebtAmount.toNumber())}`,
   });
