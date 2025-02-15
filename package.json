@@ -22,6 +22,7 @@
     "execute:get-total-active-users": "STATS=true npx ts-node scripts/get-total-active-users.ts",
     "execute:migrate-market": "npx ts-node scripts/migrate-market.ts",
     "execute:verify-bad-debt": "npx ts-node scripts/verify-bad-debt.ts",
+    "execute:verify-debt-composition": "npx ts-node scripts/verify-debt-composition.ts",
     "execute:verify-glp-balances": "NETWORK_ID=42161 STATS=true npx ts-node scripts/verify-glp-balances.ts",
     "execute:verify-market-state": "npx ts-node scripts/verify-market-state.ts",
     "execute:verify-plv-glp-balances": "NETWORK_ID=42161 STATS=true npx ts-node scripts/verify-plv-glp-balances.ts",

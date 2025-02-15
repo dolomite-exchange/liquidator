@@ -82,12 +82,14 @@ async function getAccounts(
   query: string,
   blockNumber: number,
   lastId: string | undefined,
+  extraVariables: object = {},
 ): Promise<{ accounts: ApiAccount[] }> {
   const accounts: ApiAccount[] = await axios.post(
     subgraphUrl,
     {
       query,
       variables: {
+        ...extraVariables,
         blockNumber,
         lastId: lastId ?? '',
       },
@@ -130,6 +132,46 @@ export async function getLiquidatableDolomiteAccounts(
                 }
               }`;
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
+}
+
+export async function getLiquidatableDolomiteAccountsWithCertainSupplyAsset(
+  marketIndexMap: { [marketId: string]: MarketIndex },
+  tokenAddress: string,
+  blockNumber: number,
+  lastId: string | undefined,
+): Promise<{ accounts: ApiAccount[] }> {
+  const query = `
+            query getActiveMarginAccounts($tokenAddress: String, $blockNumber: Int, $lastId: ID) {
+                marginAccounts(
+                  where: { hasBorrowValue: true id_gt: $lastId supplyTokens_contains: [$tokenAddress]  }
+                  block: { number: $blockNumber }
+                  orderBy: id
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                ) {
+                ${marginAccountFields}
+                }
+              }`;
+  return getAccounts(marketIndexMap, query, blockNumber, lastId, { tokenAddress });
+}
+
+export async function getLiquidatableDolomiteAccountsWithCertainBorrowAsset(
+  marketIndexMap: { [marketId: string]: MarketIndex },
+  tokenAddress: string,
+  blockNumber: number,
+  lastId: string | undefined,
+): Promise<{ accounts: ApiAccount[] }> {
+  const query = `
+            query getActiveMarginAccounts($tokenAddress: String, $blockNumber: Int, $lastId: ID) {
+                marginAccounts(
+                  where: { hasBorrowValue: true id_gt: $lastId borrowTokens_contains: [$tokenAddress]  }
+                  block: { number: $blockNumber }
+                  orderBy: id
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                ) {
+                ${marginAccountFields}
+                }
+              }`;
+  return getAccounts(marketIndexMap, query, blockNumber, lastId, { tokenAddress });
 }
 
 export async function getAllDolomiteUsersWithPositions(
@@ -443,7 +485,8 @@ export async function getLiquidationsBetweenTimestamps(
 export async function getTimestampToBlockNumberMap(timestamps: number[]): Promise<Record<string, number>> {
   let queries = '';
   timestamps.forEach(timestamp => {
-    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 30}, timestamp_lte: ${timestamp} } first: 1 orderBy: number orderDirection: desc) { number }\n`
+    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp
+    - 30}, timestamp_lte: ${timestamp} } first: 1 orderBy: number orderDirection: desc) { number }\n`
   });
   const result = await axios.post(
     `${process.env.SUBGRAPH_BLOCKS_URL}`,

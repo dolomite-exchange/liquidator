@@ -1,0 +1,280 @@
+import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
+import v8 from 'v8';
+import {
+  getDolomiteRiskParams,
+  getLiquidatableDolomiteAccountsWithCertainBorrowAsset,
+  getLiquidatableDolomiteAccountsWithCertainSupplyAsset,
+} from '../src/clients/dolomite';
+import { updateGasPrice } from '../src/helpers/gas-price-helpers';
+import { dolomite } from '../src/helpers/web3';
+import { ApiAccount, ApiBalance, ApiMarket } from '../src/lib/api-types';
+import '../src/lib/env';
+import { ChainId } from '../src/lib/chain-id';
+import Logger from '../src/lib/logger';
+import Pageable from '../src/lib/pageable';
+import AccountStore from '../src/stores/account-store';
+import BlockStore from '../src/stores/block-store';
+import MarketStore from '../src/stores/market-store';
+
+const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${500_000}`);
+
+const TEN = new BigNumber('10');
+
+const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
+const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
+
+const ONE_DOLLAR = new BigNumber(10).pow(36);
+
+const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | undefined>> = {
+  [ChainId.ArbitrumOne]: {},
+  [ChainId.Base]: {},
+  [ChainId.Berachain]: {
+    // 1: new BigNumber('6'), // BERA
+  },
+  [ChainId.Mantle]: {},
+  [ChainId.PolygonZkEvm]: {},
+  [ChainId.XLayer]: {},
+}
+
+interface TransformedApiBalance extends ApiBalance {
+  amountUsd: Decimal;
+}
+
+interface TransformedApiAccount extends ApiAccount {
+  borrowUSD: Decimal;
+  supplyUSD: Decimal;
+  balances: Record<string, TransformedApiBalance>;
+}
+
+function formatApiAccount(account: TransformedApiAccount): object {
+  return {
+    owner: account.owner,
+    number: account.number.toFixed(0),
+    supplyUsd: account.supplyUSD.toFormat(2),
+    borrowUsd: account.borrowUSD.toFormat(2),
+    balances: Object.keys(account.balances)
+      .map(k => account.balances[k])
+      .sort((a, b) => a.amountUsd.minus(b.amountUsd).toNumber())
+      .map(b => formatApiBalance(b)),
+  };
+}
+
+function formatApiBalance(balance: TransformedApiBalance): string {
+  return `${balance.wei.div(TEN.pow(balance.tokenDecimals))
+    .toFormat(6)} (${balance.amountUsd.toFormat(2)} USD) ${balance.tokenSymbol}`;
+}
+
+async function start() {
+  const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore);
+  const accountStore = new AccountStore(blockStore, marketStore);
+
+  await blockStore._update();
+
+  const blockNumber = blockStore.getBlockNumber()!;
+  const { riskParams } = await getDolomiteRiskParams(blockNumber);
+  const networkId = await dolomite.web3.eth.net.getId();
+
+  const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
+  if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
+    const message = `Invalid dolomite margin address found!\n
+    { network: ${riskParams.dolomiteMargin} library: ${libraryDolomiteMargin} }`;
+    Logger.error(message);
+    return Promise.reject(new Error(message));
+  } else if (networkId !== Number(process.env.NETWORK_ID)) {
+    const message = `Invalid network ID found!\n
+    { network: ${networkId} environment: ${Number(process.env.NETWORK_ID)} }`;
+    Logger.error(message);
+    return Promise.reject(new Error(message));
+  }
+
+  const marketCount = await dolomite.getters.getNumMarkets();
+  const marketId = new BigNumber(process.env.MARKET_ID ?? '');
+  if (marketId.isNaN()) {
+    const message = 'Invalid market ID'
+    Logger.error(message);
+    return Promise.reject(new Error(message));
+  } else if (!marketId.isInteger()) {
+    const message = 'Market ID must be integer'
+    Logger.error(message);
+    return Promise.reject(new Error(message));
+  } else if (marketId.gte(marketCount) || marketId.lt(INTEGERS.ZERO)) {
+    const message = 'Market ID out of range'
+    Logger.error(message);
+    return Promise.reject(new Error(message));
+  }
+
+  Logger.info({
+    message: 'DolomiteMargin data',
+    dolomiteMargin: libraryDolomiteMargin,
+    ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
+    heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
+    ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
+    marketId: marketId.toFixed(),
+    networkId,
+    subgraphUrl: process.env.SUBGRAPH_URL,
+  });
+
+  await marketStore._update();
+  await accountStore._update();
+  await updateGasPrice(dolomite);
+
+  Logger.info({
+    message: 'Finished updating accounts and markets',
+  });
+
+  const marketMap = marketStore.getMarketMap();
+  const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
+
+  const supplyAccounts = await Pageable.getPageableValues(async (lastId) => {
+    const { tokenAddress } = marketMap[marketId.toFixed()];
+    const { accounts: nextAccounts } = await getLiquidatableDolomiteAccountsWithCertainSupplyAsset(
+      marketIndexMap,
+      tokenAddress,
+      blockNumber,
+      lastId,
+    );
+    return nextAccounts;
+  });
+  const allSupplyAccounts = getTransformedAccounts(supplyAccounts, marketMap, networkId);
+  allSupplyAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1));
+  Logger.info({
+    message: 'Stats on supply accounts',
+    medianAccountDebt: allSupplyAccounts[Math.floor(allSupplyAccounts.length / 2)].borrowUSD.toFormat(2),
+    biggestAccountDebt: allSupplyAccounts[allSupplyAccounts.length - 1].borrowUSD.toFormat(2),
+    averageAccountDebt: allSupplyAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
+      .div(allSupplyAccounts.length)
+      .toFormat(2),
+    largeAccounts: {
+      thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
+      accounts: allSupplyAccounts.filter(a => a.borrowUSD.abs().gt(LARGE_AMOUNT_THRESHOLD_USD))
+        .map(formatApiAccount),
+    },
+  });
+
+  const borrowAccounts = await Pageable.getPageableValues(async (lastId) => {
+    const { tokenAddress } = marketMap[marketId.toFixed()];
+    const { accounts: nextAccounts } = await getLiquidatableDolomiteAccountsWithCertainBorrowAsset(
+      marketIndexMap,
+      tokenAddress,
+      blockNumber,
+      lastId,
+    );
+    return nextAccounts;
+  });
+  const allBorrowAccounts = getTransformedAccounts(borrowAccounts, marketMap, networkId);
+  allBorrowAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1));
+  Logger.info({
+    message: 'Stats on debt accounts',
+    medianAccountDebt: allBorrowAccounts[Math.floor(allBorrowAccounts.length / 2)].borrowUSD.toFormat(2),
+    biggestAccountDebt: allBorrowAccounts[allBorrowAccounts.length - 1].borrowUSD.toFormat(2),
+    averageAccountDebt: allBorrowAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
+      .div(allBorrowAccounts.length)
+      .toFormat(2),
+    largeAccounts: {
+      thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
+      accounts: allBorrowAccounts.filter(a => a.borrowUSD.abs().gt(LARGE_AMOUNT_THRESHOLD_USD))
+        .map(formatApiAccount),
+    },
+  });
+
+  const totalSupplyAccountDebt = supplyAccounts.reduce((acc, account) => {
+    const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
+      if (balance.wei.gte(INTEGERS.ZERO)) {
+        return memo;
+      }
+      const market = marketMap[balance.marketId.toString()];
+      return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
+    }, INTEGERS.ZERO);
+    return acc.plus(totalBorrowUsd);
+  }, INTEGERS.ZERO).toNumber();
+  Logger.info({
+    message: `Found ${supplyAccounts.length} supply accounts with debt`,
+    debtCount: supplyAccounts.length,
+    debtAmount: `$${formatNumber(totalSupplyAccountDebt)}`,
+  });
+
+  const totalBorrowAccountDebt = borrowAccounts.reduce((acc, account) => {
+    const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
+      if (balance.wei.gte(INTEGERS.ZERO)) {
+        return memo;
+      }
+      const market = marketMap[balance.marketId.toString()];
+      return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
+    }, INTEGERS.ZERO);
+    return acc.plus(totalBorrowUsd);
+  }, INTEGERS.ZERO).toNumber();
+  Logger.info({
+    message: `Found ${borrowAccounts.length} borrow accounts with debt`,
+    debtCount: borrowAccounts.length,
+    debtAmount: `$${formatNumber(totalBorrowAccountDebt)}`,
+  });
+
+  return true;
+}
+
+function getTransformedAccounts(
+  accounts: ApiAccount[],
+  marketMap: Record<string, ApiMarket>,
+  networkId: number,
+): TransformedApiAccount[] {
+  const transformedAccounts: TransformedApiAccount[] = [];
+  for (let i = 0; i < accounts.length; i += 1) {
+    const account = accounts[i];
+    const initial = {
+      borrow: INTEGERS.ZERO,
+      supply: INTEGERS.ZERO,
+      borrowAdj: INTEGERS.ZERO,
+      supplyAdj: INTEGERS.ZERO,
+      transformedBalances: {} as Record<string, TransformedApiBalance>,
+    };
+    const {
+      supply,
+      borrow,
+      transformedBalances,
+    } = Object.values(account.balances)
+      .reduce((acc, balance) => {
+        const market = marketMap[balance.marketId.toString()];
+        const priceMultiplier = new BigNumber(10).pow(36 - balance.tokenDecimals);
+        const priceOverrideRaw = NETWORK_TO_PRICE_OVERRIDE_MAP[networkId as ChainId][market.marketId];
+        const priceOverride = priceOverrideRaw ? new BigNumber(priceOverrideRaw).times(priceMultiplier) : undefined;
+        const value = balance.wei.times(priceOverride ?? market.oraclePrice).div(ONE_DOLLAR);
+        const adjust = MARGIN_PREMIUM_BASE.plus(MARGIN_PREMIUM_SPECULATIVE ?? market.marginPremium);
+        if (balance.wei.lt(INTEGERS.ZERO)) {
+          // increase the borrow size by the premium
+          acc.borrow = acc.borrow.plus(value.abs());
+          acc.borrowAdj = acc.borrowAdj.plus(value.abs().times(adjust).div(MARGIN_PREMIUM_BASE));
+        } else {
+          // decrease the supply size by the premium
+          acc.supply = acc.supply.plus(value);
+          acc.supplyAdj = acc.supplyAdj.plus(value.times(MARGIN_PREMIUM_BASE).div(adjust));
+        }
+        acc.transformedBalances[market.marketId] = {
+          ...balance,
+          amountUsd: value,
+        };
+        return acc;
+      }, initial);
+
+    if (supply.gt(INTEGERS.ZERO)) {
+      transformedAccounts.push({
+        ...account,
+        supplyUSD: supply,
+        borrowUSD: borrow,
+        balances: transformedBalances,
+      });
+    }
+  }
+
+  return transformedAccounts;
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString('en-US', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+start().catch(error => {
+  console.error(`Found error while starting: ${error.toString()}`, error);
+  process.exit(1);
+});
