@@ -121,6 +121,8 @@ async function start() {
     return Promise.reject(new Error(message));
   }
 
+  const marketName = await dolomite.token.getName(await dolomite.getters.getMarketTokenAddress(marketId));
+
   Logger.info({
     message: 'DolomiteMargin data',
     dolomiteMargin: libraryDolomiteMargin,
@@ -128,6 +130,7 @@ async function start() {
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     marketId: marketId.toFixed(),
+    marketName: marketName,
     networkId,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
