@@ -64,7 +64,7 @@ const marginAccountFields = `
                     id
                   }
                   accountNumber
-                  tokenValues {
+                  tokenValues(where: { valuePar_not: "0" }) {
                     token {
                       id
                       marketId
