@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /** @formatter:off */
 /** @formatter:on */
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
@@ -30,8 +31,10 @@ async function start() {
     subgraphUrl: process.env.SUBGRAPH_URL,
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
-  const startTimestamp: number = 1739664000; // February 16, 2025
-  const endTimestamp: number = 1740268800; // February 23, 2025
+  // const startTimestamp: number = 1739664000; // February 16, 2025
+  // const endTimestamp: number = 1740268800; // February 23, 2025
+  const startTimestamp: number = 1740355200; // February 24, 2025
+  const endTimestamp: number = 1740873600; // March 2, 2025
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   } else if (startTimestamp === endTimestamp) {
@@ -60,6 +63,7 @@ async function start() {
     dolomite.networkId,
     Object.values(timestampToBlockNumberMap),
   );
+  // const tvlAndFees = { borrowFees: [], totalSupplyLiquidity: [], totalBorrowLiquidity: [] };
   const totalTransactions = await getTotalTransactions(
     timestampToBlockNumberMap[startTimestamp],
     timestampToBlockNumberMap[endTimestamp - ONE_DAY_SECONDS],
@@ -73,7 +77,7 @@ async function start() {
   const liquidatedDebtUsd = allLiquidations.reduce((acc, l) => acc.plus(l.owedAmountUSD), INTEGERS.ZERO)
 
   const borrowFees = tvlAndFees.borrowFees.reduce((acc, value) => acc.plus(value), new BigNumber(0));
-  const reserveFactor = INTEGERS.ONE.minus(await dolomite.getters.getEarningsRate());
+  const reserveFactor = INTEGERS.ONE.minus(await dolomite.getters.getEarningsRate({ blockNumber: endBlockNumber }));
   const estimatedRevenue = borrowFees.times(reserveFactor);
 
   const actualRevenue = await getRealFeesAccrued(startBlockNumber, endBlockNumber);
