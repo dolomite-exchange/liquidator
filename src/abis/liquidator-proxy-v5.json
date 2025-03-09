@@ -1,0 +1,236 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_chainId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_expiry",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_dolomiteMargin",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_dolomiteRegistry",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_liquidatorAssetRegistry",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "version",
+        "type": "uint8"
+      }
+    ],
+    "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_MARGIN",
+    "outputs": [
+      {
+        "internalType": "contract IDolomiteMargin",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_MARGIN_OWNER",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_REGISTRY",
+    "outputs": [
+      {
+        "internalType": "contract IDolomiteRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "EXPIRY",
+    "outputs": [
+      {
+        "internalType": "contract IExpiry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "LIQUIDATOR_ASSET_REGISTRY",
+    "outputs": [
+      {
+        "internalType": "contract ILiquidatorAssetRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo",
+            "name": "solidAccount",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo",
+            "name": "liquidAccount",
+            "type": "tuple"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "marketIdsPath",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "inputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minOutputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "enum IGenericTraderBase.TraderType",
+                "name": "traderType",
+                "type": "uint8"
+              },
+              {
+                "internalType": "uint256",
+                "name": "makerAccountIndex",
+                "type": "uint256"
+              },
+              {
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes",
+                "name": "tradeData",
+                "type": "bytes"
+              }
+            ],
+            "internalType": "struct IGenericTraderBase.TraderParam[]",
+            "name": "tradersPath",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo[]",
+            "name": "makerAccounts",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "expirationTimestamp",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "withdrawAllReward",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct ILiquidatorProxyV5.LiquidateParams",
+        "name": "_liquidateParams",
+        "type": "tuple"
+      }
+    ],
+    "name": "liquidate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

@@ -32,6 +32,7 @@ import BlockStore from './stores/block-store';
 import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
 import RiskParamsStore from './stores/risk-params-store';
+import { liquidatorProxyV5 } from './helpers/liquidator-proxy-v5-helper';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -170,11 +171,17 @@ async function start() {
       owedPreferences: process.env.OWED_PREFERENCES,
     });
   } else if (liquidationMode === LiquidationMode.Generic) {
+    const liquidatorProxyV5Address = liquidatorProxyV5.options.address;
+    const isGlobalOperator = await dolomite.getters.getIsGlobalOperator(liquidatorProxyV5Address);
     Logger.info({
       liquidationMode,
       message: 'Generic liquidation mode variables:',
-      liquidatorProxyV4WithGenericTrader: dolomite.liquidatorProxyV4WithGenericTrader.address,
+      liquidatorProxyV5: liquidatorProxyV5Address,
+      liquidatorProxyV5IsGlobalOperator: isGlobalOperator,
     });
+    if (!isGlobalOperator) {
+      throw new Error(`Liquidator proxy v5 is not global operator: ${liquidatorProxyV5Address}`);
+    }
   } else {
     throw new Error(`Invalid liquidation mode: ${liquidationMode}`);
   }

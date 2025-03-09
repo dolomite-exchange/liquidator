@@ -24,8 +24,9 @@ import {
 import { getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei, getRawGasPriceWei, isGasSpikeProtectionEnabled } from './gas-price-helpers';
 import { dolomite } from './web3';
+import { liquidateV5 } from './liquidator-proxy-v5-helper';
 
-const solidAccount = {
+export const SOLID_ACCOUNT = {
   owner: process.env.ACCOUNT_WALLET_ADDRESS as string,
   number: new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER as string),
 };
@@ -273,8 +274,8 @@ async function _liquidateAccountSimple(
 
   if (isGasSpikeProtectionEnabled()) {
     const { gasEstimate } = await dolomite.liquidatorProxyV1.liquidate(
-      solidAccount.owner,
-      solidAccount.number,
+      SOLID_ACCOUNT.owner,
+      SOLID_ACCOUNT.number,
       liquidAccount.owner,
       liquidAccount.number,
       new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
@@ -283,7 +284,7 @@ async function _liquidateAccountSimple(
       collateralMarkets.map((p) => new BigNumber(p)),
       {
         gasPrice: gasPrice.toFixed(),
-        from: solidAccount.owner,
+        from: SOLID_ACCOUNT.owner,
         confirmationType: ConfirmationType.Simulate,
       },
     );
@@ -298,8 +299,8 @@ async function _liquidateAccountSimple(
     }
 
     return dolomite.liquidatorProxyV1.liquidate(
-      solidAccount.owner,
-      solidAccount.number,
+      SOLID_ACCOUNT.owner,
+      SOLID_ACCOUNT.number,
       liquidAccount.owner,
       liquidAccount.number,
       new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
@@ -309,14 +310,14 @@ async function _liquidateAccountSimple(
       {
         gas: _convertGasEstimateToGas(gasEstimate!),
         gasPrice: gasPrice.toFixed(),
-        from: solidAccount.owner,
+        from: SOLID_ACCOUNT.owner,
         confirmationType: ConfirmationType.Hash,
       },
     );
   } else {
     return dolomite.liquidatorProxyV1.liquidate(
-      solidAccount.owner,
-      solidAccount.number,
+      SOLID_ACCOUNT.owner,
+      SOLID_ACCOUNT.number,
       liquidAccount.owner,
       liquidAccount.number,
       new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
@@ -325,7 +326,7 @@ async function _liquidateAccountSimple(
       collateralMarkets.map((p) => new BigNumber(p)),
       {
         gasPrice: gasPrice.toFixed(),
-        from: solidAccount.owner,
+        from: SOLID_ACCOUNT.owner,
         confirmationType: ConfirmationType.Hash,
       },
     );
@@ -461,7 +462,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
         new ZapBigNumber(heldWei),
         owedToken,
         new ZapBigNumber(owedWei),
-        solidAccount.owner,
+        SOLID_ACCOUNT.owner,
         { isLiquidation: true },
       );
     } else {
@@ -480,7 +481,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
         new ZapBigNumber(heldWei),
         owedToken,
         new ZapBigNumber(owedWei),
-        solidAccount.owner,
+        SOLID_ACCOUNT.owner,
         marketIdToActionsMap,
         marketToOracleMap,
         { isLiquidation: true, isVaporizable },
@@ -491,24 +492,19 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     const inputAmount = !isHeldBalanceLargerThanProtocol ? INTEGERS.MAX_UINT : heldWei;
     const outputAmount = !isHeldBalanceLargerThanProtocol ? INTEGERS.MAX_UINT : owedWei;
 
-    let firstError: unknown;
+    let firstError: Error | undefined;
     if (isGasSpikeProtectionEnabled()) {
       for (let i = 0; i < outputs.length; i += 1) {
         try {
-          const { gasEstimate } = await dolomite.liquidatorProxyV4WithGenericTrader.liquidate(
-            solidAccount.owner,
-            solidAccount.number,
-            liquidAccount.owner,
-            liquidAccount.number,
-            outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
+          const { gasEstimate } = await liquidateV5(
+            liquidAccount,
             inputAmount,
+            outputs[i],
             outputAmount,
-            outputs[i].traderParams,
-            outputs[i].makerAccounts,
-            isExpiring ? (owedBalance.expiresAt ?? null) : null,
+            (isExpiring && owedBalance.expiresAt) ? owedBalance.expiresAt.toNumber() : null,
             {
               gasPrice: gasPrice.toFixed(),
-              from: solidAccount.owner,
+              from: SOLID_ACCOUNT.owner,
               confirmationType: ConfirmationType.Simulate,
             },
           );
@@ -518,25 +514,20 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
             return undefined;
           }
 
-          return await dolomite.liquidatorProxyV4WithGenericTrader.liquidate(
-            solidAccount.owner,
-            solidAccount.number,
-            liquidAccount.owner,
-            liquidAccount.number,
-            outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
+          return await liquidateV5(
+            liquidAccount,
             inputAmount,
+            outputs[i],
             outputAmount,
-            outputs[i].traderParams,
-            outputs[i].makerAccounts,
-            isExpiring ? (owedBalance.expiresAt ?? null) : null,
+            (isExpiring && owedBalance.expiresAt) ? owedBalance.expiresAt.toNumber() : null,
             {
               gas: _convertGasEstimateToGas(gasEstimate!),
               gasPrice: gasPrice.toFixed(),
-              from: solidAccount.owner,
+              from: SOLID_ACCOUNT.owner,
               confirmationType: ConfirmationType.Hash,
             },
           );
-        } catch (e) {
+        } catch (e: any) {
           if (!firstError) {
             firstError = e;
           }
@@ -545,24 +536,19 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     } else {
       for (let i = 0; i < outputs.length; i += 1) {
         try {
-          return await dolomite.liquidatorProxyV4WithGenericTrader.liquidate(
-            solidAccount.owner,
-            solidAccount.number,
-            liquidAccount.owner,
-            liquidAccount.number,
-            outputs[i].marketIdsPath.map((p) => new BigNumber(p)),
+          return await liquidateV5(
+            liquidAccount,
             INTEGERS.MAX_UINT,
+            outputs[i],
             INTEGERS.MAX_UINT,
-            outputs[i].traderParams,
-            outputs[i].makerAccounts,
-            isExpiring ? (owedBalance.expiresAt ?? null) : null,
+            (isExpiring && owedBalance.expiresAt) ? owedBalance.expiresAt.toNumber() : null,
             {
               gasPrice: getGasPriceWei().toFixed(),
-              from: solidAccount.owner,
+              from: SOLID_ACCOUNT.owner,
               confirmationType: ConfirmationType.Hash,
             },
           );
-        } catch (e) {
+        } catch (e: any) {
           if (!firstError) {
             firstError = e;
           }
@@ -573,59 +559,6 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     return Promise.reject(firstError);
   }
 }
-
-// async function _performSimpleLiquidationForSkippedGenericLiquidation(
-//   liquidAccount: ApiAccount,
-//   owedMarket: ApiMarket,
-//   heldMarket: ApiMarket,
-//   owedBalance: ApiBalance,
-//   heldBalance: ApiBalance,
-//   owedWei: Integer,
-//   heldWei: Integer,
-//   owedPriceAdj: Integer,
-//   marketMap: { [marketId: string]: ApiMarket },
-//   marginAccountToActionsMap: { [marginAccountId: string]: ApiAsyncAction[] | undefined },
-//   lastBlockTimestamp: DateTime,
-//   isExpiring: boolean,
-// ): Promise<TxResult | undefined> {
-//   const hasIsolationModeMarket = zap.getIsolationModeConverterByMarketId(new ZapBigNumber(owedMarket.marketId))
-//     || zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId));
-//   if (hasIsolationModeMarket) {
-//     return undefined;
-//   }
-//
-//   Logger.info({
-//     message: `Performing simple ${isExpiring ? 'expiration' : 'liquidation'} instead of external sell`,
-//     owedMarketId: owedMarket.marketId,
-//     heldMarketId: heldMarket.marketId,
-//     owedBalance: owedBalance.wei.abs().toFixed(),
-//     heldBalance: heldBalance.wei.abs().toFixed(),
-//     owedWeiForLiquidation: owedWei.toFixed(),
-//     heldWeiForLiquidation: heldWei.toFixed(),
-//     owedPriceAdj: owedPriceAdj.toFixed(),
-//     heldPrice: heldMarket.oraclePrice.toFixed(),
-//   });
-//
-//   if (isExpiring) {
-//     return _liquidateExpiredAccountInternalSimple(
-//       liquidAccount,
-//       marketMap,
-//       marginAccountToActionsMap,
-//       lastBlockTimestamp,
-//       [new BigNumber(heldBalance.marketId)],
-//       [new BigNumber(owedBalance.marketId)],
-//     );
-//   } else {
-//     return _liquidateAccountSimple(
-//       liquidAccount,
-//       marginAccountToActionsMap,
-//       marketMap,
-//       [new BigNumber(owedBalance.marketId)],
-//       [new BigNumber(heldBalance.marketId)],
-//       INTEGERS.ZERO,
-//     );
-//   }
-// }
 
 async function _liquidateExpiredAccountInternalSimple(
   expiredAccount: ApiAccount,
@@ -679,8 +612,8 @@ async function _liquidateExpiredAccountInternalSimple(
   }
 
   return dolomite.expiryProxy.expire(
-    solidAccount.owner,
-    solidAccount.number,
+    SOLID_ACCOUNT.owner,
+    SOLID_ACCOUNT.number,
     expiredAccount.owner,
     expiredAccount.number,
     new BigNumber(owedBalance.marketId),
@@ -688,7 +621,7 @@ async function _liquidateExpiredAccountInternalSimple(
     owedBalance.expiresAt,
     {
       gasPrice: getGasPriceWei().toFixed(),
-      from: solidAccount.owner,
+      from: SOLID_ACCOUNT.owner,
       confirmationType: ConfirmationType.Hash,
     },
   );
@@ -736,7 +669,7 @@ async function _prepareLiquidationForAsyncMarket(
         new ZapBigNumber(heldBalance.wei.toFixed()),
         outputToken,
         new ZapBigNumber('1'),
-        solidAccount.owner,
+        SOLID_ACCOUNT.owner,
         {
           isLiquidation: true,
           gasPriceInWei: new ZapBigNumber(getGasPriceWei().toFixed()),
