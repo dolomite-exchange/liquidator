@@ -139,6 +139,7 @@ export interface GraphqlRiskParams {
   id: string
   liquidationRatio: string
   liquidationReward: string
+  numberOfMarkets: number
 }
 
 export interface GraphqlLiquidationsResult {

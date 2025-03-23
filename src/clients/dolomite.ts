@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { address, BigNumber, Decimal, Networks } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import {
@@ -15,16 +15,21 @@ import * as ethers from 'ethers';
 import { isMarketIgnored } from '../helpers/market-helpers';
 import { dolomite } from '../helpers/web3';
 import {
+  ALL_E_MODE_CATEGORIES,
   ApiAccount,
   ApiBalance,
   ApiLiquidation,
   ApiMarket,
   ApiRiskParam,
+  EModeCategory,
+  EModeCategoryStruct,
+  EModeRiskFeature,
+  EModeRiskFeatureStruct,
   MarketIndex,
   TotalValueLockedAndFees,
 } from '../lib/api-types';
 import { ChainId } from '../lib/chain-id';
-import { TEN_BI } from '../lib/constants';
+import { ACCOUNT_RISK_OVERRIDE_SETTER_ADDRESS, TEN_BI } from '../lib/constants';
 import {
   GraphqlAccount,
   GraphqlAccountResult,
@@ -38,6 +43,7 @@ import {
   GraphqlLiquidationsResult,
   GraphqlMarketResult,
   GraphqlOraclePrice,
+  GraphqlRiskParams,
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
   GraphqlToken,
@@ -48,6 +54,9 @@ import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
 import '../lib/env';
 import { chunkArray } from '../lib/utils';
+import AccountRiskOverrideSetterAbi from '../abis/account-risk-override-setter.json';
+
+const defaultAbiCoder = ethers.utils.defaultAbiCoder;
 
 const defaultAxiosConfig = {
   headers: { 'Accept-Encoding': 'gzip,deflate,compress' },
@@ -405,6 +414,7 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
           id
           liquidationRatio
           liquidationReward
+          numberOfMarkets
         }
       }`,
       variables: {
@@ -421,11 +431,110 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
     return Promise.reject(result.errors[0]);
   }
 
+  const dolomiteGql = result.data.dolomiteMargins[0] as GraphqlRiskParams;
+  const marketCount = dolomiteGql.numberOfMarkets;
+
+  const marketIdToCategoryMap: Record<number, EModeCategoryStruct> = {};
+  const marketIdToRiskFeatureMap: Record<number, EModeRiskFeatureStruct> = {};
+  if (dolomite.networkId !== Networks.ARBITRUM_ONE) {
+    const accountRiskOverrideSetter = new dolomite.web3.eth.Contract(
+      AccountRiskOverrideSetterAbi,
+      ACCOUNT_RISK_OVERRIDE_SETTER_ADDRESS,
+    );
+    const calls: {
+      target: string;
+      callData: string;
+    }[] = [];
+
+    ALL_E_MODE_CATEGORIES.forEach(category => {
+      calls.push({
+        target: accountRiskOverrideSetter.options.address,
+        callData: accountRiskOverrideSetter.methods.getCategoryParamByCategory(category).encodeABI(),
+      });
+    });
+
+    for (let marketId = 0; marketId < marketCount; marketId++) {
+      calls.push({
+        target: accountRiskOverrideSetter.options.address,
+        callData: accountRiskOverrideSetter.methods.getCategoryByMarketId(marketId).encodeABI(),
+      });
+    }
+
+    for (let marketId = 0; marketId < marketCount; marketId++) {
+      calls.push({
+        target: accountRiskOverrideSetter.options.address,
+        callData: accountRiskOverrideSetter.methods.getRiskFeatureParamByMarketId(marketId).encodeABI(),
+      });
+    }
+
+    const chunks = chunkArray(calls, 100);
+    const results: string[] = [];
+    for (const chunk of chunks) {
+      const { results: resultChunk } = await dolomite.multiCall.aggregate(chunk, { blockNumber });
+      results.push(...resultChunk);
+    }
+
+    let cursor = 0;
+    const categoryToParam: Record<EModeCategory, EModeCategoryStruct | undefined> = {
+      [EModeCategory.NONE]: undefined,
+      [EModeCategory.BERA]: undefined,
+      [EModeCategory.BTC]: undefined,
+      [EModeCategory.ETH]: undefined,
+      [EModeCategory.STABLE]: undefined,
+    };
+    ALL_E_MODE_CATEGORIES.forEach(category => {
+      const result = defaultAbiCoder.decode(['(uint8,(uint256),(uint256))'], results[cursor++])[0];
+      categoryToParam[category] = {
+        category: result[0],
+        marginRatioOverride: new BigNumber(result[1][0].toString()),
+        liquidationRewardOverride: new BigNumber(result[2][0].toString()),
+      };
+    });
+
+    for (let marketId = 0; marketId < marketCount; marketId++) {
+      const result = defaultAbiCoder.decode(['uint8'], results[cursor++]);
+      const category = result[0] as EModeCategory;
+      if (category !== EModeCategory.NONE) {
+        marketIdToCategoryMap[marketId] = {
+          category,
+          marginRatioOverride: categoryToParam[category]!.marginRatioOverride,
+          liquidationRewardOverride: categoryToParam[category]!.liquidationRewardOverride,
+        };
+      }
+    }
+
+    for (let marketId = 0; marketId < marketCount; marketId++) {
+      const result = defaultAbiCoder.decode(['(uint8, bytes)'], results[cursor++])[0];
+      const riskFeature = result[0] as EModeRiskFeature;
+      if (riskFeature === EModeRiskFeature.BORROW_ONLY) {
+        marketIdToRiskFeatureMap[marketId] = {
+          feature: EModeRiskFeature.BORROW_ONLY,
+        };
+      } else if (riskFeature === EModeRiskFeature.SINGLE_COLLATERAL_WITH_STRICT_DEBT) {
+        const params = defaultAbiCoder.decode(['(uint256[], (uint256), (uint256))[]'], result[1]);
+        console.log('marketIdToRiskFeatureMap[marketId]', marketIdToRiskFeatureMap[marketId]);
+        marketIdToRiskFeatureMap[marketId] = {
+          params: params.map(p => ({
+            debtMarketIds: p[0].map(m => new BigNumber(m.toNumber())),
+            marginRatioOverride: new BigNumber(p[1].toString()),
+            liquidationRewardOverride: new BigNumber(p[2].toString()),
+          })),
+          feature: EModeRiskFeature.SINGLE_COLLATERAL_WITH_STRICT_DEBT,
+        };
+      }
+    }
+  }
+
   const riskParams: ApiRiskParam[] = result.data.dolomiteMargins.map(riskParam => {
     return {
       dolomiteMargin: ethers.utils.getAddress(riskParam.id),
       liquidationRatio: new BigNumber(decimalToString(riskParam.liquidationRatio)),
       liquidationReward: new BigNumber(decimalToString(riskParam.liquidationReward)),
+      numberOfMarkets: marketCount,
+      riskOverrideSettings: {
+        marketIdToCategoryMap,
+        marketIdToRiskFeatureMap,
+      }
     };
   });
 
