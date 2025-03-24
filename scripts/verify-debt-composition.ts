@@ -185,20 +185,26 @@ async function start() {
     debtAmount: `$${formatNumber(totalSupplyAccountDebt)}`,
   });
 
-  const totalBorrowAccountDebt = borrowAccounts.reduce((acc, account) => {
-    const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
-      if (balance.wei.gte(INTEGERS.ZERO)) {
-        return memo;
-      }
+  const { debt: totalBorrowAccountDebt, collateral: totalBorrowAccountCollateral } = borrowAccounts.reduce((acc, account) => {
+    const { debt, collateral } = Object.values(account.balances).reduce((memo, balance) => {
+      const isCollateral = balance.wei.gte(INTEGERS.ZERO);
       const market = marketMap[balance.marketId.toString()];
-      return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
-    }, INTEGERS.ZERO);
-    return acc.plus(totalBorrowUsd);
-  }, INTEGERS.ZERO).toNumber();
+      const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs();
+      return {
+        debt: isCollateral ? memo.debt : memo.debt.plus(value),
+        collateral: !isCollateral ? memo.collateral : memo.collateral.plus(value),
+      };
+    }, { debt: INTEGERS.ZERO, collateral: INTEGERS.ZERO });
+    return {
+      debt: acc.debt.plus(debt),
+      collateral: acc.collateral.plus(collateral),
+    };
+  }, { debt: INTEGERS.ZERO, collateral: INTEGERS.ZERO });
   Logger.info({
     message: `Found ${borrowAccounts.length} borrow accounts with debt`,
     debtCount: borrowAccounts.length,
-    debtAmount: `$${formatNumber(totalBorrowAccountDebt)}`,
+    debtAmount: `$${formatNumber(totalBorrowAccountDebt.toNumber())}`,
+    collateralAmount: `$${formatNumber(totalBorrowAccountCollateral.toNumber())}`,
   });
 
   return true;

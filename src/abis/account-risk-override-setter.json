@@ -1,0 +1,475 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category",
+        "name": "category",
+        "type": "uint8"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "marginRatioOverride",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "liquidationRewardOverride",
+        "type": "tuple"
+      }
+    ],
+    "name": "CategoryParamSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "marketId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category",
+        "name": "category",
+        "type": "uint8"
+      }
+    ],
+    "name": "CategorySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [],
+    "name": "DefaultAccountCheckActivated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "marketId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.RiskFeature",
+        "name": "riskFeature",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "extraData",
+        "type": "bytes"
+      }
+    ],
+    "name": "RiskFeatureSet",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "number",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.AccountInfo",
+        "name": "_account",
+        "type": "tuple"
+      }
+    ],
+    "name": "getAccountRiskOverride",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "_marginRatioOverride",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "_liquidationRewardOverride",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCategoryByMarketId",
+    "outputs": [
+      {
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "_marketIds",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "getCategoryMaskByMarketIds",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category",
+        "name": "_category",
+        "type": "uint8"
+      }
+    ],
+    "name": "getCategoryParamByCategory",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category",
+            "name": "category",
+            "type": "uint8"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.Decimal",
+            "name": "marginRatioOverride",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.Decimal",
+            "name": "liquidationRewardOverride",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct IDolomiteAccountRiskOverrideSetter.CategoryStruct",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCategoryParamByMarketId",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category",
+            "name": "category",
+            "type": "uint8"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.Decimal",
+            "name": "marginRatioOverride",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.Decimal",
+            "name": "liquidationRewardOverride",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct IDolomiteAccountRiskOverrideSetter.CategoryStruct",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRiskFeatureByMarketId",
+    "outputs": [
+      {
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.RiskFeature",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRiskFeatureForSingleCollateralByMarketId",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256[]",
+            "name": "debtMarketIds",
+            "type": "uint256[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.Decimal",
+            "name": "marginRatioOverride",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.Decimal",
+            "name": "liquidationRewardOverride",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct IDolomiteAccountRiskOverrideSetter.SingleCollateralRiskStruct[]",
+        "name": "params",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRiskFeatureParamByMarketId",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum IDolomiteAccountRiskOverrideSetter.RiskFeature",
+            "name": "riskFeature",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bytes",
+            "name": "extraData",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct IDolomiteAccountRiskOverrideSetter.RiskFeatureStruct",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "_marketIds",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category[]",
+        "name": "_categories",
+        "type": "uint8[]"
+      }
+    ],
+    "name": "ownerSetCategoriesByMarketIds",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category",
+        "name": "_category",
+        "type": "uint8"
+      }
+    ],
+    "name": "ownerSetCategoryByMarketId",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.Category",
+        "name": "_category",
+        "type": "uint8"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "_marginRatioOverride",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "_liquidationRewardOverride",
+        "type": "tuple"
+      }
+    ],
+    "name": "ownerSetCategoryParam",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum IDolomiteAccountRiskOverrideSetter.RiskFeature",
+        "name": "_riskFeature",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes",
+        "name": "_extraData",
+        "type": "bytes"
+      }
+    ],
+    "name": "ownerSetRiskFeatureByMarketId",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

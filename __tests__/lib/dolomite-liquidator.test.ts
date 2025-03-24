@@ -1,14 +1,14 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { DateTime } from 'luxon';
 import { dolomite } from '../../src/helpers/web3';
-import AccountStore from '../../src/stores/account-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
+import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
+import { LiquidationMode } from '../../src/lib/liquidation-mode';
+import AccountStore from '../../src/stores/account-store';
 import AsyncActionRetryStore from '../../src/stores/async-action-retry-store';
 import AsyncActionStore from '../../src/stores/async-action-store';
 import BalanceStore from '../../src/stores/balance-store';
 import BlockStore from '../../src/stores/block-store';
-import DolomiteLiquidator from '../../src/lib/dolomite-liquidator';
-import { LiquidationMode } from '../../src/lib/liquidation-mode';
 import LiquidationStore from '../../src/stores/liquidation-store';
 import MarketStore from '../../src/stores/market-store';
 import RiskParamsStore from '../../src/stores/risk-params-store';
@@ -306,5 +306,10 @@ function getTestRiskParams(): ApiRiskParam {
     dolomiteMargin: '0x0000000000000000000000000000000000000000',
     liquidationRatio: new BigNumber('1150000000000000000'), // 115% or 1.15
     liquidationReward: new BigNumber('1050000000000000000'), // 105% or 1.05
+    numberOfMarkets: 32,
+    riskOverrideSettings: {
+      marketIdToCategoryMap: {},
+      marketIdToRiskFeatureMap: {},
+    },
   };
 }
