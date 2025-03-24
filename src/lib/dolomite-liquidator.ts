@@ -15,6 +15,7 @@ import BlockStore from '../stores/block-store';
 import LiquidationStore from '../stores/liquidation-store';
 import MarketStore from '../stores/market-store';
 import RiskParamsStore from '../stores/risk-params-store';
+import { getAccountRiskOverride } from './account-risk-override-getter';
 import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
 import { delay } from './delay';
 import Logger from './logger';
@@ -231,6 +232,7 @@ export default class DolomiteLiquidator {
     marketMap: { [marketId: string]: ApiMarket },
     riskParams: ApiRiskParam,
   ): boolean => {
+    const riskOverride = getAccountRiskOverride(account, riskParams);
     const initial = {
       borrow: INTEGERS.ZERO,
       supply: INTEGERS.ZERO,
@@ -242,7 +244,7 @@ export default class DolomiteLiquidator {
       .reduce((memo, balance) => {
         const market = marketMap[balance.marketId.toString()];
         const value = balance.wei.times(market.oraclePrice);
-        const adjust = this.BASE.plus(market.marginPremium);
+        const adjust = this.BASE.plus(riskOverride ? INTEGERS.ZERO : market.marginPremium);
         if (balance.wei.lt(INTEGERS.ZERO)) {
           // increase the borrow size by the premium
           memo.borrow = memo.borrow.plus(value.abs()
@@ -258,10 +260,8 @@ export default class DolomiteLiquidator {
         return memo;
       }, initial);
 
-    const collateralization = supply.times(this.BASE)
-      .div(borrow)
-      .integerValue(BigNumber.ROUND_FLOOR);
-    return collateralization.gte(riskParams.liquidationRatio) || supply.eq(INTEGERS.ZERO);
+    const liquidationRatio = riskOverride ? riskOverride.marginRatioOverride : riskParams.liquidationRatio;
+    return supply.lt(borrow.times(liquidationRatio).dividedToIntegerBy(this.BASE, BigNumber.ROUND_FLOOR));
   }
 
   isSufficientDebt = (

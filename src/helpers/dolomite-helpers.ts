@@ -11,6 +11,7 @@ import {
 import { ReferralOutput } from '@dolomite-exchange/zap-sdk/dist/src/lib/ApiTypes';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
+import { getAccountRiskOverride } from '../lib/account-risk-override-getter';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { ChainId } from '../lib/chain-id';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
@@ -23,8 +24,8 @@ import {
 } from './async-liquidations-helper';
 import { getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei, getRawGasPriceWei, isGasSpikeProtectionEnabled } from './gas-price-helpers';
-import { dolomite } from './web3';
 import { liquidateV5 } from './liquidator-proxy-v5-helper';
+import { dolomite } from './web3';
 
 export const SOLID_ACCOUNT = {
   owner: process.env.ACCOUNT_WALLET_ADDRESS as string,
@@ -342,6 +343,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   lastBlockTimestamp: DateTime,
   isExpiring: boolean,
 ): Promise<TxResult | undefined> {
+  const riskOverride = getAccountRiskOverride(liquidAccount, riskParams);
   const owedBalance = getLargestBalanceUSD(
     Object.values(liquidAccount.balances),
     true,
@@ -360,7 +362,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   );
   const owedMarket = marketMap[owedBalance.marketId];
   const heldMarket = marketMap[heldBalance.marketId];
-  const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskParams);
+  const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskOverride, riskParams);
   const heldProtocolBalance = protocolBalanceMap[heldBalance.marketId] ?? INTEGERS.MAX_UINT;
   const isHeldBalanceLargerThanProtocol = heldBalance.wei.abs().gt(heldProtocolBalance);
   const { owedWei, heldWei, isVaporizable } = getAmountsForLiquidation(

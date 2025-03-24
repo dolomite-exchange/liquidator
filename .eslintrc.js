@@ -42,6 +42,8 @@ module.exports = {
     'arrow-parens': 0,
     'no-else-return': 0,
     'no-param-reassign': 0,
+    'no-plusplus': 0,
+    'no-restricted-syntax': 0,
     'object-curly-spacing': ["error", "always"],
     '@typescript-eslint/naming-convention': ['error',
       {
