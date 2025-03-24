@@ -33,8 +33,8 @@ async function start() {
   });
   // const startTimestamp: number = 1739664000; // February 16, 2025
   // const endTimestamp: number = 1740268800; // February 23, 2025
-  const startTimestamp: number = 1740355200; // February 24, 2025
-  const endTimestamp: number = 1740873600; // March 2, 2025
+  const startTimestamp: number = 1740873600; // March 2, 2025
+  const endTimestamp: number = 1742169600; // March 16, 2025
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   } else if (startTimestamp === endTimestamp) {
