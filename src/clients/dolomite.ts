@@ -12,6 +12,7 @@ import {
 import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import axios from 'axios';
 import * as ethers from 'ethers';
+import AccountRiskOverrideSetterAbi from '../abis/account-risk-override-setter.json';
 import { isMarketIgnored } from '../helpers/market-helpers';
 import { dolomite } from '../helpers/web3';
 import {
@@ -53,10 +54,9 @@ import {
 import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
 import '../lib/env';
-import { chunkArray } from '../lib/utils';
-import AccountRiskOverrideSetterAbi from '../abis/account-risk-override-setter.json';
+import { chunkArray, DECIMAL_BASE } from '../lib/utils';
 
-const defaultAbiCoder = ethers.utils.defaultAbiCoder;
+const { defaultAbiCoder } = ethers.utils;
 
 const defaultAxiosConfig = {
   headers: { 'Accept-Encoding': 'gzip,deflate,compress' },
@@ -406,7 +406,7 @@ export async function getDolomiteMarkets(
 }
 
 export async function getDolomiteRiskParams(blockNumber: number): Promise<{ riskParams: ApiRiskParam }> {
-  const result: any = await axios.post(
+  const subgraphResult: any = await axios.post(
     subgraphUrl,
     {
       query: `query getDolomiteMargins($blockNumber: Int) {
@@ -426,16 +426,16 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
     .then(response => response.data)
     .then(json => json as GraphqlRiskParamsResult);
 
-  if (result.errors && typeof result.errors === 'object') {
+  if (subgraphResult.errors && typeof subgraphResult.errors === 'object') {
     // noinspection JSPotentiallyInvalidTargetOfIndexedPropertyAccess
-    return Promise.reject(result.errors[0]);
+    return Promise.reject(subgraphResult.errors[0]);
   }
 
-  const dolomiteGql = result.data.dolomiteMargins[0] as GraphqlRiskParams;
+  const dolomiteGql = subgraphResult.data.dolomiteMargins[0] as GraphqlRiskParams;
   const marketCount = dolomiteGql.numberOfMarkets;
 
-  const marketIdToCategoryMap: Record<number, EModeCategoryStruct> = {};
-  const marketIdToRiskFeatureMap: Record<number, EModeRiskFeatureStruct> = {};
+  const marketIdToCategoryMap: Record<number, EModeCategoryStruct | undefined> = {};
+  const marketIdToRiskFeatureMap: Record<number, EModeRiskFeatureStruct | undefined> = {};
   if (dolomite.networkId !== Networks.ARBITRUM_ONE) {
     const accountRiskOverrideSetter = new dolomite.web3.eth.Contract(
       AccountRiskOverrideSetterAbi,
@@ -486,8 +486,8 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
       const result = defaultAbiCoder.decode(['(uint8,(uint256),(uint256))'], results[cursor++])[0];
       categoryToParam[category] = {
         category: result[0],
-        marginRatioOverride: new BigNumber(result[1][0].toString()),
-        liquidationRewardOverride: new BigNumber(result[2][0].toString()),
+        marginRatioOverride: new BigNumber(result[1][0].toString()).plus(DECIMAL_BASE),
+        liquidationRewardOverride: new BigNumber(result[2][0].toString()).plus(DECIMAL_BASE),
       };
     });
 
@@ -512,12 +512,11 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
         };
       } else if (riskFeature === EModeRiskFeature.SINGLE_COLLATERAL_WITH_STRICT_DEBT) {
         const params = defaultAbiCoder.decode(['(uint256[], (uint256), (uint256))[]'], result[1]);
-        console.log('marketIdToRiskFeatureMap[marketId]', marketIdToRiskFeatureMap[marketId]);
         marketIdToRiskFeatureMap[marketId] = {
-          params: params.map(p => ({
-            debtMarketIds: p[0].map(m => new BigNumber(m.toNumber())),
-            marginRatioOverride: new BigNumber(p[1].toString()),
-            liquidationRewardOverride: new BigNumber(p[2].toString()),
+          params: params.map(([p]) => ({
+            debtMarketIds: p[0].map((m: any) => new BigNumber(m.toNumber())),
+            marginRatioOverride: new BigNumber(p[1].toString()).plus(DECIMAL_BASE),
+            liquidationRewardOverride: new BigNumber(p[2].toString()).plus(DECIMAL_BASE),
           })),
           feature: EModeRiskFeature.SINGLE_COLLATERAL_WITH_STRICT_DEBT,
         };
@@ -525,7 +524,7 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
     }
   }
 
-  const riskParams: ApiRiskParam[] = result.data.dolomiteMargins.map(riskParam => {
+  const riskParams: ApiRiskParam[] = subgraphResult.data.dolomiteMargins.map(riskParam => {
     return {
       dolomiteMargin: ethers.utils.getAddress(riskParam.id),
       liquidationRatio: new BigNumber(decimalToString(riskParam.liquidationRatio)),
@@ -534,7 +533,7 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
       riskOverrideSettings: {
         marketIdToCategoryMap,
         marketIdToRiskFeatureMap,
-      }
+      },
     };
   });
 
@@ -1069,7 +1068,7 @@ function mapGraphqlAccountToApiAccount(
     }
 
     const index = (valuePar.lt('0') ? indexObject.borrow : indexObject.supply)
-      .times(INTEGERS.INTEREST_RATE_BASE);
+      .times(DECIMAL_BASE);
     memo[value.token.marketId] = {
       marketId: Number(value.token.marketId),
       tokenName: value.token.name,
@@ -1078,7 +1077,7 @@ function mapGraphqlAccountToApiAccount(
       tokenAddress: value.token.id,
       par: valuePar,
       wei: new BigNumber(valuePar).times(index)
-        .div(INTEGERS.INTEREST_RATE_BASE)
+        .div(DECIMAL_BASE)
         .integerValue(BigNumber.ROUND_HALF_UP),
       expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
       expiryAddress: value.expiryAddress,

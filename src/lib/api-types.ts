@@ -89,8 +89,8 @@ export interface SingleCollateralStruct {
 }
 
 export interface ApiRiskOverrideSettings {
-  marketIdToCategoryMap: Record<number, EModeCategoryStruct>;
-  marketIdToRiskFeatureMap: Record<number, EModeRiskFeatureStruct>;
+  marketIdToCategoryMap: Record<number, EModeCategoryStruct | undefined>;
+  marketIdToRiskFeatureMap: Record<number, EModeRiskFeatureStruct | undefined>;
 }
 
 export interface ApiRiskParam {
