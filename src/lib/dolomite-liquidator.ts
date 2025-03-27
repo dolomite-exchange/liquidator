@@ -1,7 +1,8 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import {
-  emitDepositCancelled, emitWithdrawalExecuted,
+  emitDepositCancelled,
+  emitWithdrawalExecuted,
   liquidateAccount,
   liquidateExpiredAccount,
   retryAsyncAction,
@@ -15,13 +16,12 @@ import BlockStore from '../stores/block-store';
 import LiquidationStore from '../stores/liquidation-store';
 import MarketStore from '../stores/market-store';
 import RiskParamsStore from '../stores/risk-params-store';
-import { getAccountRiskOverride } from './account-risk-override-getter';
-import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
+import { ApiAccount, ApiMarket } from './api-types';
 import { delay } from './delay';
 import Logger from './logger';
+import { isCollateralized } from './utils';
 
 export default class DolomiteLiquidator {
-  private BASE = new BigNumber('1000000000000000000');
   private MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
 
   constructor(
@@ -101,7 +101,7 @@ export default class DolomiteLiquidator {
 
     const liquidatableAccounts = this.accountStore.getLiquidatableDolomiteAccounts()
       .filter(account => !this.liquidationStore.contains(account))
-      .filter(account => !this.isCollateralized(account, marketMap, riskParams))
+      .filter(account => !isCollateralized(account, marketMap, riskParams))
       .filter(account => this.isSufficientDebt(account, marketMap))
       .sort((a, b) => this.borrowAmountSorterDesc(a, b, marketMap));
 
@@ -226,43 +226,6 @@ export default class DolomiteLiquidator {
       }
     }
   };
-
-  isCollateralized = (
-    account: ApiAccount,
-    marketMap: { [marketId: string]: ApiMarket },
-    riskParams: ApiRiskParam,
-  ): boolean => {
-    const riskOverride = getAccountRiskOverride(account, riskParams);
-    const initial = {
-      borrow: INTEGERS.ZERO,
-      supply: INTEGERS.ZERO,
-    };
-    const {
-      supply,
-      borrow,
-    } = Object.values(account.balances)
-      .reduce((memo, balance) => {
-        const market = marketMap[balance.marketId.toString()];
-        const value = balance.wei.times(market.oraclePrice);
-        const adjust = this.BASE.plus(riskOverride ? INTEGERS.ZERO : market.marginPremium);
-        if (balance.wei.lt(INTEGERS.ZERO)) {
-          // increase the borrow size by the premium
-          memo.borrow = memo.borrow.plus(value.abs()
-            .times(adjust)
-            .div(this.BASE)
-            .integerValue(BigNumber.ROUND_FLOOR));
-        } else {
-          // decrease the supply size by the premium
-          memo.supply = memo.supply.plus(value.times(this.BASE)
-            .div(adjust)
-            .integerValue(BigNumber.ROUND_FLOOR));
-        }
-        return memo;
-      }, initial);
-
-    const liquidationRatio = riskOverride ? riskOverride.marginRatioOverride : riskParams.liquidationRatio;
-    return supply.lt(borrow.times(liquidationRatio).dividedToIntegerBy(this.BASE, BigNumber.ROUND_FLOOR));
-  }
 
   isSufficientDebt = (
     account: ApiAccount,

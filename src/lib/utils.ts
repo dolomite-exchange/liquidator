@@ -1,8 +1,46 @@
 import { BigNumber, Integer } from '@dolomite-exchange/dolomite-margin';
-import { RiskOverride } from './account-risk-override-getter';
-import { ApiMarket, ApiRiskParam } from './api-types';
+import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
+import { getAccountRiskOverride, RiskOverride } from './account-risk-override-getter';
+import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
 
 export const DECIMAL_BASE = new BigNumber(10).pow(18);
+
+export function isCollateralized(
+  account: ApiAccount,
+  marketMap: { [marketId: string]: ApiMarket },
+  riskParams: ApiRiskParam,
+): boolean {
+  const riskOverride = getAccountRiskOverride(account, riskParams);
+  const initial = {
+    borrow: INTEGERS.ZERO,
+    supply: INTEGERS.ZERO,
+  };
+  const {
+    supply,
+    borrow,
+  } = Object.values(account.balances)
+    .reduce((memo, balance) => {
+      const market = marketMap[balance.marketId.toString()];
+      const value = balance.wei.times(market.oraclePrice);
+      const adjust = DECIMAL_BASE.plus(riskOverride ? INTEGERS.ZERO : market.marginPremium);
+      if (balance.wei.lt(INTEGERS.ZERO)) {
+        // increase the borrow size by the premium
+        memo.borrow = memo.borrow.plus(value.abs()
+          .times(adjust)
+          .div(DECIMAL_BASE)
+          .integerValue(BigNumber.ROUND_FLOOR));
+      } else {
+        // decrease the supply size by the premium
+        memo.supply = memo.supply.plus(value.times(DECIMAL_BASE)
+          .div(adjust)
+          .integerValue(BigNumber.ROUND_FLOOR));
+      }
+      return memo;
+    }, initial);
+
+  const liquidationRatio = riskOverride ? riskOverride.marginRatioOverride : riskParams.liquidationRatio;
+  return supply.lt(borrow.times(liquidationRatio).dividedToIntegerBy(DECIMAL_BASE, BigNumber.ROUND_FLOOR));
+}
 
 export function getPartial(amount: Integer, numerator: Integer, denominator: Integer): Integer {
   return amount.times(numerator).dividedToIntegerBy(denominator);

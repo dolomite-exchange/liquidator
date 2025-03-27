@@ -11,10 +11,12 @@ import v8 from 'v8';
 import { getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getGasPriceWei, updateGasPrice } from '../src/helpers/gas-price-helpers';
 import { dolomite, loadAccounts } from '../src/helpers/web3';
+import { getAccountRiskOverride } from '../src/lib/account-risk-override-getter';
 import { ApiAccount, ApiBalance } from '../src/lib/api-types';
 import '../src/lib/env';
 import { ChainId } from '../src/lib/chain-id';
 import Logger from '../src/lib/logger';
+import { DECIMAL_BASE, isCollateralized } from '../src/lib/utils';
 import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
@@ -106,6 +108,7 @@ async function start() {
   const totalAccountsWithBadDebt = [] as (ApiAccount & { borrow: BigNumber; supply: BigNumber; })[];
   for (let i = 0; i < accounts.length; i += 1) {
     const account = accounts[i];
+    const riskOverride = getAccountRiskOverride(account, riskParams);
     const initial = {
       borrow: INTEGERS.ZERO,
       supply: INTEGERS.ZERO,
@@ -124,7 +127,9 @@ async function start() {
         const priceOverrideRaw = NETWORK_TO_PRICE_OVERRIDE_MAP[networkId as ChainId][market.marketId];
         const priceOverride = priceOverrideRaw ? new BigNumber(priceOverrideRaw).times(priceMultiplier) : undefined;
         const value = balance.wei.times(priceOverride ?? market.oraclePrice).div(ONE_DOLLAR);
-        const adjust = MARGIN_PREMIUM_BASE.plus(MARGIN_PREMIUM_SPECULATIVE ?? market.marginPremium);
+        const adjust = riskOverride
+          ? MARGIN_PREMIUM_BASE
+          : MARGIN_PREMIUM_BASE.plus(MARGIN_PREMIUM_SPECULATIVE ?? market.marginPremium);
         if (balance.wei.lt(INTEGERS.ZERO)) {
           // increase the borrow size by the premium
           acc.borrow = acc.borrow.plus(value.abs());
@@ -145,6 +150,7 @@ async function start() {
       });
     }
 
+    const marginRatio = (riskOverride?.marginRatioOverride ?? riskParams.liquidationRatio).div(DECIMAL_BASE);
     if (borrow.gt(supply)) {
       if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
         Logger.warn({
@@ -191,7 +197,7 @@ async function start() {
         borrow,
         supply,
       });
-    } else if (borrowAdj.times('1.15').gt(supplyAdj) && !shouldIgnoreAccount(account)) {
+    } else if (!isCollateralized(account, marketMap, riskParams) && !shouldIgnoreAccount(account)) {
       if (borrowAdj.lt(SMALL_BORROW_THRESHOLD)) {
         smallLiquidBorrowCount += 1;
         smallLiquidDebtAmount = smallLiquidDebtAmount.plus(borrow);
@@ -202,14 +208,19 @@ async function start() {
           borrowUSD: borrow,
         });
       }
-    } else if (borrowAdj.times('1.155').gt(supplyAdj) && !shouldIgnoreAccount(account)) {
+    } else if (borrowAdj.times(marginRatio).times(1.01).gt(supplyAdj) && !shouldIgnoreAccount(account)) {
       if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
+        const extraData = riskOverride ? {} : {
+          supplyAdj: supplyAdj.toFormat(6),
+          borrowAdj: borrowAdj.toFormat(6),
+        };
         Logger.info({
           message: 'Found almost liquid account!',
           account: account.id,
           markets: Object.values(account.balances).map(formatApiBalance),
           supplyUSD: supply.toFormat(6),
           borrowUSD: borrow.toFormat(6),
+          ...extraData,
         });
       }
     }
