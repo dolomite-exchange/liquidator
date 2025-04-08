@@ -226,24 +226,26 @@ async function start() {
     }
   }
 
+  function computeAverageAndFormat<T>(values: T[], getter: (t: T) => Decimal): string {
+    return values.reduce((acc, b) => acc.plus(getter(b)), INTEGERS.ZERO)
+      .div(values.length)
+      .toFormat(2);
+  }
+
   allAccounts.sort((a, b) => (a.borrowUSD.gt(b.borrowUSD) ? 1 : -1));
   Logger.info({
     message: 'Stats on accounts with debt',
-    medianAccountDebt: allAccounts[Math.floor(allAccounts.length / 2)].borrowUSD.toFormat(2),
-    biggestAccountDebt: allAccounts[allAccounts.length - 1].borrowUSD.toFormat(2),
-    averageAccountDebt: allAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
-      .div(allAccounts.length)
-      .toFormat(2),
+    medianAccountDebt: `$${allAccounts[Math.floor(allAccounts.length / 2)].borrowUSD.toFormat(4)}`,
+    biggestAccountDebt: `$${allAccounts[allAccounts.length - 1].borrowUSD.toFormat(2)}`,
+    averageAccountDebt: `$${computeAverageAndFormat(allAccounts, a => a.borrowUSD)}`,
   });
 
   allAccounts.sort((a, b) => (a.supplyUSD.gt(b.supplyUSD) ? 1 : -1));
   Logger.info({
     message: 'Stats on accounts with supply',
-    medianAccountSupply: allAccounts[Math.floor(allAccounts.length / 2)].supplyUSD.toFormat(2),
-    biggestAccountSupply: allAccounts[allAccounts.length - 1].supplyUSD.toFormat(2),
-    averageAccountSupply: allAccounts.reduce((acc, b) => acc.plus(b.supplyUSD), INTEGERS.ZERO)
-      .div(allAccounts.length)
-      .toFormat(2),
+    medianAccountSupply: `$${allAccounts[Math.floor(allAccounts.length / 2)].supplyUSD.toFormat(4)}`,
+    biggestAccountSupply: `$${allAccounts[allAccounts.length - 1].supplyUSD.toFormat(2)}`,
+    averageAccountSupply: `$${computeAverageAndFormat(allAccounts, a => a.supplyUSD)}`,
   });
 
   liquidAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1)).forEach(account => {
@@ -251,8 +253,8 @@ async function start() {
       message: 'Found liquid account!',
       account: account.id,
       markets: Object.values(account.balances).map(formatApiBalance),
-      supplyUSD: account.supplyUSD.toFormat(6),
-      borrowUSD: account.borrowUSD.toFormat(6),
+      supplyUSD: `$${account.supplyUSD.toFormat(66)}`,
+      borrowUSD: `$${account.borrowUSD.toFormat(66)}`,
     });
   });
 

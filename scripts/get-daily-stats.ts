@@ -2,6 +2,7 @@
 /** @formatter:off */
 /** @formatter:on */
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import axios from 'axios';
 import v8 from 'v8';
 import {
   getLiquidationsBetweenTimestamps,
@@ -10,12 +11,14 @@ import {
   getTotalValueLockedAndFees,
 } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
+import { TEN_BI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
 import '../src/lib/env';
 import Pageable from '../src/lib/pageable';
 
 const ONE_DAY_SECONDS = 86_400;
 const ONE_DOLLAR = new BigNumber('1000000000000000000000000000000000000');
+const PROFIT_THRESHOLD_FOR_DISPLAY: Decimal = new BigNumber(2_500);
 
 const ignoredMarketIds: Record<string, true | undefined> = (process.env.IGNORED_MARKETS ?? '').split(',')
   .reduce((memo, market) => {
@@ -31,10 +34,9 @@ async function start() {
     subgraphUrl: process.env.SUBGRAPH_URL,
     subgraphBlocksUrl: process.env.SUBGRAPH_BLOCKS_URL,
   });
-  // const startTimestamp: number = 1739664000; // February 16, 2025
-  // const endTimestamp: number = 1740268800; // February 23, 2025
-  const startTimestamp: number = 1740873600; // March 2, 2025
-  const endTimestamp: number = 1742169600; // March 16, 2025
+  // const startTimestamp: number = 1743379200; // March 31, 2025
+  const startTimestamp: number = 1743984000; // April 7, 2025
+  const endTimestamp: number = 1744070400; // April 8, 2025
   if (startTimestamp % ONE_DAY_SECONDS !== 0 || endTimestamp % ONE_DAY_SECONDS !== 0) {
     return Promise.reject(new Error('Invalid start timestamp or end timestamp'))
   } else if (startTimestamp === endTimestamp) {
@@ -128,12 +130,24 @@ async function start() {
 }
 
 async function getRealFeesAccrued(startBlockNumber: number, endBlockNumber: number): Promise<Decimal> {
-  const marketToUnits: Record<string, Integer | undefined> = {};
+  const marketIdToTokenAddressMap = await axios.get(`https://api.dolomite.io/tokens/${dolomite.networkId}`)
+    .then(response => {
+      return response.data.tokens.reduce((acc, token) => {
+        acc[token.marketId] = {
+          marketId: token.marketId,
+          address: token.id,
+          decimals: token.decimals,
+          symbol: token.cleanSymbol,
+        };
+        return acc;
+      }, {} as Record<string, string>)
+    });
+  const marketToStartUnits: Record<string, Integer | undefined> = {};
   const startMarketsCount = (await dolomite.getters.getNumMarkets({ blockNumber: startBlockNumber })).toNumber();
   for (let i = 0; i < startMarketsCount; i += 1) {
     if (!ignoredMarketIds[i]) {
       const marketId = new BigNumber(i);
-      marketToUnits[i] = await dolomite.getters.getNumExcessTokens(marketId, { blockNumber: startBlockNumber });
+      marketToStartUnits[i] = await dolomite.getters.getNumExcessTokens(marketId, { blockNumber: startBlockNumber });
     }
   }
 
@@ -144,7 +158,18 @@ async function getRealFeesAccrued(startBlockNumber: number, endBlockNumber: numb
       const marketId = new BigNumber(i);
       const endAmount = await dolomite.getters.getNumExcessTokens(marketId, { blockNumber: endBlockNumber });
       const price = await dolomite.getters.getMarketPrice(marketId, { blockNumber: endBlockNumber });
-      const diff = endAmount.minus(marketToUnits[i] ?? INTEGERS.ZERO)
+      const diff = endAmount.minus(marketToStartUnits[i] ?? INTEGERS.ZERO);
+      const totalUsdValue = endAmount.times(price).div(ONE_DOLLAR);
+      if (totalUsdValue.gt(PROFIT_THRESHOLD_FOR_DISPLAY)) {
+        const token = marketIdToTokenAddressMap[i];
+        Logger.info({
+          message: `Found profits greater than $${PROFIT_THRESHOLD_FOR_DISPLAY.toFormat(2)}`,
+          token,
+          units: endAmount.div(TEN_BI.pow(token.decimals)).toFormat(6),
+          value: `$${totalUsdValue.toFormat(2)}`,
+        })
+      }
+
       actualFees = actualFees.plus(diff.times(price).div(ONE_DOLLAR));
     }
   }
