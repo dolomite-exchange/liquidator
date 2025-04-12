@@ -1,12 +1,12 @@
-import LiquidatorProxyV5Abi from '../abis/liquidator-proxy-v5.json';
-import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
-import { dolomite } from './web3';
-import { ApiAccount } from '../lib/api-types';
 import { BigNumber, ContractCallOptions, Integer } from '@dolomite-exchange/dolomite-margin';
 import { TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { SOLID_ACCOUNT } from './dolomite-helpers';
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { ZapOutputParam } from '@dolomite-exchange/zap-sdk';
 import axios from 'axios';
+import LiquidatorProxyV5Abi from '../abis/liquidator-proxy-v5.json';
+import { SOLID_ACCOUNT } from '../clients/dolomite';
+import { ApiAccount } from '../lib/api-types';
+import { dolomite } from './web3';
 
 const networkId = Number(process.env.NETWORK_ID);
 

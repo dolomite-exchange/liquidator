@@ -67,6 +67,11 @@ if (!subgraphUrl) {
   throw new Error('SUBGRAPH_URL is not set')
 }
 
+export const SOLID_ACCOUNT = {
+  owner: process.env.ACCOUNT_WALLET_ADDRESS as string,
+  number: new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER as string),
+};
+
 const marginAccountFields = `
                   id
                   user {

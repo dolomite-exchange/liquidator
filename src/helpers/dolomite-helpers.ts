@@ -11,6 +11,7 @@ import {
 import { ReferralOutput } from '@dolomite-exchange/zap-sdk/dist/src/lib/ApiTypes';
 import { ethers } from 'ethers';
 import { DateTime } from 'luxon';
+import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { getAccountRiskOverride } from '../lib/account-risk-override-getter';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { ChainId } from '../lib/chain-id';
@@ -27,10 +28,6 @@ import { getGasPriceWei, getRawGasPriceWei, isGasSpikeProtectionEnabled } from '
 import { liquidateV5 } from './liquidator-proxy-v5-helper';
 import { dolomite } from './web3';
 
-export const SOLID_ACCOUNT = {
-  owner: process.env.ACCOUNT_WALLET_ADDRESS as string,
-  number: new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER as string),
-};
 const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? '')?.split(',')
   .map((pref) => new BigNumber(pref.trim()));
 const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split(',')
