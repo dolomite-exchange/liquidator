@@ -1,5 +1,8 @@
 FROM node:16.15.1-alpine
 
+ARG GIT_COMMIT
+ENV GIT_COMMIT_HASH=$GIT_COMMIT
+
 RUN apk update &&  \
     apk upgrade && \
     apk -Uuv add --no-cache make g++ git py-pip jq openssh curl openssh docker &&  \

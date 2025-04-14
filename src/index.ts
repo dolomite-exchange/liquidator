@@ -119,6 +119,10 @@ async function start() {
   }
 
   Logger.info({
+    version: process.env.GIT_COMMIT_HASH,
+  });
+
+  Logger.info({
     message: 'DolomiteMargin data',
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
     asyncActionsEnabled: process.env.ASYNC_ACTIONS_ENABLED,
