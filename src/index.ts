@@ -6,7 +6,7 @@ import '../src/lib/env';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
-import { dolomite, initializeDolomiteLiquidations, loadAccounts } from './helpers/web3';
+import { dolomite, initializeDolomiteLiquidations, liquidatorProxyV5, loadAccounts } from './helpers/web3';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
@@ -32,7 +32,6 @@ import BlockStore from './stores/block-store';
 import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
 import RiskParamsStore from './stores/risk-params-store';
-import { liquidatorProxyV5 } from './helpers/liquidator-proxy-v5-helper';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');

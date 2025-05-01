@@ -268,9 +268,11 @@ async function start() {
     }, INTEGERS.ZERO);
     return acc.plus(totalBorrowUsd);
   }, INTEGERS.ZERO).toNumber();
+
+  const debtCountFormatted = accounts.length.toLocaleString(undefined, { useGrouping: true });
   Logger.info({
-    message: `Found ${accounts.length} accounts with debt`,
-    debtCount: accounts.length,
+    message: `Found ${debtCountFormatted} accounts with debt`,
+    debtCount: debtCountFormatted,
     debtAmount: `$${formatNumber(totalAccountDebt)}`,
   });
 

@@ -1,19 +1,13 @@
 import { BigNumber, ContractCallOptions, Integer } from '@dolomite-exchange/dolomite-margin';
 import { TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { ZapOutputParam } from '@dolomite-exchange/zap-sdk';
 import axios from 'axios';
-import LiquidatorProxyV5Abi from '../abis/liquidator-proxy-v5.json';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { ApiAccount } from '../lib/api-types';
-import { dolomite } from './web3';
+import Logger from '../lib/logger';
+import { dolomite, liquidatorProxyV5 } from './web3';
 
 const networkId = Number(process.env.NETWORK_ID);
-
-export const liquidatorProxyV5 = new dolomite.web3.eth.Contract(
-  LiquidatorProxyV5Abi,
-  ModuleDeployments.LiquidatorProxyV5[networkId].address,
-);
 
 const TEN = new BigNumber(10);
 
@@ -37,7 +31,10 @@ async function getWithdrawAllReward(liquidAccount: ApiAccount, zapOutput: ZapOut
     const reward = outputBalance.plus(zapOutput.amountWeisPath[zapOutput.amountWeisPath.length - 1].toFixed());
     return !(maxSupplyWei === null || reward.plus(currentWei).lt(maxSupplyWei));
   } catch (e) {
-    console.error(e);
+    Logger.error({
+      message: 'Could not get available liquidity from Dolomite Server...',
+      error: e,
+    })
     return false;
   }
 }
