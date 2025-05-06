@@ -255,6 +255,7 @@ function getTestExpiredAccounts(): ApiAccount[] {
 function getTestMarkets(): ApiMarket[] {
   return [
     {
+      id: '0',
       marketId: 0,
       symbol: 'WETH',
       name: 'Wrapped Ether',
@@ -266,6 +267,7 @@ function getTestMarkets(): ApiMarket[] {
       isBorrowingDisabled: false,
     },
     {
+      id: '1',
       marketId: 1,
       symbol: 'DAI',
       name: 'Dai Stablecoin',
@@ -277,6 +279,7 @@ function getTestMarkets(): ApiMarket[] {
       isBorrowingDisabled: false,
     },
     {
+      id: '2',
       marketId: 2,
       symbol: 'USDC',
       name: 'USD Coin',
@@ -288,6 +291,7 @@ function getTestMarkets(): ApiMarket[] {
       isBorrowingDisabled: false,
     },
     {
+      id: '3',
       marketId: 3,
       symbol: 'LINK',
       name: 'Chainlink Token',
