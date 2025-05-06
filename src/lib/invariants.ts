@@ -41,8 +41,8 @@ export function checkBigNumber(key: string) {
   }
 }
 
-export function checkBigNumberAndGreaterThan(key: string, minValue: string) {
-  if (!process.env[key] || new BigNumber(process.env[key]!).isNaN() || new BigNumber(process.env[key]!).lte(minValue)) {
+export function checkBigNumberAndGreaterThanOrEqual(key: string, minValue: string) {
+  if (!process.env[key] || new BigNumber(process.env[key]!).isNaN() || new BigNumber(process.env[key]!).lt(minValue)) {
     throw new Error(`${key} is not provided or invalid, min value ${minValue}`);
   }
 }

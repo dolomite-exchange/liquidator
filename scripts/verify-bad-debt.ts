@@ -161,7 +161,7 @@ async function start() {
           borrowUSD: borrow.toFormat(6),
         });
 
-        if (process.env.VAPORIZE_EXCESS === 'true') {
+        if (supply.eq(INTEGERS.ZERO) && process.env.VAPORIZE_EXCESS === 'true') {
           await loadAccounts();
           const vaporMarket = Object.values(account.balances).find(b => b.wei.lt(INTEGERS.ZERO));
           const txResult = await dolomite.operation.initiate()

@@ -35,6 +35,8 @@ const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split('
 
 const minValueLiquidatedForGenericSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL as string);
 
+const gasSpikeThresholdUsd = new BigNumber(process.env.GAS_SPIKE_THRESHOLD_USD as string);
+
 const NETWORK_ID = Number(process.env.NETWORK_ID);
 let oogaBoogaReferralInfo: ReferralOutput | undefined;
 if (NETWORK_ID === ChainId.Berachain) {
@@ -397,21 +399,24 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       owedBalance: owedBalance.wei.abs().toFixed(),
       heldBalance: heldBalance.wei.abs().toFixed(),
     });
-    return undefined;
-    // return _performSimpleLiquidationForSkippedGenericLiquidation(
+
+    // TODO: turn this back on when the risk override setter can cope with solid account having no debt
+    // const owedMarkets = Object.values(liquidAccount.balances)
+    //   .filter(b => b.par.lt(INTEGERS.ZERO))
+    //   .map(b => new BigNumber(b.marketId));
+    // const heldMarkets = Object.values(liquidAccount.balances)
+    //   .filter(b => b.par.gt(INTEGERS.ZERO))
+    //   .filter(b => !isIsolationModeMarket(b.marketId))
+    //   .map(b => new BigNumber(b.marketId));
+    // TODO: check held markets length > 0
+    // return _liquidateAccountSimple(
     //   liquidAccount,
-    //   owedMarket,
-    //   heldMarket,
-    //   owedBalance,
-    //   heldBalance,
-    //   owedWei,
-    //   heldWei,
-    //   owedPriceAdj,
-    //   marketMap,
     //   marginAccountToActionsMap,
-    //   lastBlockTimestamp,
-    //   isExpiring,
+    //   marketMap,
+    //   owedMarkets,
+    //   heldMarkets,
     // );
+    return undefined;
   } else if (
     Object.keys(marketIdToActionsMap).length === 0
     && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
@@ -779,7 +784,8 @@ function _isGasSpikeFound(
   const payablePriceUsd: Integer = Object.values(marketMap)
     .find(m => m.tokenAddress.toLowerCase() === dolomite.payableToken.address.toLowerCase())!.oraclePrice;
   const rewardAmountUsd = debtAmountUsd.times('5').dividedToIntegerBy('100');
-  if (gasPrice.times(gasEstimate).times(payablePriceUsd).gt(rewardAmountUsd)) {
+  const gasPriceUsd = gasPrice.times(gasEstimate).times(payablePriceUsd);
+  if (gasPriceUsd.gt(rewardAmountUsd) && gasPriceUsd.gt(gasSpikeThresholdUsd)) {
     Logger.info({
       at: 'dolomite-helpers#_isGasSpikeFound',
       message: 'Skipping liquidation due to gas spike',

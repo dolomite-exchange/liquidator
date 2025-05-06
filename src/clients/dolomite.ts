@@ -27,6 +27,7 @@ import {
   EModeRiskFeature,
   EModeRiskFeatureStruct,
   MarketIndex,
+  SingleCollateralParam,
   TotalValueLockedAndFees,
 } from '../lib/api-types';
 import { ChainId } from '../lib/chain-id';
@@ -349,6 +350,7 @@ export async function getDolomiteMarkets(
                   where: { id_gt: $lastId }
                   orderBy: id
                 ) {
+                  id
                   token {
                     id
                     marketId
@@ -394,6 +396,7 @@ export async function getDolomiteMarkets(
     const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
     const marketId = new BigNumber(market.token.marketId)
     const apiMarket: ApiMarket = {
+      id: market.id,
       marketId: marketId.toNumber(),
       decimals: Number(market.token.decimals),
       symbol: market.token.symbol,
@@ -437,7 +440,7 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
   }
 
   const dolomiteGql = subgraphResult.data.dolomiteMargins[0] as GraphqlRiskParams;
-  const marketCount = dolomiteGql.numberOfMarkets;
+  const marketCount = Number(dolomiteGql.numberOfMarkets);
 
   const marketIdToCategoryMap: Record<number, EModeCategoryStruct | undefined> = {};
   const marketIdToRiskFeatureMap: Record<number, EModeRiskFeatureStruct | undefined> = {};
@@ -516,13 +519,17 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
           feature: EModeRiskFeature.BORROW_ONLY,
         };
       } else if (riskFeature === EModeRiskFeature.SINGLE_COLLATERAL_WITH_STRICT_DEBT) {
-        const params = defaultAbiCoder.decode(['(uint256[], (uint256), (uint256))[]'], result[1]);
+        const params = defaultAbiCoder.decode(['(uint256[], (uint256), (uint256))[]'], result[1])[0];
+        const mappedParams: SingleCollateralParam[] = [];
+        for (let i = 0; i < params.length; i++) {
+          mappedParams.push({
+            debtMarketIds: params[i][0].map((m: any) => new BigNumber(m.toNumber())),
+            marginRatioOverride: new BigNumber(params[i][1].toString()).plus(DECIMAL_BASE),
+            liquidationRewardOverride: new BigNumber(params[i][2].toString()).plus(DECIMAL_BASE),
+          });
+        }
         marketIdToRiskFeatureMap[marketId] = {
-          params: params.map(([p]) => ({
-            debtMarketIds: p[0].map((m: any) => new BigNumber(m.toNumber())),
-            marginRatioOverride: new BigNumber(p[1].toString()).plus(DECIMAL_BASE),
-            liquidationRewardOverride: new BigNumber(p[2].toString()).plus(DECIMAL_BASE),
-          })),
+          params: mappedParams,
           feature: EModeRiskFeature.SINGLE_COLLATERAL_WITH_STRICT_DEBT,
         };
       }

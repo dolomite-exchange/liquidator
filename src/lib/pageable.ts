@@ -15,8 +15,13 @@ export default class Pageable {
       }
 
       lastValue = (queryResults[queryResults.length - 1] as any).id;
+      if (!lastValue) {
+        throw new Error(
+          `Missing 'id' property in query results: ${JSON.stringify(queryResults[queryResults.length - 1])}`,
+        );
+      }
       results = results.concat(queryResults);
-    } while (queryResults.length !== 0 && queryResults.length >= Pageable.MAX_PAGE_SIZE - 1);
+    } while (queryResults.length !== 0);
 
     return results
   }

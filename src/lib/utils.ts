@@ -16,8 +16,8 @@ export function isCollateralized(
     supply: INTEGERS.ZERO,
   };
   const {
-    supply,
     borrow,
+    supply,
   } = Object.values(account.balances)
     .reduce((memo, balance) => {
       const market = marketMap[balance.marketId.toString()];
@@ -39,7 +39,7 @@ export function isCollateralized(
     }, initial);
 
   const liquidationRatio = riskOverride ? riskOverride.marginRatioOverride : riskParams.liquidationRatio;
-  return supply.lt(borrow.times(liquidationRatio).dividedToIntegerBy(DECIMAL_BASE, BigNumber.ROUND_FLOOR));
+  return supply.gte(borrow.times(liquidationRatio).dividedToIntegerBy(DECIMAL_BASE));
 }
 
 export function getPartial(amount: Integer, numerator: Integer, denominator: Integer): Integer {

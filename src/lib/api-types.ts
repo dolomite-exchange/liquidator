@@ -36,6 +36,7 @@ export interface ApiAccount {
 }
 
 export interface ApiMarket {
+  id: string;
   marketId: number;
   symbol: string;
   name: string;

@@ -103,6 +103,7 @@ export default class DolomiteLiquidator {
       .filter(account => !this.liquidationStore.contains(account))
       .filter(account => !isCollateralized(account, marketMap, riskParams))
       .filter(account => this.isSufficientDebt(account, marketMap))
+      .filter(account => !this.isVaporizable(account, marketMap))
       .sort((a, b) => this.borrowAmountSorterDesc(a, b, marketMap));
 
     // Do not put an account in both liquidatable and expired; prioritize liquidation
@@ -242,6 +243,31 @@ export default class DolomiteLiquidator {
       }, INTEGERS.ZERO);
 
     return borrow.gte(this.MIN_VALUE_LIQUIDATED);
+  }
+
+  isVaporizable = (
+    account: ApiAccount,
+    marketMap: { [marketId: string]: ApiMarket },
+  ): boolean => {
+    const supply = Object.values(account.balances)
+      .reduce((memo, balance) => {
+        if (balance.wei.gt(INTEGERS.ZERO)) {
+          const market = marketMap[balance.marketId.toString()];
+          return memo.plus(balance.wei.times(market.oraclePrice));
+        }
+        return memo;
+      }, INTEGERS.ZERO);
+    const borrow = Object.values(account.balances)
+      .reduce((memo, balance) => {
+        if (balance.wei.lt(INTEGERS.ZERO)) {
+          const market = marketMap[balance.marketId.toString()];
+          const value = balance.wei.times(market.oraclePrice);
+          return memo.plus(value.abs());
+        }
+        return memo;
+      }, INTEGERS.ZERO);
+
+    return supply.eq(INTEGERS.ZERO) && borrow.gt(INTEGERS.ZERO);
   }
 
   /**

@@ -1,4 +1,4 @@
-import { ISOLATION_MODE_CONVERSION_MARKET_ID_MAP } from '@dolomite-exchange/zap-sdk/dist/src/lib/MarketIds';
+import { ISOLATION_MODE_CONVERSION_MARKET_ID_MAP } from '@dolomite-exchange/zap-sdk';
 import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import v8 from 'v8';
 // eslint-disable-next-line
@@ -11,7 +11,7 @@ import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
   checkBigNumber,
-  checkBigNumberAndGreaterThan,
+  checkBigNumberAndGreaterThanOrEqual,
   checkBooleanValue,
   checkConditionally,
   checkDuration,
@@ -53,6 +53,7 @@ checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
 checkBooleanValue('GAS_SPIKE_PROTECTION');
+checkBigNumber('GAS_SPIKE_THRESHOLD_USD');
 checkConditionally(!!process.env.IGNORED_MARKETS, () => checkMarketIdList('IGNORED_MARKETS', 0));
 checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkDuration('LIQUIDATE_POLL_INTERVAL_MS', 1000);
@@ -60,8 +61,8 @@ checkDuration('LIQUIDATION_KEY_EXPIRATION_SECONDS', 1, /* isMillis = */ false);
 checkBooleanValue('LIQUIDATIONS_ENABLED');
 checkDuration('MARKET_POLL_INTERVAL_MS', 1000);
 checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
-checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED', '1000000000000000000000000'); // 1e24
-checkBigNumberAndGreaterThan('MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL', process.env.MIN_VALUE_LIQUIDATED!);
+checkBigNumberAndGreaterThanOrEqual('MIN_VALUE_LIQUIDATED', '1000000000000000000000000'); // 1e24
+checkBigNumberAndGreaterThanOrEqual('MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL', process.env.MIN_VALUE_LIQUIDATED!);
 checkJsNumber('NETWORK_ID');
 checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkMarketIdList('OWED_PREFERENCES', 1));
 checkDuration('RISK_PARAMS_POLL_INTERVAL_MS', 1000);

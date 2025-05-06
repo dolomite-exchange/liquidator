@@ -87,6 +87,8 @@ export default class AccountStore {
     Logger.info({
       at: 'AccountStore#_update',
       message: 'Finished updating accounts',
+      liquidatableDolomiteAccounts: this.liquidatableDolomiteAccounts.length,
+      expirableAccounts: this.expirableAccounts.length,
     });
   };
 }

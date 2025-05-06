@@ -55,7 +55,12 @@ function formatApiBalance(balance: TransformedApiBalance): string {
 
 function formatAccountData(accounts: ApiAccount[], marketMap: Record<string, ApiMarket>, value: 'supply' | 'borrow') {
   const transformedAccounts = getTransformedAccounts(accounts, marketMap);
-  transformedAccounts.sort((a, b) => (a.borrowUSD.gt(b.borrowUSD) ? 1 : -1));
+  transformedAccounts.sort((a, b) => {
+    if (a.borrowUSD.eq(b.borrowUSD)) {
+      return a.supplyUSD.gt(b.supplyUSD) ? 1 : -1;
+    }
+    return a.borrowUSD.gt(b.borrowUSD) ? 1 : -1;
+  });
 
   const medianAccount = transformedAccounts[Math.floor(transformedAccounts.length / 2)];
   const biggestAccount = transformedAccounts[transformedAccounts.length - 1];
@@ -70,7 +75,7 @@ function formatAccountData(accounts: ApiAccount[], marketMap: Record<string, Api
       averageAccountDebt: `$${averageAccountDebt.toFormat(2)}`,
       largeAccounts: {
         thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
-        accounts: transformedAccounts.filter(a => a.borrowUSD.abs().gt(LARGE_AMOUNT_THRESHOLD_USD))
+        accounts: transformedAccounts.filter(a => a.borrowUSD.abs().gte(LARGE_AMOUNT_THRESHOLD_USD))
           .map(formatApiAccount),
       },
     });
@@ -130,7 +135,7 @@ async function start() {
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     marketId: marketId.toFixed(),
-    marketName: marketName,
+    market: marketName,
     networkId,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
@@ -185,7 +190,10 @@ async function start() {
     debtAmount: `$${formatNumber(totalSupplyAccountDebt)}`,
   });
 
-  const { debt: totalBorrowAccountDebt, collateral: totalBorrowAccountCollateral } = borrowAccounts.reduce((acc, account) => {
+  const { debt: totalBorrowAccountDebt, collateral: totalBorrowAccountCollateral } = borrowAccounts.reduce((
+    acc,
+    account,
+  ) => {
     const { debt, collateral } = Object.values(account.balances).reduce((memo, balance) => {
       const isCollateral = balance.wei.gte(INTEGERS.ZERO);
       const market = marketMap[balance.marketId.toString()];
