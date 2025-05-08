@@ -1,6 +1,7 @@
 import { DolomiteMargin, Web3 } from '@dolomite-exchange/dolomite-margin';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import LiquidatorProxyV5Abi from '../abis/liquidator-proxy-v5.json';
+import GlvRegistryAbi from '../abis/glv-registry.json';
 import { ChainId } from '../lib/chain-id';
 import Logger from '../lib/logger';
 import '../lib/env';
@@ -24,6 +25,11 @@ export const dolomite = new DolomiteMargin(
 export const liquidatorProxyV5 = new dolomite.web3.eth.Contract(
   LiquidatorProxyV5Abi,
   ModuleDeployments.LiquidatorProxyV5[networkId].address,
+);
+
+export const glvRegistry = new dolomite.web3.eth.Contract(
+  GlvRegistryAbi,
+  ModuleDeployments.GlvRegistryProxy[networkId].address,
 );
 
 export async function loadAccounts() {
