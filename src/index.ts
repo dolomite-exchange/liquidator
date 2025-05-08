@@ -32,6 +32,7 @@ import BlockStore from './stores/block-store';
 import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
 import RiskParamsStore from './stores/risk-params-store';
+import GlvLiquidityStore from './stores/glv-liquidity-store';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -86,6 +87,7 @@ async function start() {
   const balanceStore = new BalanceStore(marketStore);
   const liquidationStore = new LiquidationStore();
   const riskParamsStore = new RiskParamsStore(blockStore);
+  const glvLiquidityStore = new GlvLiquidityStore();
   const dolomiteLiquidator = new DolomiteLiquidator(
     accountStore,
     asyncActionStore,
@@ -95,6 +97,7 @@ async function start() {
     balanceStore,
     liquidationStore,
     riskParamsStore,
+    glvLiquidityStore,
   );
   const gasPriceUpdater = new GasPriceUpdater();
   const liquidationMode = getLiquidationMode();

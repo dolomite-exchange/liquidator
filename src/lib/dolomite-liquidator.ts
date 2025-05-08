@@ -20,7 +20,9 @@ import { ApiAccount, ApiMarket } from './api-types';
 import { delay } from './delay';
 import Logger from './logger';
 import { isCollateralized } from './utils';
-
+import GlvLiquidityStore from '../stores/glv-liquidity-store';
+import { updateGlvTokenToGmMarketForDeposit } from '../helpers/glv-registry-helpers';
+import { updateGlvTokenToGmMarketForWithdrawal } from '../helpers/glv-registry-helpers';
 export default class DolomiteLiquidator {
   private MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
 
@@ -33,6 +35,7 @@ export default class DolomiteLiquidator {
     private readonly balanceStore: BalanceStore,
     private readonly liquidationStore: LiquidationStore,
     private readonly riskParamsStore: RiskParamsStore,
+    private readonly glvLiquidityStore: GlvLiquidityStore,
   ) {
   }
 
@@ -222,6 +225,49 @@ export default class DolomiteLiquidator {
           at: 'DolomiteLiquidator#_liquidateAccounts',
           message: 'Failed to liquidate expired account',
           account,
+          error,
+        });
+      }
+    }
+
+    const glvTokenToLiquidGmMarket = this.glvLiquidityStore.getGlvTokenToLiquidGmMarket();
+    for (const [glvToken, gmMarket] of Object.entries(glvTokenToLiquidGmMarket)) {
+      // Update deposit market
+      try {
+        const result = await updateGlvTokenToGmMarketForDeposit(glvToken, gmMarket);
+        await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
+        if (result) {
+          Logger.info({
+            message: 'GLV token to GM market deposit update transaction hash:',
+            transactionHash: result?.transactionHash,
+          });
+        }
+      } catch (error: any) {
+        Logger.error({
+          at: 'DolomiteLiquidator#_liquidateAccounts', 
+          message: 'Failed to process GLV token to GM market deposit update',
+          glvToken,
+          gmMarket,
+          error,
+        });
+      }
+
+      // Update withdrawal market
+      try {
+        const result = await updateGlvTokenToGmMarketForWithdrawal(glvToken, gmMarket);
+        await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
+        if (result) {
+          Logger.info({
+            message: 'GLV token to GM market withdrawal update transaction hash:',
+            transactionHash: result?.transactionHash,
+          });
+        }
+      } catch (error: any) {
+        Logger.error({
+          at: 'DolomiteLiquidator#_liquidateAccounts',
+          message: 'Failed to process GLV token to GM market withdrawal update',
+          glvToken,
+          gmMarket,
           error,
         });
       }
