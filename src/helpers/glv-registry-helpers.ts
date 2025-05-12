@@ -1,27 +1,33 @@
-import { TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { glvRegistry } from './web3';
+import { ContractCallOptions, TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
+import Contract from 'web3/eth/contract';
 import { dolomite } from './web3';
 
 export async function updateGlvTokenToGmMarketForDeposit(
+  glvRegistry: Contract,
   glvToken: string,
-  gmMarket: string
+  gmMarket: string,
+  options?: ContractCallOptions,
 ): Promise<TxResult> {
   return dolomite.contracts.callContractFunction(
-    glvRegistry.methods.ownerSetGlvTokenToGmMarketForDeposit(
+    glvRegistry.methods.handlerSetGlvTokenToGmMarketForDeposit(
       glvToken,
-      gmMarket
-    )
+      gmMarket,
+    ),
+    options,
   );
 }
 
 export async function updateGlvTokenToGmMarketForWithdrawal(
+  glvRegistry: Contract,
   glvToken: string,
-  gmMarket: string
+  gmMarket: string,
+  options?: ContractCallOptions,
 ): Promise<TxResult> {
   return dolomite.contracts.callContractFunction(
-    glvRegistry.methods.ownerSetGlvTokenToGmMarketForWithdrawal(
+    glvRegistry.methods.handlerSetGlvTokenToGmMarketForWithdrawal(
       glvToken,
-      gmMarket
-    )
+      gmMarket,
+    ),
+    options,
   );
 }

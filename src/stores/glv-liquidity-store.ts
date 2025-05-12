@@ -1,19 +1,21 @@
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import * as axios from 'axios';
 
 import { ethers } from 'ethers';
+import GlvRegistryAbi from '../abis/glv-registry.json';
+import {
+  updateGlvTokenToGmMarketForDeposit,
+  updateGlvTokenToGmMarketForWithdrawal,
+} from '../helpers/glv-registry-helpers';
+import { dolomite } from '../helpers/web3';
 import { delay } from '../lib/delay';
 import Logger from '../lib/logger';
-import { glvRegistry } from '../helpers/web3';
-
 
 /**
  * Keeps track of the GLV tokens to update most liquid GM market
  */
 export default class GlvLiquidityStore {
-  private glvTokenToLiquidGmMarket: Record<string, string>;
-
-  constructor() {
-    this.glvTokenToLiquidGmMarket = {};
+  constructor(private readonly networkId: number) {
   }
 
   static async getGlvTokenLiquidity(): Promise<any> {
@@ -21,15 +23,12 @@ export default class GlvLiquidityStore {
       .then(res => res.data);
   }
 
-  public getGlvTokenToLiquidGmMarket(): Record<string, string> {
-    return this.glvTokenToLiquidGmMarket;
-  }
-
   start = () => {
     Logger.info({
       at: 'GlvLiquidityStore#start',
-      message: 'Starting glv liquidity store',
+      message: 'Starting GLV liquidity store',
     });
+
     this._poll();
   };
 
@@ -55,13 +54,17 @@ export default class GlvLiquidityStore {
       at: 'GlvLiquidityStore#_update',
       message: 'Updating glv liquidity...',
     });
-    const newGlvTokenToLiquidGmMarket = {};
+    const glvTokenToLiquidGmMarket: Record<string, string> = {};
     const glvLiquidity = await GlvLiquidityStore.getGlvTokenLiquidity();
+    const glvRegistry = new dolomite.web3.eth.Contract(
+      GlvRegistryAbi,
+      ModuleDeployments.GlvRegistryProxy[this.networkId].address,
+    );
 
     // Loop through each GLV token
     for (const glv of glvLiquidity.glvs) {
       const glvToken = glv.glvToken.toLowerCase();
-      
+
       // Find market with highest balanceUsd
       let highestBalanceMarket = glv.markets[0];
       let highestBalance = ethers.BigNumber.from(highestBalanceMarket.balanceUsd);
@@ -76,13 +79,55 @@ export default class GlvLiquidityStore {
       }
 
       // Check if the most liquid market matches market on registry
-      const currentGmMarket = await glvRegistry.methods.glvTokenToGmMarketForWithdrawal(glvToken).call();
-      if (currentGmMarket !== highestBalanceMarket.address.toLowerCase()) {
-        newGlvTokenToLiquidGmMarket[glvToken] = highestBalanceMarket.address.toLowerCase();
+      const currentGmMarket = await dolomite.contracts.callConstantContractFunction<string>(
+        glvRegistry.methods.glvTokenToGmMarketForWithdrawal(glvToken),
+      );
+      if (currentGmMarket !== highestBalanceMarket.address) {
+        glvTokenToLiquidGmMarket[glvToken] = highestBalanceMarket.address;
       }
     }
 
-    this.glvTokenToLiquidGmMarket = newGlvTokenToLiquidGmMarket;
+    for (const [glvToken, gmMarket] of Object.entries(glvTokenToLiquidGmMarket)) {
+      // Update deposit market
+      try {
+        const result = await updateGlvTokenToGmMarketForDeposit(glvRegistry, glvToken, gmMarket);
+        await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
+        if (result) {
+          Logger.info({
+            message: 'GLV token to GM market deposit update transaction hash:',
+            transactionHash: result?.transactionHash,
+          });
+        }
+      } catch (error: any) {
+        Logger.error({
+          at: 'GlvLiquidityStore#_update',
+          message: 'Failed to process GLV token to GM market deposit update',
+          glvToken,
+          gmMarket,
+          error,
+        });
+      }
+
+      // Update withdrawal market
+      try {
+        const result = await updateGlvTokenToGmMarketForWithdrawal(glvRegistry, glvToken, gmMarket);
+        await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
+        if (result) {
+          Logger.info({
+            message: 'GLV token to GM market withdrawal update transaction hash:',
+            transactionHash: result?.transactionHash,
+          });
+        }
+      } catch (error: any) {
+        Logger.error({
+          at: 'GlvLiquidityStore#_update',
+          message: 'Failed to process GLV token to GM market withdrawal update',
+          glvToken,
+          gmMarket,
+          error,
+        });
+      }
+    }
 
     Logger.info({
       at: 'GlvLiquidityStore#_update',
