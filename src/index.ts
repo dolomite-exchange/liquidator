@@ -32,6 +32,7 @@ import BlockStore from './stores/block-store';
 import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
 import RiskParamsStore from './stores/risk-params-store';
+import GlvLiquidityStore from './stores/glv-liquidity-store';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -54,6 +55,8 @@ checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
 checkBooleanValue('GAS_SPIKE_PROTECTION');
 checkBigNumber('GAS_SPIKE_THRESHOLD_USD');
+checkBooleanValue('GLV_LIQUIDITY_POLL_ENABLED');
+checkDuration('GLV_LIQUIDITY_POLL_INTERVAL_MS', 1_000);
 checkConditionally(!!process.env.IGNORED_MARKETS, () => checkMarketIdList('IGNORED_MARKETS', 0));
 checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkDuration('LIQUIDATE_POLL_INTERVAL_MS', 1000);
@@ -78,6 +81,8 @@ if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
 }
 
 async function start() {
+  const networkId = await dolomite.web3.eth.net.getId();
+
   const blockStore = new BlockStore();
   const marketStore = new MarketStore(blockStore);
   const accountStore = new AccountStore(blockStore, marketStore);
@@ -86,6 +91,7 @@ async function start() {
   const balanceStore = new BalanceStore(marketStore);
   const liquidationStore = new LiquidationStore();
   const riskParamsStore = new RiskParamsStore(blockStore);
+  const glvLiquidityStore = new GlvLiquidityStore(networkId);
   const dolomiteLiquidator = new DolomiteLiquidator(
     accountStore,
     asyncActionStore,
@@ -103,7 +109,6 @@ async function start() {
 
   const { blockNumber: subgraphBlockNumber } = await getSubgraphBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
-  const networkId = await dolomite.web3.eth.net.getId();
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
@@ -136,6 +141,7 @@ async function start() {
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPriceAddition: process.env.GAS_PRICE_ADDITION,
     gasSpikeProtection: process.env.GAS_SPIKE_PROTECTION,
+    glvLiquidityPollEnabled: process.env.GLV_LIQUIDITY_POLL_ENABLED,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
@@ -154,7 +160,8 @@ async function start() {
     accountPollIntervalMillis: process.env.ACCOUNT_POLL_INTERVAL_MS,
     asyncActionPollIntervalMillis: process.env.ASYNC_ACTIONS_POLL_INTERVAL_MS,
     blockPollIntervalMillis: process.env.BLOCK_POLL_INTERVAL_MS,
-    gasPricePollInterval: process.env.GAS_PRICE_POLL_INTERVAL_MS,
+    gasPricePollIntervalMillis: process.env.GAS_PRICE_POLL_INTERVAL_MS,
+    glvLiquidityPollIntervalMillis: process.env.GLV_LIQUIDITY_POLL_INTERVAL_MS,
     liquidatePollIntervalMillis: process.env.LIQUIDATE_POLL_INTERVAL_MS,
     marketPollIntervalMillis: process.env.MARKET_POLL_INTERVAL_MS,
     riskParamsPollIntervalMillis: process.env.RISK_PARAMS_POLL_INTERVAL_MS,
@@ -206,6 +213,10 @@ async function start() {
 
   if (process.env.ASYNC_ACTIONS_ENABLED === 'true') {
     asyncActionStore.start();
+  }
+
+  if (process.env.GLV_LIQUIDITY_POLL_ENABLED === 'true') {
+    glvLiquidityStore.start();
   }
 
   if (

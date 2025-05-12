@@ -12,6 +12,7 @@ import BlockStore from '../../src/stores/block-store';
 import LiquidationStore from '../../src/stores/liquidation-store';
 import MarketStore from '../../src/stores/market-store';
 import RiskParamsStore from '../../src/stores/risk-params-store';
+import GlvLiquidityStore from '../../src/stores/glv-liquidity-store';
 
 jest.mock('@dolomite-exchange/dolomite-margin/dist/src/modules/operate/AccountOperation');
 
@@ -25,6 +26,7 @@ describe('dolomite-liquidator', () => {
   let liquidationStore: LiquidationStore;
   let dolomiteLiquidator: DolomiteLiquidator;
   let riskParamsStore: RiskParamsStore;
+  let glvLiquidityStore: GlvLiquidityStore;
 
   beforeEach(() => {
     process.env.EXPIRATIONS_ENABLED = 'true';
@@ -40,6 +42,7 @@ describe('dolomite-liquidator', () => {
     asyncActionRetryStore = new AsyncActionRetryStore();
     liquidationStore = new LiquidationStore();
     riskParamsStore = new RiskParamsStore(blockStore);
+    glvLiquidityStore = new GlvLiquidityStore();
     dolomiteLiquidator = new DolomiteLiquidator(
       accountStore,
       asyncActionStore,
@@ -49,6 +52,7 @@ describe('dolomite-liquidator', () => {
       balanceStore,
       liquidationStore,
       riskParamsStore,
+      glvLiquidityStore,
     );
     (
       blockStore.getBlockTimestamp as any

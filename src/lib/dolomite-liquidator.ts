@@ -20,7 +20,6 @@ import { ApiAccount, ApiMarket } from './api-types';
 import { delay } from './delay';
 import Logger from './logger';
 import { isCollateralized } from './utils';
-
 export default class DolomiteLiquidator {
   private MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
 
