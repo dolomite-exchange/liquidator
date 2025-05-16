@@ -223,12 +223,130 @@
             "type": "bool"
           }
         ],
-        "internalType": "struct ILiquidatorProxyV5.LiquidateParams",
+        "internalType": "struct ILiquidatorProxyV6.LiquidateParams",
         "name": "_liquidateParams",
         "type": "tuple"
       }
     ],
     "name": "liquidate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo",
+            "name": "solidAccount",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo",
+            "name": "liquidAccount",
+            "type": "tuple"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "marketIdsPath",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "inputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minOutputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "enum IGenericTraderBase.TraderType",
+                "name": "traderType",
+                "type": "uint8"
+              },
+              {
+                "internalType": "uint256",
+                "name": "makerAccountIndex",
+                "type": "uint256"
+              },
+              {
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes",
+                "name": "tradeData",
+                "type": "bytes"
+              }
+            ],
+            "internalType": "struct IGenericTraderBase.TraderParam[]",
+            "name": "tradersPath",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo[]",
+            "name": "makerAccounts",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "expirationTimestamp",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "withdrawAllReward",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct ILiquidatorProxyV6.LiquidateParams",
+        "name": "_liquidateParams",
+        "type": "tuple"
+      }
+    ],
+    "name": "liquidateViaProxyWithStrictInputMarket",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
