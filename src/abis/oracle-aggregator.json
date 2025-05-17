@@ -1,0 +1,306 @@
+[
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "oracle",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "tokenPair",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "weight",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IOracleAggregatorV2.OracleInfo[]",
+            "name": "oracleInfos",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "uint8",
+            "name": "decimals",
+            "type": "uint8"
+          },
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct IOracleAggregatorV2.TokenInfo[]",
+        "name": "_infos",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "address",
+        "name": "_dolomiteMargin",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "components": [
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "oracle",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "tokenPair",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "weight",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IOracleAggregatorV2.OracleInfo[]",
+            "name": "oracleInfos",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "uint8",
+            "name": "decimals",
+            "type": "uint8"
+          },
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IOracleAggregatorV2.TokenInfo",
+        "name": "info",
+        "type": "tuple"
+      }
+    ],
+    "name": "TokenInsertedOrUpdated",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_MARGIN",
+    "outputs": [
+      {
+        "internalType": "contract IDolomiteMargin",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_MARGIN_OWNER",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "name": "getDecimalsByToken",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "_decimals",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "name": "getOraclesByToken",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "oracle",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "tokenPair",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "weight",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IOracleAggregatorV2.OracleInfo[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "name": "getPrice",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.MonetaryPrice",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "name": "getTokenInfo",
+    "outputs": [
+      {
+        "components": [
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "oracle",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "tokenPair",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "weight",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IOracleAggregatorV2.OracleInfo[]",
+            "name": "oracleInfos",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "uint8",
+            "name": "decimals",
+            "type": "uint8"
+          },
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct IOracleAggregatorV2.TokenInfo",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "oracle",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "tokenPair",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "weight",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IOracleAggregatorV2.OracleInfo[]",
+            "name": "oracleInfos",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "uint8",
+            "name": "decimals",
+            "type": "uint8"
+          },
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct IOracleAggregatorV2.TokenInfo",
+        "name": "_info",
+        "type": "tuple"
+      }
+    ],
+    "name": "ownerInsertOrUpdateToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
