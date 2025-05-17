@@ -25,7 +25,7 @@ import {
 } from './async-liquidations-helper';
 import { getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei, getRawGasPriceWei, isGasSpikeProtectionEnabled } from './gas-price-helpers';
-import { liquidateV5 } from './liquidator-proxy-v5-helper';
+import { liquidateV6 } from './liquidator-proxy-v6-helper';
 import { dolomite } from './web3';
 
 const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? '')?.split(',')
@@ -500,7 +500,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     if (isGasSpikeProtectionEnabled()) {
       for (let i = 0; i < outputs.length; i += 1) {
         try {
-          const { gasEstimate } = await liquidateV5(
+          const { gasEstimate } = await liquidateV6(
             liquidAccount,
             inputAmount,
             outputs[i],
@@ -518,7 +518,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
             return undefined;
           }
 
-          return await liquidateV5(
+          return await liquidateV6(
             liquidAccount,
             inputAmount,
             outputs[i],
@@ -540,7 +540,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     } else {
       for (let i = 0; i < outputs.length; i += 1) {
         try {
-          return await liquidateV5(
+          return await liquidateV6(
             liquidAccount,
             INTEGERS.MAX_UINT,
             outputs[i],

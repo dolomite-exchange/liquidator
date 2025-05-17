@@ -1,6 +1,6 @@
 import { DolomiteMargin, Web3 } from '@dolomite-exchange/dolomite-margin';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
-import LiquidatorProxyV5Abi from '../abis/liquidator-proxy-v5.json';
+import LiquidatorProxyV6Abi from '../abis/liquidator-proxy-v6.json';
 import { ChainId } from '../lib/chain-id';
 import Logger from '../lib/logger';
 import '../lib/env';
@@ -21,9 +21,9 @@ export const dolomite = new DolomiteMargin(
   opts,
 );
 
-export const liquidatorProxyV5 = new dolomite.web3.eth.Contract(
-  LiquidatorProxyV5Abi,
-  ModuleDeployments.LiquidatorProxyV5[networkId].address,
+export const liquidatorProxyV6 = new dolomite.web3.eth.Contract(
+  LiquidatorProxyV6Abi,
+  ModuleDeployments.LiquidatorProxyV6[networkId].address,
 );
 
 export async function loadAccounts() {
@@ -74,7 +74,7 @@ export async function initializeDolomiteLiquidations() {
   await checkOperatorIsApproved(dolomite.contracts.expiryProxy.options.address);
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV1.options.address);
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV4WithGenericTrader.options.address);
-  await checkOperatorIsApproved(liquidatorProxyV5.options.address);
+  await checkOperatorIsApproved(liquidatorProxyV6.options.address);
 }
 
 async function checkOperatorIsApproved(operator?: string) {

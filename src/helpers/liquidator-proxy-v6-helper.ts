@@ -5,7 +5,7 @@ import axios from 'axios';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { ApiAccount } from '../lib/api-types';
 import Logger from '../lib/logger';
-import { dolomite, liquidatorProxyV5 } from './web3';
+import { dolomite, liquidatorProxyV6 } from './web3';
 
 const networkId = Number(process.env.NETWORK_ID);
 
@@ -39,7 +39,7 @@ async function getWithdrawAllReward(liquidAccount: ApiAccount, zapOutput: ZapOut
   }
 }
 
-export async function liquidateV5(
+export async function liquidateV6(
   liquidAccount: ApiAccount,
   inputTokenAmount: Integer,
   zapOutput: ZapOutputParam,
@@ -50,7 +50,7 @@ export async function liquidateV5(
   const withdrawAllReward = await getWithdrawAllReward(liquidAccount, zapOutput);
 
   return dolomite.contracts.callContractFunction(
-    liquidatorProxyV5.methods.liquidate({
+    liquidatorProxyV6.methods.liquidate({
       solidAccount: { owner: SOLID_ACCOUNT.owner, number: SOLID_ACCOUNT.number.toFixed() },
       liquidAccount: { owner: liquidAccount.owner, number: liquidAccount.number.toFixed() },
       marketIdsPath: zapOutput.marketIdsPath.map((p) => p.toFixed()),

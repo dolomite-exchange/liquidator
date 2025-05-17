@@ -6,7 +6,7 @@ import '../src/lib/env';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
-import { dolomite, initializeDolomiteLiquidations, liquidatorProxyV5, loadAccounts } from './helpers/web3';
+import { dolomite, initializeDolomiteLiquidations, liquidatorProxyV6, loadAccounts } from './helpers/web3';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
@@ -182,16 +182,16 @@ async function start() {
       owedPreferences: process.env.OWED_PREFERENCES,
     });
   } else if (liquidationMode === LiquidationMode.Generic) {
-    const liquidatorProxyV5Address = liquidatorProxyV5.options.address;
-    const isGlobalOperator = await dolomite.getters.getIsGlobalOperator(liquidatorProxyV5Address);
+    const liquidatorProxyV6Address = liquidatorProxyV6.options.address;
+    const isGlobalOperator = await dolomite.getters.getIsGlobalOperator(liquidatorProxyV6Address);
     Logger.info({
       liquidationMode,
       message: 'Generic liquidation mode variables:',
-      liquidatorProxyV5: liquidatorProxyV5Address,
-      liquidatorProxyV5IsGlobalOperator: isGlobalOperator,
+      liquidatorProxyV6: liquidatorProxyV6Address,
+      liquidatorProxyV6IsGlobalOperator: isGlobalOperator,
     });
     if (!isGlobalOperator) {
-      throw new Error(`Liquidator proxy v5 is not global operator: ${liquidatorProxyV5Address}`);
+      throw new Error(`Liquidator proxy v5 is not global operator: ${liquidatorProxyV6Address}`);
     }
   } else {
     throw new Error(`Invalid liquidation mode: ${liquidationMode}`);
