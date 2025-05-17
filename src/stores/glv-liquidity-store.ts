@@ -81,13 +81,13 @@ export default class GlvLiquidityStore {
 
       // Set initial highest balance market and balance
       let highestBalanceMarket = { address: ADDRESS_ZERO };
-      let highestBalance = ethers.BigNumber.from('0');
+      let highestBalanceUsd = ethers.BigNumber.from('0');
 
       for (let i = 0; i < glv.markets.length; i++) {
         const market = glv.markets[i];
-        const balance = ethers.BigNumber.from(market.balanceUsd);
+        const balanceUsd = ethers.BigNumber.from(market.balanceUsd);
 
-        if (balance.gt(highestBalance)) {
+        if (balanceUsd.gt(highestBalanceUsd)) {
           const marketInfo = await dolomite.contracts.callConstantContractFunction<any>(
             gmxReader.methods.getMarket(GMX_DATA_STORE_ADDRESS, market.address)
           );
@@ -102,7 +102,7 @@ export default class GlvLiquidityStore {
           }
 
           highestBalanceMarket = market;
-          highestBalance = balance;
+          highestBalanceUsd = balanceUsd;
         }
       }
 
