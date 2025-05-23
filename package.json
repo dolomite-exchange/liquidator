@@ -40,7 +40,7 @@
   "homepage": "https://github.com/dolomite-exchange/liquidator#readme",
   "dependencies": {
     "@dolomite-exchange/dolomite-margin": "^0.14.3",
-    "@dolomite-exchange/zap-sdk": "^0.4.10",
+    "@dolomite-exchange/zap-sdk": "^0.4.11",
     "axios": "^1.8.2",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",
