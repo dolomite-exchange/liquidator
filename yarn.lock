@@ -325,10 +325,10 @@
     enabled "2.0.x"
     kuler "^2.0.0"
 
-"@dolomite-exchange/dolomite-margin@^0.14.3":
-  version "0.14.3"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.14.3.tgz#3b3a3bdd4fc97b914158aca064aa78099047c5f4"
-  integrity sha512-d11JFOeKe7w2Y0CCOoT2poDQadB46mv5drD4Ap/uz7HZn8KeNb7Ez5xQBs2QRZ2wN1d9l022JnO4cwc10NRgRg==
+"@dolomite-exchange/dolomite-margin@^0.14.4":
+  version "0.14.4"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.14.4.tgz#88fe332f12f93c0e4e888d332dbb08f7c016a3e7"
+  integrity sha512-BEz9am9qiWLHpFY7zOCOdSZjorr2ObUf5s2O6+S616+O8SZNLfjWLb6CNhdTtBiDHcfv2GM0qCUPy33Y8zonIA==
   dependencies:
     "@openzeppelin/contracts" "^2.5.1"
     "@types/web3" "1.0.18"
@@ -342,18 +342,18 @@
     query-string "^6.9.0"
     web3 "1.2.1"
 
-"@dolomite-exchange/modules-deployments@^0.1.5":
-  version "0.1.5"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.1.5.tgz#51b087b10423f49936925b4f4c301ecd1b44726c"
-  integrity sha512-uT/SdT/v+eEoTyT06jAaj78wPYwl8GgAtZsyC+cdeeiE59Ui/t7xq36X3eEg+Eb8nYd0tL4lm7l8qjWnq8VoHQ==
+"@dolomite-exchange/modules-deployments@^0.1.7":
+  version "0.1.7"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.1.7.tgz#ab583dfefa99dcd9cebb8b2eafd3743c96da8f36"
+  integrity sha512-Wl4zWDO3+6Ezd7rHc2sK21+YQbRxvtwLKm/XMxuHdqskVZH4NbSaF94qa6h9MaDYq4TLkjzNuA2CpA12QYLASA==
 
-"@dolomite-exchange/zap-sdk@^0.4.13":
-  version "0.4.13"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.4.13.tgz#4a674dabaf26b5416e428d8eaece219d83837ad2"
-  integrity sha512-SmYAdRpR1rH05f2iC27hlhsGce1RPo475De8eu3GuLHxfpycxaJuL311qrah4OctFtdrtcKsJudIX21u5vDKpg==
+"@dolomite-exchange/zap-sdk@^0.5.0":
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.5.0.tgz#a1eb3a1251f8f65ab306bf8dc4d0aee6c7a84a3e"
+  integrity sha512-1YYBJ71DW2JdZtUMG5bKivkuFdvSXvoDugOrmsM5JTwervqN4+/iFHEIfFvlIMXMwTLPwkOQl0g4/FemGBBotQ==
   dependencies:
-    "@dolomite-exchange/modules-deployments" "^0.1.5"
-    axios "^0.29.0"
+    "@dolomite-exchange/modules-deployments" "^0.1.7"
+    axios "^0.30.0"
     bignumber.js "^9.1.1"
     dotenv-flow "^0.4.0"
     ethers "^5.7.2"
@@ -2201,10 +2201,10 @@ axios@^0.21.1:
   dependencies:
     follow-redirects "^1.14.0"
 
-axios@^0.29.0:
-  version "0.29.0"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-0.29.0.tgz#5eed1a0bc4c0ffe060624eb7900aff66b7881eeb"
-  integrity sha512-Kjsq1xisgO5DjjNQwZFsy0gpcU1P2j36dZeQDXVhpIU26GVgkDUnROaHLSuluhMqtDE7aKA2hbKXG5yu5DN8Tg==
+axios@^0.30.0:
+  version "0.30.0"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-0.30.0.tgz#026ae2c0ae6ac35d564056690683fb77c991d0d3"
+  integrity sha512-Z4F3LjCgfjZz8BMYalWdMgAQUnEtKDmpwNHjh/C8pQZWde32TF64cqnSeyL3xD/aTIASRU30RHTNzRiV/NpGMg==
   dependencies:
     follow-redirects "^1.15.4"
     form-data "^4.0.0"

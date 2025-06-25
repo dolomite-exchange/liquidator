@@ -41,6 +41,7 @@ const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | un
   [ChainId.Berachain]: {
     // 1: new BigNumber('6'), // BERA
   },
+  [ChainId.Ethereum]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},

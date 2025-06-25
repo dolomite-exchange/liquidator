@@ -2,6 +2,7 @@ export enum ChainId {
   ArbitrumOne = 42161,
   Base = 8453,
   Berachain = 80094,
+  Ethereum = 1,
   Mantle = 5000,
   PolygonZkEvm = 1101,
   XLayer = 196,
@@ -17,6 +18,10 @@ export function isBase(chainId: ChainId): boolean {
 
 export function isBerachain(chainId: ChainId): boolean {
   return chainId === ChainId.Berachain;
+}
+
+export function isEthereum(chainId: ChainId): boolean {
+  return chainId === ChainId.Ethereum;
 }
 
 export function isMantle(chainId: ChainId): boolean {
