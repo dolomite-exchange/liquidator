@@ -56,9 +56,7 @@ import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
 import '../lib/env';
 import { chunkArray, DECIMAL_BASE } from '../lib/utils';
-import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
-import MultiCallWithExceptionHandlerAbi from '../abis/multi-call-with-exception-handler.json';
-import { MultiCallWithExceptionHandler } from '../abis/MultiCallWithExceptionHandler';
+import { aggregateWithExceptionHandler } from '../lib/multi-call-with-exception-handler';
 
 const { defaultAbiCoder } = ethers.utils;
 
@@ -75,12 +73,6 @@ export const SOLID_ACCOUNT = {
   owner: process.env.ACCOUNT_WALLET_ADDRESS as string,
   number: new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER as string),
 };
-
-const multiCallWithExceptionHandlerAddress =
-  ModuleDeployments.MultiCallWithExceptionHandler[process.env.NETWORK_ID!].address;
-if (!multiCallWithExceptionHandlerAddress) {
-  throw new Error('Could not find multiCallWithExceptionHandlerAddress');
-}
 
 const marginAccountFields = `
                   id
@@ -399,12 +391,7 @@ export async function getDolomiteMarkets(
   });
 
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
-  const multiCallWithExceptionHandler = new ethers.Contract(
-    multiCallWithExceptionHandlerAddress,
-    MultiCallWithExceptionHandlerAbi,
-    new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL),
-  ) as MultiCallWithExceptionHandler;
-  const { returnData: marketPriceResults } = await multiCallWithExceptionHandler.callStatic.aggregate(marketPriceCalls);
+  const marketPriceResults = await aggregateWithExceptionHandler(marketPriceCalls);
 
   const markets: (ApiMarket | undefined)[] = await Promise.all(
     filteredMarketRiskInfos
@@ -777,13 +764,19 @@ export async function getTotalValueLockedAndFees(
         callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.toNumber()).encodeABI(),
       };
     });
-    const { results: allPricesRaw } = await dolomite.multiCall.aggregate(callDatas, { blockNumber });
+    const allPricesRaw = await aggregateWithExceptionHandler(callDatas, { blockTag: blockNumber });
     const allPrices = allPricesRaw.map(priceEncoded => {
-      return new BigNumber(dolomite.web3.eth.abi.decodeParameter('uint256', priceEncoded).toString());
+      if (!priceEncoded.success) {
+        return undefined;
+      }
+      return new BigNumber(dolomite.web3.eth.abi.decodeParameter('uint256', priceEncoded.returnData).toString());
     })
 
     const allPricesMap = allMarkets.reduce((memo, market, j) => {
-      memo[market.toFixed()] = allPrices[j];
+      const price = allPrices[j];
+      if (price) {
+        memo[market.toFixed()] = price;
+      }
       return memo;
     }, {} as Record<string, BigNumber>)
 
