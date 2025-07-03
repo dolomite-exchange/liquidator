@@ -1,9 +1,10 @@
 import '../lib/env';
-import { MultiCallWithExceptionHandler } from '../abis/MultiCallWithExceptionHandler';
-import type { CallOverrides } from 'ethers';
-import * as ethers from 'ethers';
 import MultiCallWithExceptionHandlerAbi from '../abis/multi-call-with-exception-handler.json';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
+import { dolomite } from '../helpers/web3';
+import { ContractConstantCallOptions } from '@dolomite-exchange/dolomite-margin/dist/src/types';
+
+export type CallStruct = { target: string; callData: string };
 
 const multiCallWithExceptionHandlerAddress =
   ModuleDeployments.MultiCallWithExceptionHandler[process.env.NETWORK_ID!].address;
@@ -12,14 +13,16 @@ if (!multiCallWithExceptionHandlerAddress) {
 }
 
 export async function aggregateWithExceptionHandler(
-  calls: MultiCallWithExceptionHandler.CallStruct[],
-  overrides?: CallOverrides,
+  calls: CallStruct[],
+  options?: ContractConstantCallOptions,
 ) {
-  const multiCallWithExceptionHandler = new ethers.Contract(
-    multiCallWithExceptionHandlerAddress,
+  const multiCallWithExceptionHandler = new dolomite.web3.eth.Contract(
     MultiCallWithExceptionHandlerAbi,
-    new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL),
-  ) as MultiCallWithExceptionHandler;
-  const { returnData } = await multiCallWithExceptionHandler.callStatic.aggregate(calls, overrides);
+    multiCallWithExceptionHandlerAddress,
+  );
+  const { returnData } = await dolomite.contracts.callConstantContractFunction(
+    multiCallWithExceptionHandler.methods.aggregate(calls),
+    options,
+  );
   return returnData;
 }
