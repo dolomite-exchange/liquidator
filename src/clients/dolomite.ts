@@ -56,6 +56,9 @@ import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
 import '../lib/env';
 import { chunkArray, DECIMAL_BASE } from '../lib/utils';
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
+import MultiCallWithExceptionHandlerAbi from '../abis/multi-call-with-exception-handler.json';
+import { MultiCallWithExceptionHandler } from '../abis/MultiCallWithExceptionHandler';
 
 const { defaultAbiCoder } = ethers.utils;
 
@@ -72,6 +75,12 @@ export const SOLID_ACCOUNT = {
   owner: process.env.ACCOUNT_WALLET_ADDRESS as string,
   number: new BigNumber(process.env.DOLOMITE_ACCOUNT_NUMBER as string),
 };
+
+const multiCallWithExceptionHandlerAddress =
+  ModuleDeployments.MultiCallWithExceptionHandler[process.env.NETWORK_ID!].address;
+if (!multiCallWithExceptionHandlerAddress) {
+  throw new Error('Could not find multiCallWithExceptionHandlerAddress');
+}
 
 const marginAccountFields = `
                   id
@@ -390,27 +399,38 @@ export async function getDolomiteMarkets(
   });
 
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
-  const { results: marketPriceResults } = await dolomite.multiCall.aggregate(marketPriceCalls);
+  const multiCallWithExceptionHandler = new ethers.Contract(
+    multiCallWithExceptionHandlerAddress,
+    MultiCallWithExceptionHandlerAbi,
+    new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL),
+  ) as MultiCallWithExceptionHandler;
+  const { returnData: marketPriceResults } = await multiCallWithExceptionHandler.callStatic.aggregate(marketPriceCalls);
 
-  const markets: Promise<ApiMarket>[] = filteredMarketRiskInfos.map(async (market, i) => {
-    const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
-    const marketId = new BigNumber(market.token.marketId)
-    const apiMarket: ApiMarket = {
-      id: market.id,
-      marketId: marketId.toNumber(),
-      decimals: Number(market.token.decimals),
-      symbol: market.token.symbol,
-      name: market.token.name,
-      tokenAddress: market.token.id,
-      oraclePrice: new BigNumber(oraclePrice),
-      marginPremium: new BigNumber(decimalToString(market.marginPremium)),
-      liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
-      isBorrowingDisabled: market.isBorrowingDisabled,
-    };
-    return apiMarket;
-  });
+  const markets: (ApiMarket | undefined)[] = await Promise.all(
+    filteredMarketRiskInfos
+      .map(async (market, i) => {
+        if (!marketPriceResults[i].success) {
+          return undefined;
+        }
+        const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i].returnData);
+        const marketId = new BigNumber(market.token.marketId)
+        const apiMarket: ApiMarket = {
+          id: market.id,
+          marketId: marketId.toNumber(),
+          decimals: Number(market.token.decimals),
+          symbol: market.token.symbol,
+          name: market.token.name,
+          tokenAddress: market.token.id,
+          oraclePrice: new BigNumber(oraclePrice),
+          marginPremium: new BigNumber(decimalToString(market.marginPremium)),
+          liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
+          isBorrowingDisabled: market.isBorrowingDisabled,
+        };
+        return apiMarket;
+      }),
+  );
 
-  return { markets: await Promise.all(markets) };
+  return { markets: markets.filter((m): m is ApiMarket => m !== undefined) };
 }
 
 export async function getDolomiteRiskParams(blockNumber: number): Promise<{ riskParams: ApiRiskParam }> {
