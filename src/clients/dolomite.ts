@@ -56,6 +56,7 @@ import Logger from '../lib/logger';
 import Pageable from '../lib/pageable';
 import '../lib/env';
 import { chunkArray, DECIMAL_BASE } from '../lib/utils';
+import { aggregateWithExceptionHandler } from '../lib/multi-call-with-exception-handler';
 
 const { defaultAbiCoder } = ethers.utils;
 
@@ -390,27 +391,32 @@ export async function getDolomiteMarkets(
   });
 
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
-  const { results: marketPriceResults } = await dolomite.multiCall.aggregate(marketPriceCalls);
+  const marketPriceResults = await aggregateWithExceptionHandler(marketPriceCalls);
 
-  const markets: Promise<ApiMarket>[] = filteredMarketRiskInfos.map(async (market, i) => {
-    const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
-    const marketId = new BigNumber(market.token.marketId)
-    const apiMarket: ApiMarket = {
-      id: market.id,
-      marketId: marketId.toNumber(),
-      decimals: Number(market.token.decimals),
-      symbol: market.token.symbol,
-      name: market.token.name,
-      tokenAddress: market.token.id,
-      oraclePrice: new BigNumber(oraclePrice),
-      marginPremium: new BigNumber(decimalToString(market.marginPremium)),
-      liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
-      isBorrowingDisabled: market.isBorrowingDisabled,
-    };
-    return apiMarket;
-  });
+  const markets: ApiMarket[] = filteredMarketRiskInfos
+    .map((market, i) => {
+      if (!marketPriceResults[i].success) {
+        return undefined;
+      }
+      const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i].returnData);
+      const marketId = new BigNumber(market.token.marketId)
+      const apiMarket: ApiMarket = {
+        id: market.id,
+        marketId: marketId.toNumber(),
+        decimals: Number(market.token.decimals),
+        symbol: market.token.symbol,
+        name: market.token.name,
+        tokenAddress: market.token.id,
+        oraclePrice: new BigNumber(oraclePrice),
+        marginPremium: new BigNumber(decimalToString(market.marginPremium)),
+        liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
+        isBorrowingDisabled: market.isBorrowingDisabled,
+      };
+      return apiMarket;
+    })
+    .filter((m): m is ApiMarket => m !== undefined);
 
-  return { markets: await Promise.all(markets) };
+  return { markets };
 }
 
 export async function getDolomiteRiskParams(blockNumber: number): Promise<{ riskParams: ApiRiskParam }> {
@@ -757,13 +763,19 @@ export async function getTotalValueLockedAndFees(
         callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.toNumber()).encodeABI(),
       };
     });
-    const { results: allPricesRaw } = await dolomite.multiCall.aggregate(callDatas, { blockNumber });
+    const allPricesRaw = await aggregateWithExceptionHandler(callDatas, { blockNumber });
     const allPrices = allPricesRaw.map(priceEncoded => {
-      return new BigNumber(dolomite.web3.eth.abi.decodeParameter('uint256', priceEncoded).toString());
+      if (!priceEncoded.success) {
+        return undefined;
+      }
+      return new BigNumber(dolomite.web3.eth.abi.decodeParameter('uint256', priceEncoded.returnData).toString());
     })
 
     const allPricesMap = allMarkets.reduce((memo, market, j) => {
-      memo[market.toFixed()] = allPrices[j];
+      const price = allPrices[j];
+      if (price) {
+        memo[market.toFixed()] = price;
+      }
       return memo;
     }, {} as Record<string, BigNumber>)
 
