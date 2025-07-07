@@ -340,6 +340,7 @@ export async function getExpiredAccounts(
 export async function getDolomiteMarkets(
   blockNumber: number,
   lastId: string | undefined,
+  ignoreBadPrices: boolean,
 ): Promise<{ markets: ApiMarket[] }> {
   const result: GraphqlMarketResult = await axios.post(
     subgraphUrl,
@@ -395,10 +396,12 @@ export async function getDolomiteMarkets(
 
   const markets: ApiMarket[] = filteredMarketRiskInfos
     .map((market, i) => {
-      if (!marketPriceResults[i].success) {
+      if (!marketPriceResults[i].success && !ignoreBadPrices) {
         return undefined;
       }
-      const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i].returnData);
+      const oraclePrice = marketPriceResults[i].success
+        ? dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i].returnData)
+        : INTEGERS.ZERO;
       const marketId = new BigNumber(market.token.marketId)
       const apiMarket: ApiMarket = {
         id: market.id,
@@ -407,7 +410,7 @@ export async function getDolomiteMarkets(
         symbol: market.token.symbol,
         name: market.token.name,
         tokenAddress: market.token.id,
-        oraclePrice: new BigNumber(oraclePrice),
+        oraclePrice: new BigNumber(oraclePrice.toString()),
         marginPremium: new BigNumber(decimalToString(market.marginPremium)),
         liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
         isBorrowingDisabled: market.isBorrowingDisabled,

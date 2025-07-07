@@ -16,7 +16,8 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
+// const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
+const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
 
 const TEN = new BigNumber('10');
 
@@ -62,12 +63,12 @@ function formatAccountData(accounts: ApiAccount[], marketMap: Record<string, Api
     return a.borrowUSD.gt(b.borrowUSD) ? 1 : -1;
   });
 
-  const medianAccount = transformedAccounts[Math.floor(transformedAccounts.length / 2)];
-  const biggestAccount = transformedAccounts[transformedAccounts.length - 1];
-  const averageAccountDebt = transformedAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
-    .div(transformedAccounts.length);
-
   if (accounts.length > 0) {
+    console.log('transformedAccounts.length', transformedAccounts.length)
+    const medianAccount = transformedAccounts[Math.floor(transformedAccounts.length / 2)];
+    const biggestAccount = transformedAccounts[transformedAccounts.length - 1];
+    const averageAccountDebt = transformedAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
+      .div(transformedAccounts.length);
     Logger.info({
       message: `Stats on ${value} accounts`,
       medianAccountDebt: `$${medianAccount.borrowUSD.toFormat(2)}`,
@@ -88,7 +89,7 @@ function formatAccountData(accounts: ApiAccount[], marketMap: Record<string, Api
 
 async function start() {
   const blockStore = new BlockStore();
-  const marketStore = new MarketStore(blockStore);
+  const marketStore = new MarketStore(blockStore, true);
   const accountStore = new AccountStore(blockStore, marketStore);
 
   await blockStore._update();
@@ -113,15 +114,15 @@ async function start() {
   const marketCount = await dolomite.getters.getNumMarkets();
   const marketId = new BigNumber(process.env.MARKET_ID ?? '');
   if (marketId.isNaN()) {
-    const message = 'Invalid market ID'
+    const message = 'Invalid MARKET_ID'
     Logger.error(message);
     return Promise.reject(new Error(message));
   } else if (!marketId.isInteger()) {
-    const message = 'Market ID must be integer'
+    const message = 'MARKET_ID must be integer'
     Logger.error(message);
     return Promise.reject(new Error(message));
   } else if (marketId.gte(marketCount) || marketId.lt(INTEGERS.ZERO)) {
-    const message = 'Market ID out of range'
+    const message = 'MARKET_ID out of range'
     Logger.error(message);
     return Promise.reject(new Error(message));
   }
@@ -257,14 +258,12 @@ function getTransformedAccounts(
         return acc;
       }, initial);
 
-    if (supply.gt(INTEGERS.ZERO)) {
-      transformedAccounts.push({
-        ...account,
-        supplyUSD: supply,
-        borrowUSD: borrow,
-        balances: transformedBalances,
-      });
-    }
+    transformedAccounts.push({
+      ...account,
+      supplyUSD: supply,
+      borrowUSD: borrow,
+      balances: transformedBalances,
+    });
   }
 
   return transformedAccounts;

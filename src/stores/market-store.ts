@@ -12,7 +12,7 @@ import Pageable from '../lib/pageable';
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };
 
-  constructor(private readonly blockStore: BlockStore) {
+  constructor(private readonly blockStore: BlockStore, private readonly ignoreBadPrices: boolean = false) {
     this.marketMap = {};
   }
 
@@ -87,7 +87,7 @@ export default class MarketStore {
     }
 
     const nextDolomiteMarkets = await Pageable.getPageableValues(async (lastId) => {
-      const result = await getDolomiteMarkets(blockNumber, lastId);
+      const result = await getDolomiteMarkets(blockNumber, lastId, this.ignoreBadPrices);
       return result.markets
     });
 
