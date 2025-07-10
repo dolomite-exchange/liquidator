@@ -340,6 +340,7 @@ export async function getExpiredAccounts(
 export async function getDolomiteMarkets(
   blockNumber: number,
   lastId: string | undefined,
+  filterOutBadPrices: boolean,
 ): Promise<{ markets: ApiMarket[] }> {
   const result: GraphqlMarketResult = await axios.post(
     subgraphUrl,
@@ -393,13 +394,20 @@ export async function getDolomiteMarkets(
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
   const marketPriceResults = await aggregateWithExceptionHandler(marketPriceCalls);
 
+  const badMarkets: number[] = [];
   const markets: ApiMarket[] = filteredMarketRiskInfos
     .map((market, i) => {
+      const marketId = new BigNumber(market.token.marketId)
       if (!marketPriceResults[i].success) {
+        badMarkets.push(marketId.toNumber());
+      }
+
+      if (!marketPriceResults[i].success && filterOutBadPrices) {
         return undefined;
       }
-      const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i].returnData);
-      const marketId = new BigNumber(market.token.marketId)
+      const oraclePrice = marketPriceResults[i].success
+        ? dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i].returnData)
+        : INTEGERS.ZERO;
       const apiMarket: ApiMarket = {
         id: market.id,
         marketId: marketId.toNumber(),
@@ -415,6 +423,13 @@ export async function getDolomiteMarkets(
       return apiMarket;
     })
     .filter((m): m is ApiMarket => m !== undefined);
+
+  if (badMarkets.length !== 0) {
+    Logger.info({
+      message: 'Found markets with invalid oracle prices:',
+      badMarkets: badMarkets.join(', '),
+    });
+  }
 
   return { markets };
 }

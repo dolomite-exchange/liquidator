@@ -10,13 +10,14 @@ import { updateGasPrice } from '../src/helpers/gas-price-helpers';
 import { dolomite } from '../src/helpers/web3';
 import { ApiAccount, ApiBalance, ApiMarket } from '../src/lib/api-types';
 import '../src/lib/env';
+import { ChainId } from '../src/lib/chain-id';
 import Logger from '../src/lib/logger';
 import Pageable from '../src/lib/pageable';
 import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
+const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
 
 const TEN = new BigNumber('10');
 
@@ -33,6 +34,19 @@ interface TransformedApiAccount extends ApiAccount {
   borrowUSD: Decimal;
   supplyUSD: Decimal;
   balances: Record<string, TransformedApiBalance>;
+}
+
+const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | undefined>> = {
+  [ChainId.ArbitrumOne]: {
+    6: new BigNumber('0.08'),
+  },
+  [ChainId.Base]: {},
+  [ChainId.Berachain]: {
+  },
+  [ChainId.Ethereum]: {},
+  [ChainId.Mantle]: {},
+  [ChainId.PolygonZkEvm]: {},
+  [ChainId.XLayer]: {},
 }
 
 function formatApiAccount(account: TransformedApiAccount): object {
@@ -88,7 +102,7 @@ function formatAccountData(accounts: ApiAccount[], marketMap: Record<string, Api
 
 async function start() {
   const blockStore = new BlockStore();
-  const marketStore = new MarketStore(blockStore);
+  const marketStore = new MarketStore(blockStore, false);
   const accountStore = new AccountStore(blockStore, marketStore);
 
   await blockStore._update();
@@ -149,6 +163,12 @@ async function start() {
   });
 
   const marketMap = marketStore.getMarketMap();
+  Object.values(marketMap).forEach(market => {
+    const priceMultiplier = new BigNumber(10).pow(36 - market.decimals);
+    const priceOverrideRaw = NETWORK_TO_PRICE_OVERRIDE_MAP[networkId as ChainId][market.marketId];
+    market.oraclePrice = priceOverrideRaw?.times(priceMultiplier) ?? market.oraclePrice;
+  });
+
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
   const { tokenAddress } = marketMap[marketId.toFixed()];
 
@@ -184,9 +204,20 @@ async function start() {
     }, INTEGERS.ZERO);
     return acc.plus(totalBorrowUsd);
   }, INTEGERS.ZERO).toNumber();
+  const totalSupplyAccountAssets = supplyAccounts.reduce((acc, account) => {
+    const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
+      if (balance.wei.lte(INTEGERS.ZERO)) {
+        return memo;
+      }
+      const market = marketMap[balance.marketId.toString()];
+      return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
+    }, INTEGERS.ZERO);
+    return acc.plus(totalBorrowUsd);
+  }, INTEGERS.ZERO).toNumber();
   Logger.info({
     message: `Found ${supplyAccounts.length} supply accounts with debt`,
     debtCount: supplyAccounts.length,
+    supplyAmount: `$${formatNumber(totalSupplyAccountAssets)}`,
     debtAmount: `$${formatNumber(totalSupplyAccountDebt)}`,
   });
 
