@@ -21,11 +21,11 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const SMALL_BORROW_THRESHOLD = new BigNumber('10.00');
+const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
 
 const TEN = new BigNumber('10');
 
-const TICKERS_TO_IGNORE = ['djUSDC'];
+const TICKERS_TO_IGNORE: string[] = [];
 
 const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
 const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
@@ -36,11 +36,14 @@ const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
 const ONE_DOLLAR = new BigNumber(10).pow(36);
 
 const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | undefined>> = {
-  [ChainId.ArbitrumOne]: {},
+  [ChainId.ArbitrumOne]: {
+    41: new BigNumber('0.08'),
+  },
   [ChainId.Base]: {},
   [ChainId.Berachain]: {
     // 1: new BigNumber('6'), // BERA
   },
+  [ChainId.Ethereum]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},
@@ -56,7 +59,7 @@ function shouldIgnoreAccount(account: ApiAccount): boolean {
 
 async function start() {
   const blockStore = new BlockStore();
-  const marketStore = new MarketStore(blockStore);
+  const marketStore = new MarketStore(blockStore, false);
   const accountStore = new AccountStore(blockStore, marketStore);
 
   await blockStore._update();

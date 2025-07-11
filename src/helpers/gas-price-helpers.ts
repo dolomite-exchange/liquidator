@@ -48,7 +48,6 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
     return;
   }
 
-
   // const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
   // const addition = new BigNumber(process.env.GAS_PRICE_ADDITION as string);
   // const totalWei = response
@@ -62,8 +61,6 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
     message: 'Updating gas price',
     gasPrice: response,
   });
-
-
 }
 
 export function getGasPriceWei(): Integer {
@@ -129,6 +126,10 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
     return getStandardOrEip1559GasPrice();
   } else if (isInk(networkId)) {
     return getStandardOrEip1559GasPrice();
+  } else if (isEthereum(networkId)) {
+    const response = await dolomite.web3.eth.getGasPrice();
+    const gasPrice = new BigNumber(response).div(ONE_GWEI_IN_WEI_UNITS).toFixed();
+    return { fast: gasPrice };
   } else if (isMantle(networkId)) {
     return {
       type: GasPriceType.STANDARD,
