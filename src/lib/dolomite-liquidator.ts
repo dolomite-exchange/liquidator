@@ -302,11 +302,15 @@ export default class DolomiteLiquidator {
   };
 
   _parseError(error: any): any {
-    if (error.error) {
+    if (error === undefined) {
+      return error;
+    }
+
+    if (error.error !== undefined) {
       error = error.error;
     }
 
-    if (error.error) {
+    if (error.error !== undefined) {
       // Remove extraneous inner errors that clogs logs
       delete error.error;
     }

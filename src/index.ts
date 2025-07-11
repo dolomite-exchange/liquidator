@@ -84,7 +84,7 @@ const originalWarn = console.warn;
 console.warn = (msg?: any, ...args: any[]) => {
   if (
     typeof msg === 'string'
-    && msg.includes('version=providers/5.7.2')
+    && (msg.includes('version=providers/5.7.2') || msg.includes('version=web/5.7.1'))
   ) {
     return; // skip
   }
@@ -95,7 +95,7 @@ const originalError = console.error;
 console.error = (msg?: any, ...args: any[]) => {
   if (
     typeof msg === 'string'
-    && msg.includes('version=providers/5.7.2')
+    && (msg.includes('version=providers/5.7.2') || msg.includes('version=web/5.7.1'))
   ) {
     return; // skip
   }
