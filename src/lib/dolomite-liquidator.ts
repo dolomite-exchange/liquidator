@@ -20,6 +20,7 @@ import { ApiAccount, ApiMarket } from './api-types';
 import { delay } from './delay';
 import Logger from './logger';
 import { isCollateralized } from './utils';
+
 export default class DolomiteLiquidator {
   private MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
 
@@ -184,11 +185,13 @@ export default class DolomiteLiquidator {
         if (result) {
           Logger.info({
             message: 'Liquidation transaction hash:',
-            transactionHash: result?.transactionHash,
+            transactionHash: result?.hash,
           });
         }
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
       } catch (error: any) {
+        // eslint-disable-next-line no-ex-assign
+        error = this._parseError(error);
         Logger.error({
           at: 'DolomiteLiquidator#_liquidateAccounts',
           message: 'Failed to liquidate account',
@@ -213,10 +216,12 @@ export default class DolomiteLiquidator {
         if (result) {
           Logger.info({
             message: 'Expiration transaction hash:',
-            transactionHash: result?.transactionHash,
+            transactionHash: result?.hash,
           });
         }
       } catch (error: any) {
+        // eslint-disable-next-line no-ex-assign
+        error = this._parseError(error);
         Logger.error({
           at: 'DolomiteLiquidator#_liquidateAccounts',
           message: 'Failed to liquidate expired account',
@@ -295,4 +300,17 @@ export default class DolomiteLiquidator {
 
     return totalBorrow1.gt(totalBorrow2) ? -1 : 1;
   };
+
+  _parseError(error: any): any {
+    if (error.error) {
+      error = error.error;
+    }
+
+    if (error.error) {
+      // Remove extraneous inner errors that clogs logs
+      delete error.error;
+    }
+
+    return error;
+  }
 }

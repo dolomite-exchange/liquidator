@@ -3,19 +3,23 @@ import { ConfirmationType, TxResult } from '@dolomite-exchange/dolomite-margin/d
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { ApiAsyncAction, ApiAsyncActionType } from '@dolomite-exchange/zap-sdk';
 import { ApiMarketConverter } from '@dolomite-exchange/zap-sdk/dist/src/lib/ApiTypes';
+import { ContractTransaction, ethers, type PayableOverrides } from 'ethers';
 import AsyncUnwrapperAbi from '../abis/async-unwrapper-trader.json';
 import AsyncWrapperAbi from '../abis/async-wrapper-trader.json';
 import IsolationModeFreezableLiquidatorProxyAbi from '../abis/isolation-mode-freezable-liquidator-proxy.json';
+import { IsolationModeFreezableLiquidatorProxy } from '../abis/IsolationModeFreezableLiquidatorProxy';
 import { ApiAccount } from '../lib/api-types';
-import { getGasPriceWei } from './gas-price-helpers';
+import { getGasPriceWeiWithModifications, getTypedGasPriceWeiWithModifications } from './gas-price-helpers';
 import { dolomite } from './web3';
 
 const solidAccountOwner = process.env.ACCOUNT_WALLET_ADDRESS as string;
 
-const isolationModeFreezableLiquidatorProxy = new dolomite.web3.eth.Contract(
+const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL);
+const isolationModeFreezableLiquidatorProxy = new ethers.Contract(
+  ModuleDeployments.IsolationModeFreezableLiquidatorProxyV3[process.env.NETWORK_ID!].address,
   IsolationModeFreezableLiquidatorProxyAbi,
-  ModuleDeployments.IsolationModeFreezableLiquidatorProxyV3[process.env.NETWORK_ID as string].address,
-);
+  new ethers.Wallet(process.env.ACCOUNT_WALLET_PRIVATE_KEY!, provider),
+) as IsolationModeFreezableLiquidatorProxy;
 
 export async function emitEventFinalizingEvent(
   action: ApiAsyncAction,
@@ -28,7 +32,7 @@ export async function emitEventFinalizingEvent(
       wrapper.methods.emitDepositCancelled(action.key),
       {
         ...options,
-        gasPrice: getGasPriceWei().toFixed(),
+        gasPrice: getGasPriceWeiWithModifications().toFixed(),
         from: solidAccountOwner,
         confirmationType: ConfirmationType.Hash,
       },
@@ -39,7 +43,7 @@ export async function emitEventFinalizingEvent(
       unwrapper.methods.emitWithdrawalExecuted(action.key),
       {
         ...options,
-        gasPrice: getGasPriceWei().toFixed(),
+        gasPrice: getGasPriceWeiWithModifications().toFixed(),
         from: solidAccountOwner,
         confirmationType: ConfirmationType.Hash,
       },
@@ -60,7 +64,7 @@ export async function retryDepositOrWithdrawalAction(
       wrapper.methods.executeDepositCancellationForRetry(action.key),
       {
         ...options,
-        gasPrice: getGasPriceWei().toFixed(),
+        gasPrice: getGasPriceWeiWithModifications().toFixed(),
         from: solidAccountOwner,
         confirmationType: ConfirmationType.Hash,
       },
@@ -71,7 +75,7 @@ export async function retryDepositOrWithdrawalAction(
       unwrapper.methods.executeWithdrawalForRetry(action.key),
       {
         ...options,
-        gasPrice: getGasPriceWei().toFixed(),
+        gasPrice: getGasPriceWeiWithModifications().toFixed(),
         from: solidAccountOwner,
         confirmationType: ConfirmationType.Hash,
       },
@@ -89,10 +93,11 @@ export async function prepareForLiquidation(
   minOutputAmount: Integer,
   expirationTimestamp: number | undefined,
   extraData: string,
-  options: ContractCallOptions = {},
-): Promise<TxResult> {
-  return dolomite.contracts.callContractFunction(
-    isolationModeFreezableLiquidatorProxy.methods.prepareForLiquidation({
+  overrides?: PayableOverrides & { from?: string },
+): Promise<ContractTransaction> {
+  const gas = getTypedGasPriceWeiWithModifications();
+  return isolationModeFreezableLiquidatorProxy.prepareForLiquidation(
+    {
       liquidAccount: { owner: liquidAccount.owner, number: liquidAccount.number.toFixed() },
       freezableMarketId: freezableMarketId.toFixed(),
       inputTokenAmount: inputTokenAmount.toFixed(),
@@ -100,13 +105,10 @@ export async function prepareForLiquidation(
       minOutputAmount: minOutputAmount.toFixed(),
       expirationTimestamp: expirationTimestamp ? expirationTimestamp.toString() : '0',
       extraData,
-    }),
-    {
-      ...options,
-      gasPrice: getGasPriceWei().toFixed(),
-      gas: 10_000_000,
-      from: solidAccountOwner,
-      confirmationType: ConfirmationType.Hash,
     },
-  );
+    {
+      ...overrides,
+      ...gas,
+    },
+  )
 }

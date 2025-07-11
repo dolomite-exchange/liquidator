@@ -14,7 +14,13 @@ export interface ApiBalance {
   tokenAddress: string
   tokenName: string
   tokenSymbol: string
+  /**
+   * Can be negative for owed, positive for held
+   */
   par: Integer;
+  /**
+   * Can be negative for owed, positive for held
+   */
   wei: Integer;
   expiresAt: Integer | null;
   expiryAddress: string | null;
@@ -46,6 +52,16 @@ export interface ApiMarket {
   marginPremium: Integer;
   liquidationRewardPremium: Integer;
   isBorrowingDisabled: boolean;
+  supplyLiquidity: Decimal | undefined;
+  maxSupplyLiquidity: Decimal | undefined;
+}
+
+export interface ApiTokenResponse {
+  marketId: string;
+  supplyLiquidity: string;
+  riskInfo: {
+    supplyMaxWei: string | null;
+  };
 }
 
 export enum EModeCategory {

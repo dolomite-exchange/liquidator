@@ -1,6 +1,10 @@
 import { DolomiteMargin, Web3 } from '@dolomite-exchange/dolomite-margin';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
+import { ethers } from 'ethers';
+import ExpiryProxyV1Abi from '../abis/expiry-proxy-v1.json';
+import LiquidatorProxyV1Abi from '../abis/liquidator-proxy-v1.json';
 import LiquidatorProxyV6Abi from '../abis/liquidator-proxy-v6.json';
+import { LiquidatorProxyV6 } from '../abis/LiquidatorProxyV6';
 import { ChainId } from '../lib/chain-id';
 import Logger from '../lib/logger';
 import '../lib/env';
@@ -8,23 +12,34 @@ import '../lib/env';
 const accountWalletAddress = process.env.ACCOUNT_WALLET_ADDRESS?.toLowerCase() ?? '';
 const opts = { defaultAccount: accountWalletAddress };
 
-const provider: any = new Web3.providers.HttpProvider(process.env.ETHEREUM_NODE_URL ?? '');
-
 const networkId = Number(process.env.NETWORK_ID);
 if (Object.keys(ChainId).indexOf(networkId.toString()) === -1) {
   throw new Error(`Invalid networkId ${process.env.NETWORK_ID}`)
 }
 
 export const dolomite = new DolomiteMargin(
-  provider,
+  new Web3.providers.HttpProvider(process.env.ETHEREUM_NODE_URL!),
   Number(process.env.NETWORK_ID),
   opts,
 );
 
-export const liquidatorProxyV6 = new dolomite.web3.eth.Contract(
-  LiquidatorProxyV6Abi,
-  ModuleDeployments.LiquidatorProxyV6[networkId].address,
+const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL!);
+export const expiryProxy = new ethers.Contract(
+  dolomite.contracts.expiryProxy.options.address,
+  ExpiryProxyV1Abi,
+  new ethers.Wallet(process.env.ACCOUNT_WALLET_PRIVATE_KEY!, provider),
 );
+export const liquidatorProxyV1 = new ethers.Contract(
+  dolomite.contracts.liquidatorProxyV1.options.address,
+  LiquidatorProxyV1Abi,
+  new ethers.Wallet(process.env.ACCOUNT_WALLET_PRIVATE_KEY!, provider),
+);
+
+export const liquidatorProxyV6 = new ethers.Contract(
+  ModuleDeployments.LiquidatorProxyV6[networkId].address,
+  LiquidatorProxyV6Abi,
+  new ethers.Wallet(process.env.ACCOUNT_WALLET_PRIVATE_KEY!, provider),
+) as LiquidatorProxyV6;
 
 export async function loadAccounts() {
   if (!accountWalletAddress) {
@@ -74,7 +89,7 @@ export async function initializeDolomiteLiquidations() {
   await checkOperatorIsApproved(dolomite.contracts.expiryProxy.options.address);
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV1.options.address);
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV4WithGenericTrader.options.address);
-  await checkOperatorIsApproved(liquidatorProxyV6.options.address);
+  await checkOperatorIsApproved(liquidatorProxyV6.address);
 }
 
 async function checkOperatorIsApproved(operator?: string) {

@@ -22,6 +22,7 @@ import {
   ApiLiquidation,
   ApiMarket,
   ApiRiskParam,
+  ApiTokenResponse,
   EModeCategory,
   EModeCategoryStruct,
   EModeRiskFeature,
@@ -53,10 +54,10 @@ import {
   GraphqlUserResult,
 } from '../lib/graphql-types';
 import Logger from '../lib/logger';
+import { aggregateWithExceptionHandler } from '../lib/multi-call-with-exception-handler';
 import Pageable from '../lib/pageable';
 import '../lib/env';
 import { chunkArray, DECIMAL_BASE } from '../lib/utils';
-import { aggregateWithExceptionHandler } from '../lib/multi-call-with-exception-handler';
 
 const { defaultAbiCoder } = ethers.utils;
 
@@ -394,6 +395,33 @@ export async function getDolomiteMarkets(
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
   const marketPriceResults = await aggregateWithExceptionHandler(marketPriceCalls);
 
+  const marketToDolomiteApiMarket: Record<string, {
+    supplyWei: Decimal;
+    maxSupplyWei: Decimal | undefined
+  } | undefined> = {};
+  try {
+    const resultJson = await axios.get(`https://api.dolomite.io/tokens/${dolomite.networkId}`)
+      .then(res => {
+        if (res.status !== 200) {
+          return Promise.reject(new Error(`Failed to fetch token info: ${res.statusText}`));
+        }
+
+        return Promise.resolve(res.data.tokens as ApiTokenResponse[]);
+      });
+
+    resultJson.forEach(token => {
+      marketToDolomiteApiMarket[token.marketId] = {
+        supplyWei: new BigNumber(token.supplyLiquidity),
+        maxSupplyWei: token.riskInfo.supplyMaxWei ? new BigNumber(token.riskInfo.supplyMaxWei) : undefined,
+      }
+    });
+  } catch (e) {
+    Logger.warn({
+      at: 'getDolomiteMarkets',
+      message: 'Could not get API response for current liquidity',
+    });
+  }
+
   const badMarkets: number[] = [];
   const markets: ApiMarket[] = filteredMarketRiskInfos
     .map((market, i) => {
@@ -415,10 +443,12 @@ export async function getDolomiteMarkets(
         symbol: market.token.symbol,
         name: market.token.name,
         tokenAddress: market.token.id,
-        oraclePrice: new BigNumber(oraclePrice),
+        oraclePrice: new BigNumber(oraclePrice.toString()),
         marginPremium: new BigNumber(decimalToString(market.marginPremium)),
         liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
         isBorrowingDisabled: market.isBorrowingDisabled,
+        supplyLiquidity: marketToDolomiteApiMarket[market.id]?.supplyWei,
+        maxSupplyLiquidity: marketToDolomiteApiMarket[market.id]?.maxSupplyWei,
       };
       return apiMarket;
     })

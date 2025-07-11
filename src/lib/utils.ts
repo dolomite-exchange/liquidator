@@ -1,4 +1,4 @@
-import { BigNumber, Integer } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import { getAccountRiskOverride, RiskOverride } from './account-risk-override-getter';
 import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
@@ -68,6 +68,24 @@ export function heldWeiToOwedWei(
   owedPrice: Integer,
 ): Integer {
   return getPartialRoundUp(heldWei, heldPrice, owedPrice);
+}
+
+export function getLiquidationReward(
+  owedMarket: ApiMarket,
+  heldMarket: ApiMarket,
+  riskOverride: RiskOverride | undefined,
+  riskParams: ApiRiskParam,
+): Decimal {
+  const liquidationReward = riskOverride ? riskOverride.liquidationRewardOverride : riskParams.liquidationReward;
+  let reward = liquidationReward.minus(DECIMAL_BASE);
+
+  const heldRewardPremium = riskOverride ? DECIMAL_BASE : heldMarket.liquidationRewardPremium;
+  reward = reward.plus(getPartial(reward, heldRewardPremium, DECIMAL_BASE));
+
+  const owedRewardPremium = riskOverride ? DECIMAL_BASE : owedMarket.liquidationRewardPremium;
+  reward = reward.plus(getPartial(reward, owedRewardPremium, DECIMAL_BASE));
+
+  return reward.div(DECIMAL_BASE);
 }
 
 export function getOwedPriceForLiquidation(
