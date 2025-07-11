@@ -37,9 +37,7 @@ interface TransformedApiAccount extends ApiAccount {
 }
 
 const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | undefined>> = {
-  [ChainId.ArbitrumOne]: {
-    6: new BigNumber('0.08'),
-  },
+  [ChainId.ArbitrumOne]: {},
   [ChainId.Base]: {},
   [ChainId.Berachain]: {
   },
