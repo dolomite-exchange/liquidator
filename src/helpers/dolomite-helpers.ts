@@ -24,15 +24,10 @@ import {
   retryDepositOrWithdrawalAction,
 } from './async-liquidations-helper';
 import { getLargestBalanceUSD } from './balance-helpers';
-import {
-  getDefaultGasLimit,
-  getGasPriceWei,
-  getGasPriceWeiWithModifications,
-  isGasSpikeProtectionEnabled,
-} from './gas-price-helpers';
-import { liquidateV6 } from './liquidator-proxy-v6-helper';
-import { expireSimple } from './simple-expiration-proxy-helper';
-import { liquidateSimple } from './simple-liquidator-proxy-helper';
+import { getGasPriceWei, getGasPriceWeiWithModifications, isGasSpikeProtectionEnabled } from './gas-price-helpers';
+import { liquidateV6, liquidateV6EstimateGas } from './liquidator-proxy-v6-helper';
+import { expireSimple, expireSimpleEstimateGas } from './simple-expiration-proxy-helper';
+import { liquidateSimple, liquidateSimpleEstimateGas } from './simple-liquidator-proxy-helper';
 import { dolomite } from './web3';
 
 const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? '')?.split(',')
@@ -259,6 +254,7 @@ export async function liquidateExpiredAccount(
       marketMap,
       marginAccountToActionsMap,
       lastBlockTimestamp,
+      riskParams,
     );
   } else {
     return Promise.reject(new Error(`Unknown liquidation mode: ${liquidationMode}`))
@@ -277,6 +273,7 @@ async function _liquidateAccountSimple(
     return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple liquidations on async account'));
   }
 
+  const gasLimit = await liquidateSimpleEstimateGas(liquidAccount, owedMarkets, collateralMarkets);
   if (isGasSpikeProtectionEnabled()) {
     const debtAmountUsd: Integer = owedMarkets.reduce((acc, m) => {
       const amountWei = liquidAccount.balances[m.toFixed()].wei;
@@ -304,13 +301,12 @@ async function _liquidateAccountSimple(
 
     const riskOverride = getAccountRiskOverride(liquidAccount, riskParams);
     const liquidationReward = getLiquidationReward(largestOwedMarket, largestHeldMarket, riskOverride, riskParams);
-    const gasLimit = new BigNumber(ethers.BigNumber.from(getDefaultGasLimit()).toString());
     if (_isGasSpikeFound(gasLimit, debtAmountUsd, liquidationReward, marketMap)) {
       return undefined;
     }
   }
 
-  return liquidateSimple(liquidAccount, owedMarkets, collateralMarkets);
+  return liquidateSimple(liquidAccount, owedMarkets, collateralMarkets, gasLimit);
 }
 
 async function _liquidateAccountAndSellWithGenericLiquidity(
@@ -478,20 +474,33 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     const outputAmount = !isHeldBalanceLargerThanProtocol ? INTEGERS.MAX_UINT : owedWei;
 
     let firstError: Error | undefined;
-    if (isGasSpikeProtectionEnabled()) {
-      for (let i = 0; i < outputs.length; i += 1) {
-        try {
-          const gasLimit = new BigNumber(ethers.BigNumber.from(getDefaultGasLimit()).toString());
-          const debtAmountUsd = owedWei.times(owedMarket.oraclePrice);
-          const liquidationReward = getLiquidationReward(owedMarket, heldMarket, riskOverride, riskParams);
-          if (_isGasSpikeFound(gasLimit, debtAmountUsd, liquidationReward, marketMap)) {
-            return undefined;
-          }
-        } catch (e: any) {
-          if (!firstError) {
-            firstError = e;
-          }
+    let gasLimit: Integer | undefined;
+    for (let i = 0; i < outputs.length; i += 1) {
+      try {
+        gasLimit = await liquidateV6EstimateGas(
+          liquidAccount,
+          inputAmount,
+          outputs[i],
+          outputAmount,
+          (isExpiring && owedBalance.expiresAt) ? owedBalance.expiresAt.toNumber() : null,
+          marketMap,
+        );
+        break;
+      } catch (e: any) {
+        if (!firstError) {
+          firstError = e;
         }
+      }
+    }
+    if (!gasLimit || firstError) {
+      return Promise.reject(firstError);
+    }
+
+    if (isGasSpikeProtectionEnabled()) {
+      const debtAmountUsd = owedWei.times(owedMarket.oraclePrice);
+      const liquidationReward = getLiquidationReward(owedMarket, heldMarket, riskOverride, riskParams);
+      if (_isGasSpikeFound(gasLimit, debtAmountUsd, liquidationReward, marketMap)) {
+        return undefined;
       }
     }
 
@@ -504,6 +513,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
           outputAmount,
           (isExpiring && owedBalance.expiresAt) ? owedBalance.expiresAt.toNumber() : null,
           marketMap,
+          gasLimit,
         );
       } catch (e: any) {
         if (!firstError) {
@@ -521,9 +531,10 @@ async function _liquidateExpiredAccountInternalSimple(
   marketMap: { [marketId: string]: ApiMarket },
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
+  riskParams: ApiRiskParam,
   heldMarketIds: Integer[] = collateralPreferences,
   owedMarketIds: Integer[] = owedPreferences,
-): Promise<ContractTransaction> {
+): Promise<ContractTransaction | undefined> {
   if (marginAccountToActionsMap[expiredAccount.id]) {
     return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple expirations on async account'));
   }
@@ -567,11 +578,25 @@ async function _liquidateExpiredAccountInternalSimple(
     throw new Error(`Could not find a held balance: ${JSON.stringify(preferredBalances, null, 2)}`);
   }
 
+  const gasLimit = await expireSimpleEstimateGas(
+    expiredAccount,
+    owedBalance,
+    heldBalance,
+    owedBalance.expiresAt,
+  );
+  const rewardPercentage = riskParams.liquidationReward.div(DECIMAL_BASE);
+  const owedMarket = marketMap[owedBalance.marketId];
+  const debtAmountUsd = owedBalance.wei.abs().times(owedMarket.oraclePrice);
+  if (isGasSpikeProtectionEnabled() && _isGasSpikeFound(gasLimit, debtAmountUsd, rewardPercentage, marketMap)) {
+    return undefined;
+  }
+
   return expireSimple(
     expiredAccount,
     owedBalance,
     heldBalance,
     owedBalance.expiresAt,
+    gasLimit,
   );
 }
 
