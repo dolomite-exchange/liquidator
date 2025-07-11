@@ -1,8 +1,8 @@
 import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import axios from 'axios';
+import { ethers } from 'ethers';
 import { ChainId, isArbitrum, isBase, isBerachain, isBotanix, isEthereum, isInk, isMantle } from '../lib/chain-id';
 import Logger from '../lib/logger';
-import { ethers } from 'ethers';
 
 export enum GasPriceType {
   STANDARD = 'STANDARD',
@@ -13,6 +13,7 @@ export interface GasPriceStandard {
   type: GasPriceType.STANDARD;
 
   gasPriceWei: Integer;
+  gasLimit: Integer;
 }
 
 export interface GasPriceEip1559 {
@@ -20,20 +21,33 @@ export interface GasPriceEip1559 {
 
   baseFeeWei: Integer;
   priorityFeeWei: Integer;
+  gasLimit: Integer;
+}
+
+export interface GasPriceForEthers {
+  type: number
+  gasPrice?: ethers.BigNumberish;
+  maxFeePerGas?: ethers.BigNumberish;
+  maxPriorityFeePerGas?: ethers.BigNumberish;
 }
 
 export type GasPriceResult = GasPriceStandard | GasPriceEip1559;
 
 const ONE_GWEI_IN_WEI_UNITS = new BigNumber('1000000000');
+const MULTIPLIER = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
+const ADDITION_WEI = new BigNumber(process.env.GAS_PRICE_ADDITION_WEI as string);
+const STANDARD_BLOCK_GAS_LIMIT = new BigNumber(15_000_000);
 
-let gasPriceResult: GasPriceResult;
-resetGasPriceWei();
+let gasResult: GasPriceResult;
+resetGasPriceWei()
 
-export function resetGasPriceWei() {
-  gasPriceResult = {
+export function resetGasPriceWei(): GasPriceResult {
+  gasResult = {
     type: GasPriceType.STANDARD,
     gasPriceWei: new BigNumber(process.env.INITIAL_GAS_PRICE_WEI as string),
+    gasLimit: STANDARD_BLOCK_GAS_LIMIT,
   }
+  return gasResult;
 }
 
 export async function updateGasPrice(dolomite: DolomiteMargin) {
@@ -42,50 +56,62 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
     response = await getGasPrices(dolomite);
   } catch (error: any) {
     Logger.error({
-      message: '#updateGasPrice: Failed to retrieve gas prices',
+      at: 'updateGasPrice',
+      message: 'Failed to retrieve gas prices',
       error,
     });
     return;
   }
-
-  // const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
-  // const addition = new BigNumber(process.env.GAS_PRICE_ADDITION as string);
-  // const totalWei = response
-  //   .times(1_000_000_000)
-  //   .times(multiplier)
-  //   .plus(addition)
-  //   .toFixed(0);
 
   Logger.info({
     at: 'updateGasPrice',
     message: 'Updating gas price',
     gasPrice: response,
   });
+
+  gasResult = response;
 }
 
-export function getGasPriceWei(): Integer {
-  if (gasPriceResult.type === GasPriceType.STANDARD) {
-    return gasPriceResult.gasPriceWei;
+export function getGasPriceWeiWithModifications(): Integer {
+  const gas = getGasPriceWei();
+  return gas.multipliedBy(MULTIPLIER).plus(ADDITION_WEI);
+}
+
+export function getTypedGasPriceWeiWithModifications(): GasPriceForEthers {
+  if (gasResult.type === GasPriceType.STANDARD) {
+    return {
+      type: 0,
+      gasPrice: gasResult.gasPriceWei.multipliedBy(MULTIPLIER).plus(ADDITION_WEI).toFixed(0),
+    };
   }
 
-  if (gasPriceResult.type === GasPriceType.EIP_1559) {
-    // TODO: fix
-    return gasPriceResult.baseFeeWei.plus(gasPriceResult.priorityFeeWei);
+  if (gasResult.type === GasPriceType.EIP_1559) {
+    return {
+      type: 2,
+      maxFeePerGas: gasResult.baseFeeWei.multipliedBy(MULTIPLIER).plus(ADDITION_WEI).toFixed(0),
+      maxPriorityFeePerGas: gasResult.priorityFeeWei.plus(ADDITION_WEI).toFixed(0),
+    };
   }
 
-  throw new Error(`Invalid gas price result, found: ${gasPriceResult}`);
+  throw new Error(`Invalid gas price result, found: ${gasResult}`);
+}
+
+export function getDefaultGasLimit(): number {
+  return gasResult.gasLimit.toNumber()
 }
 
 /**
  * @return The gas price without any additions or multiplications to the original number
  */
-export function getRawGasPriceWei(): Integer {
-  // TODO: fix
-  // const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
-  // const addition = new BigNumber(process.env.GAS_PRICE_ADDITION as string);
-  // return new BigNumber(lastPriceWei).minus(addition).div(multiplier);
+export function getGasPriceWei(): Integer {
+  if (gasResult.type === GasPriceType.STANDARD) {
+    return gasResult.gasPriceWei;
+  }
+  if (gasResult.type === GasPriceType.EIP_1559) {
+    return gasResult.baseFeeWei.plus(gasResult.priorityFeeWei);
+  }
 
-  return getGasPriceWei();
+  throw new Error(`Invalid gas price result, found: ${gasResult}`);
 }
 
 export function isGasSpikeProtectionEnabled(): boolean {
@@ -103,18 +129,21 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: new BigNumber(response.data.fast).times(ONE_GWEI_IN_WEI_UNITS),
+      gasLimit: STANDARD_BLOCK_GAS_LIMIT,
     };
   } else if (networkId === ChainId.XLayer) {
     const response = await axios.get('https://rpc.xlayer.tech/gasstation');
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: new BigNumber(response.data.fast).times(ONE_GWEI_IN_WEI_UNITS),
+      gasLimit: STANDARD_BLOCK_GAS_LIMIT,
     };
   } else if (isArbitrum(networkId)) {
     const result = await dolomite.arbitrumGasInfo!.getPricesInWei();
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: result.perArbGasTotal,
+      gasLimit: STANDARD_BLOCK_GAS_LIMIT,
     };
   } else if (isBase(networkId)) {
     return getStandardOrEip1559GasPrice();
@@ -127,13 +156,12 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
   } else if (isInk(networkId)) {
     return getStandardOrEip1559GasPrice();
   } else if (isEthereum(networkId)) {
-    const response = await dolomite.web3.eth.getGasPrice();
-    const gasPrice = new BigNumber(response).div(ONE_GWEI_IN_WEI_UNITS).toFixed();
-    return { fast: gasPrice };
+    return getStandardOrEip1559GasPrice();
   } else if (isMantle(networkId)) {
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: new BigNumber(await dolomite.mantleGasInfo!.getPriceInWei()),
+      gasLimit: new BigNumber('180000000000'),
     };
   } else {
     const errorMessage = `Could not find network ID ${networkId}`;
@@ -157,6 +185,7 @@ async function getStandardOrEip1559GasPrice(): Promise<GasPriceResult> {
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: new BigNumber(feeData.gasPrice.toString()),
+      gasLimit: STANDARD_BLOCK_GAS_LIMIT,
     };
   }
 
@@ -164,5 +193,6 @@ async function getStandardOrEip1559GasPrice(): Promise<GasPriceResult> {
     type: GasPriceType.EIP_1559,
     baseFeeWei: new BigNumber(feeData.lastBaseFeePerGas.toString()),
     priorityFeeWei: new BigNumber(feeData.maxPriorityFeePerGas.toString()),
+    gasLimit: STANDARD_BLOCK_GAS_LIMIT,
   };
 }

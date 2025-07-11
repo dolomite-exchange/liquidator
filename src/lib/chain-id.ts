@@ -4,7 +4,7 @@ export enum ChainId {
   Berachain = 80094,
   Botanix = 3637,
   Ethereum = 1,
-  Ink = 1,
+  Ink = 57073,
   Mantle = 5000,
   PolygonZkEvm = 1101,
   XLayer = 196,

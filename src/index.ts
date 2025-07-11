@@ -10,7 +10,7 @@ import { dolomite, initializeDolomiteLiquidations, liquidatorProxyV6, loadAccoun
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
-  checkBigNumber,
+  checkBigNumber, checkBigNumberAndGreaterThan,
   checkBigNumberAndGreaterThanOrEqual,
   checkBooleanValue,
   checkConditionally,
@@ -29,10 +29,10 @@ import AsyncActionRetryStore from './stores/async-action-retry-store';
 import AsyncActionStore from './stores/async-action-store';
 import BalanceStore from './stores/balance-store';
 import BlockStore from './stores/block-store';
+import GlvLiquidityStore from './stores/glv-liquidity-store';
 import LiquidationStore from './stores/liquidation-store';
 import MarketStore from './stores/market-store';
 import RiskParamsStore from './stores/risk-params-store';
-import GlvLiquidityStore from './stores/glv-liquidity-store';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -50,8 +50,8 @@ checkBigNumber('DOLOMITE_ACCOUNT_NUMBER');
 checkExists('ETHEREUM_NODE_URL');
 checkBooleanValue('EXPIRATIONS_ENABLED');
 checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
-checkBigNumber('GAS_PRICE_ADDITION');
-checkBigNumber('GAS_PRICE_MULTIPLIER');
+checkBigNumber('GAS_PRICE_ADDITION_WEI');
+checkBigNumberAndGreaterThan('GAS_PRICE_MULTIPLIER', '0');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
 checkBooleanValue('GAS_SPIKE_PROTECTION');
 checkBigNumber('GAS_SPIKE_THRESHOLD_USD');
@@ -79,6 +79,28 @@ if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
     process.exit(0);
   }, Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS) * 1000);
 }
+
+const originalWarn = console.warn;
+console.warn = (msg?: any, ...args: any[]) => {
+  if (
+    typeof msg === 'string'
+    && msg.includes('version=providers/5.7.2')
+  ) {
+    return; // skip
+  }
+  originalWarn(msg, ...args); // allow others
+};
+
+const originalError = console.error;
+console.error = (msg?: any, ...args: any[]) => {
+  if (
+    typeof msg === 'string'
+    && msg.includes('version=providers/5.7.2')
+  ) {
+    return; // skip
+  }
+  originalError(msg, ...args); // allow others
+};
 
 async function start() {
   const networkId = await dolomite.web3.eth.net.getId();
@@ -139,7 +161,7 @@ async function start() {
     expiredAccountDelaySeconds: process.env.EXPIRED_ACCOUNT_DELAY_SECONDS,
     expiry: dolomite.contracts.expiry.options.address,
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
-    gasPriceAddition: process.env.GAS_PRICE_ADDITION,
+    gasPriceAddition: process.env.GAS_PRICE_ADDITION_WEI,
     gasSpikeProtection: process.env.GAS_SPIKE_PROTECTION,
     glvLiquidityPollEnabled: process.env.GLV_LIQUIDITY_POLL_ENABLED,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
@@ -182,7 +204,7 @@ async function start() {
       owedPreferences: process.env.OWED_PREFERENCES,
     });
   } else if (liquidationMode === LiquidationMode.Generic) {
-    const liquidatorProxyV6Address = liquidatorProxyV6.options.address;
+    const liquidatorProxyV6Address = liquidatorProxyV6.address;
     const isGlobalOperator = await dolomite.getters.getIsGlobalOperator(liquidatorProxyV6Address);
     Logger.info({
       liquidationMode,

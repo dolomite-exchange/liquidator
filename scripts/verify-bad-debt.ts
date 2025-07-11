@@ -9,7 +9,7 @@ import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Consta
 import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import v8 from 'v8';
 import { getDolomiteRiskParams } from '../src/clients/dolomite';
-import { getGasPriceWei, updateGasPrice } from '../src/helpers/gas-price-helpers';
+import { getGasPriceWeiWithModifications, updateGasPrice } from '../src/helpers/gas-price-helpers';
 import { dolomite, loadAccounts } from '../src/helpers/web3';
 import { getAccountRiskOverride } from '../src/lib/account-risk-override-getter';
 import { ApiAccount, ApiBalance } from '../src/lib/api-types';
@@ -43,7 +43,9 @@ const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | un
   [ChainId.Berachain]: {
     // 1: new BigNumber('6'), // BERA
   },
+  [ChainId.Botanix]: {},
   [ChainId.Ethereum]: {},
+  [ChainId.Ink]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},
@@ -182,7 +184,7 @@ async function start() {
               },
             })
             .commit({
-              gasPrice: getGasPriceWei().toFixed(),
+              gasPrice: getGasPriceWeiWithModifications().toFixed(),
               confirmationType: ConfirmationType.Hash,
             });
 

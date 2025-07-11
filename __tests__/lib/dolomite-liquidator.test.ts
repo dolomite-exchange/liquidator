@@ -265,6 +265,8 @@ function getTestMarkets(): ApiMarket[] {
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
       isBorrowingDisabled: false,
+      supplyLiquidity: undefined,
+      maxSupplyLiquidity: undefined,
     },
     {
       id: '1',
@@ -277,6 +279,8 @@ function getTestMarkets(): ApiMarket[] {
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
       isBorrowingDisabled: false,
+      supplyLiquidity: undefined,
+      maxSupplyLiquidity: undefined,
     },
     {
       id: '2',
@@ -289,6 +293,8 @@ function getTestMarkets(): ApiMarket[] {
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
       isBorrowingDisabled: false,
+      supplyLiquidity: undefined,
+      maxSupplyLiquidity: undefined,
     },
     {
       id: '3',
@@ -301,6 +307,8 @@ function getTestMarkets(): ApiMarket[] {
       liquidationRewardPremium: new BigNumber('0'),
       decimals: 18,
       isBorrowingDisabled: false,
+      supplyLiquidity: undefined,
+      maxSupplyLiquidity: undefined,
     },
   ];
 }
