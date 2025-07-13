@@ -25,9 +25,9 @@ import {
 } from './async-liquidations-helper';
 import { getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei, getGasPriceWeiWithModifications, isGasSpikeProtectionEnabled } from './gas-price-helpers';
-import { liquidateV6, liquidateV6EstimateGas } from './liquidator-proxy-v6-helper';
-import { expireSimple, expireSimpleEstimateGas } from './simple-expiration-proxy-helper';
-import { liquidateSimple, liquidateSimpleEstimateGas } from './simple-liquidator-proxy-helper';
+import { liquidateV6, estimateGasLiquidateV6 } from './liquidator-proxy-v6-helper';
+import { expireSimple, estimateGasExpireSimple } from './simple-expiration-proxy-helper';
+import { liquidateSimple, estimateGasLiquidateSimple } from './simple-liquidator-proxy-helper';
 import { dolomite } from './web3';
 
 const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? '')?.split(',')
@@ -273,7 +273,7 @@ async function _liquidateAccountSimple(
     return Promise.reject(new Error('_liquidateAccountSimple# Cannot perform simple liquidations on async account'));
   }
 
-  const gasLimit = await liquidateSimpleEstimateGas(liquidAccount, owedMarkets, collateralMarkets);
+  const gasLimit = await estimateGasLiquidateSimple(liquidAccount, owedMarkets, collateralMarkets);
   if (isGasSpikeProtectionEnabled()) {
     const debtAmountUsd: Integer = owedMarkets.reduce((acc, m) => {
       const amountWei = liquidAccount.balances[m.toFixed()].wei;
@@ -477,7 +477,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     let gasLimit: Integer | undefined;
     for (let i = 0; i < outputs.length; i += 1) {
       try {
-        gasLimit = await liquidateV6EstimateGas(
+        gasLimit = await estimateGasLiquidateV6(
           liquidAccount,
           inputAmount,
           outputs[i],
@@ -578,7 +578,7 @@ async function _liquidateExpiredAccountInternalSimple(
     throw new Error(`Could not find a held balance: ${JSON.stringify(preferredBalances, null, 2)}`);
   }
 
-  const gasLimit = await expireSimpleEstimateGas(
+  const gasLimit = await estimateGasExpireSimple(
     expiredAccount,
     owedBalance,
     heldBalance,

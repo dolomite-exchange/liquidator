@@ -4,6 +4,7 @@ import type { ContractTransaction } from 'ethers';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { ApiAccount, ApiMarket } from '../lib/api-types';
 import { GAS_ESTIMATION_MULTIPLIER } from '../lib/constants';
+import { estimateGasOrFallbackIfDisabled } from './gas-estimate-helpers';
 import { getTypedGasPriceWeiWithModifications } from './gas-price-helpers';
 import { liquidatorProxyV6 } from './web3';
 
@@ -54,7 +55,7 @@ export async function liquidateV6(
   )
 }
 
-export async function liquidateV6EstimateGas(
+export async function estimateGasLiquidateV6(
   liquidAccount: ApiAccount,
   inputTokenAmount: Integer,
   zapOutput: ZapOutputParam,
@@ -62,23 +63,25 @@ export async function liquidateV6EstimateGas(
   expirationTimestamp: number | null,
   marketMap: { [marketId: string]: ApiMarket },
 ): Promise<Integer> {
-  const withdrawAllReward = getWithdrawAllReward(liquidAccount, zapOutput, marketMap);
-  const gasLimit = await liquidatorProxyV6.estimateGas.liquidate(
-    {
-      solidAccount: { owner: SOLID_ACCOUNT.owner, number: SOLID_ACCOUNT.number.toFixed() },
-      liquidAccount: { owner: liquidAccount.owner, number: liquidAccount.number.toFixed() },
-      marketIdsPath: zapOutput.marketIdsPath.map((p) => p.toFixed()),
-      inputAmountWei: inputTokenAmount.toFixed(),
-      minOutputAmountWei: minOutputAmount.toFixed(),
-      tradersPath: zapOutput.traderParams,
-      makerAccounts: zapOutput.makerAccounts,
-      expirationTimestamp: expirationTimestamp ? expirationTimestamp.toString() : '0',
-      withdrawAllReward,
-    },
-    {
-      ...getTypedGasPriceWeiWithModifications(),
-    },
-  );
+  return estimateGasOrFallbackIfDisabled(async () => {
+    const withdrawAllReward = getWithdrawAllReward(liquidAccount, zapOutput, marketMap);
+    const gasLimit = await liquidatorProxyV6.estimateGas.liquidate(
+      {
+        solidAccount: { owner: SOLID_ACCOUNT.owner, number: SOLID_ACCOUNT.number.toFixed() },
+        liquidAccount: { owner: liquidAccount.owner, number: liquidAccount.number.toFixed() },
+        marketIdsPath: zapOutput.marketIdsPath.map((p) => p.toFixed()),
+        inputAmountWei: inputTokenAmount.toFixed(),
+        minOutputAmountWei: minOutputAmount.toFixed(),
+        tradersPath: zapOutput.traderParams,
+        makerAccounts: zapOutput.makerAccounts,
+        expirationTimestamp: expirationTimestamp ? expirationTimestamp.toString() : '0',
+        withdrawAllReward,
+      },
+      {
+        ...getTypedGasPriceWeiWithModifications(),
+      },
+    );
 
-  return new BigNumber(gasLimit.toString());
+    return new BigNumber(gasLimit.toString());
+  });
 }

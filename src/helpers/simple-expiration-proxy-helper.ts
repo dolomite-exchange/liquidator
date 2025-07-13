@@ -4,6 +4,7 @@ import { ContractTransaction } from 'ethers';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { ApiAccount, ApiBalance } from '../lib/api-types';
 import { GAS_ESTIMATION_MULTIPLIER } from '../lib/constants';
+import { estimateGasOrFallbackIfDisabled } from './gas-estimate-helpers';
 import { getTypedGasPriceWeiWithModifications } from './gas-price-helpers';
 import { expiryProxy } from './web3';
 
@@ -38,7 +39,7 @@ export async function expireSimple(
   );
 }
 
-export async function expireSimpleEstimateGas(
+export async function estimateGasExpireSimple(
   expiredAccount: ApiAccount,
   owedBalance: ApiBalance,
   heldBalance: ApiBalance,
@@ -51,15 +52,18 @@ export async function expireSimpleEstimateGas(
     return Promise.reject(new Error(`Invalid collateral, found isolation mode asset: ${assetsString}`));
   }
 
-  const gasLimit = await expiryProxy.estimateGas.expire(
-    SOLID_ACCOUNT.owner,
-    SOLID_ACCOUNT.number,
-    expiredAccount.owner,
-    expiredAccount.number,
-    owedBalance.marketId,
-    heldBalance.marketId,
-    expiresAt.toFixed(0),
+  return estimateGasOrFallbackIfDisabled(
+    async () => {
+      const gasLimit = await expiryProxy.estimateGas.expire(
+        SOLID_ACCOUNT.owner,
+        SOLID_ACCOUNT.number,
+        expiredAccount.owner,
+        expiredAccount.number,
+        owedBalance.marketId,
+        heldBalance.marketId,
+        expiresAt.toFixed(0),
+      );
+      return new BigNumber(gasLimit.toString())
+    },
   );
-
-  return new BigNumber(gasLimit.toString());
 }

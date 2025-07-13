@@ -50,6 +50,7 @@ checkBigNumber('DOLOMITE_ACCOUNT_NUMBER');
 checkExists('ETHEREUM_NODE_URL');
 checkBooleanValue('EXPIRATIONS_ENABLED');
 checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
+checkBooleanValue('GAS_ESTIMATION_ENABLED');
 checkBigNumber('GAS_PRICE_ADDITION_WEI');
 checkBigNumberAndGreaterThan('GAS_PRICE_MULTIPLIER', '0');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
@@ -160,6 +161,7 @@ async function start() {
     expirationsEnabled: process.env.EXPIRATIONS_ENABLED,
     expiredAccountDelaySeconds: process.env.EXPIRED_ACCOUNT_DELAY_SECONDS,
     expiry: dolomite.contracts.expiry.options.address,
+    gasEstimationEnabled: process.env.GAS_ESTIMATION_ENABLED,
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPriceAddition: process.env.GAS_PRICE_ADDITION_WEI,
     gasSpikeProtection: process.env.GAS_SPIKE_PROTECTION,

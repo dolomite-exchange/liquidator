@@ -4,6 +4,7 @@ import { ContractTransaction } from 'ethers';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { ApiAccount } from '../lib/api-types';
 import { GAS_ESTIMATION_MULTIPLIER } from '../lib/constants';
+import { estimateGasOrFallbackIfDisabled } from './gas-estimate-helpers';
 import { getTypedGasPriceWeiWithModifications } from './gas-price-helpers';
 import { liquidatorProxyV1 } from './web3';
 
@@ -41,7 +42,7 @@ export async function liquidateSimple(
   );
 }
 
-export async function liquidateSimpleEstimateGas(
+export async function estimateGasLiquidateSimple(
   liquidAccount: ApiAccount,
   owedMarkets: Integer[],
   collateralMarkets: Integer[],
@@ -56,19 +57,22 @@ export async function liquidateSimpleEstimateGas(
     return Promise.reject(new Error(`Invalid collateral, found isolation mode asset: ${assetsString}`));
   }
 
-  const gasLimit = await liquidatorProxyV1.estimateGas.liquidate(
-    SOLID_ACCOUNT.owner,
-    SOLID_ACCOUNT.number,
-    liquidAccount.owner,
-    liquidAccount.number,
-    new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
-    new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string),
-    owedMarketsConverted,
-    collateralMarketsConverted,
-    {
-      ...getTypedGasPriceWeiWithModifications(),
+  return estimateGasOrFallbackIfDisabled(
+    async () => {
+      const gasLimit = await liquidatorProxyV1.estimateGas.liquidate(
+        SOLID_ACCOUNT.owner,
+        SOLID_ACCOUNT.number,
+        liquidAccount.owner,
+        liquidAccount.number,
+        new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
+        new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string),
+        owedMarketsConverted,
+        collateralMarketsConverted,
+        {
+          ...getTypedGasPriceWeiWithModifications(),
+        },
+      );
+      return new BigNumber(gasLimit.toString());
     },
   );
-
-  return new BigNumber(gasLimit.toString());
 }
