@@ -374,7 +374,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       heldMarketId: heldMarket.marketId,
       owedBalance: owedBalance.wei.abs().toFixed(),
       heldBalance: heldBalance.wei.abs().toFixed(),
-      owedValueUsd: `$${owedValueUsd.toFormat(2)}`,
+      owedValueUsd: `$${owedValueUsd.div(ONE_DOLLAR).toFormat(2)}`,
     });
 
     // TODO: turn this back on when the risk override setter can cope with solid account having no debt
