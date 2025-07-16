@@ -3,8 +3,7 @@ import { ZapOutputParam } from '@dolomite-exchange/zap-sdk';
 import type { ContractTransaction } from 'ethers';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { ApiAccount, ApiMarket } from '../lib/api-types';
-import { GAS_ESTIMATION_MULTIPLIER } from '../lib/constants';
-import { estimateGasOrFallbackIfDisabled } from './gas-estimate-helpers';
+import { estimateGasOrFallbackIfDisabled, getGasLimitForExecution } from './gas-estimate-helpers';
 import { getTypedGasPriceWeiWithModifications } from './gas-price-helpers';
 import { liquidatorProxyV6 } from './web3';
 
@@ -50,7 +49,7 @@ export async function liquidateV6(
     },
     {
       ...getTypedGasPriceWeiWithModifications(),
-      gasLimit: gasLimit.times(GAS_ESTIMATION_MULTIPLIER).toFixed(0),
+      gasLimit: getGasLimitForExecution(gasLimit).toFixed(0),
     },
   )
 }
@@ -76,9 +75,6 @@ export async function estimateGasLiquidateV6(
         makerAccounts: zapOutput.makerAccounts,
         expirationTimestamp: expirationTimestamp ? expirationTimestamp.toString() : '0',
         withdrawAllReward,
-      },
-      {
-        ...getTypedGasPriceWeiWithModifications(),
       },
     );
 

@@ -1,6 +1,13 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ISOLATION_MODE_CONVERSION_MARKET_ID_MAP } from '@dolomite-exchange/zap-sdk';
 import { GraphqlToken } from './graphql-types';
+import './env';
+
+export const MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL!);
+
+export const MIN_VALUE_LIQUIDATED_FOR_SIMPLE = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
+
+export const GAS_SPIKE_THRESHOLD_USD = new BigNumber(process.env.GAS_SPIKE_THRESHOLD_USD as string);
 
 export const NETWORK_ID = Number(process.env.NETWORK_ID);
 

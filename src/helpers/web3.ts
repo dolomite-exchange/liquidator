@@ -24,21 +24,25 @@ export const dolomite = new DolomiteMargin(
 );
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL!);
+const signerOrProvider = process.env.ACCOUNT_WALLET_PRIVATE_KEY
+  ? new ethers.Wallet(process.env.ACCOUNT_WALLET_PRIVATE_KEY!, provider)
+  : provider;
+
 export const expiryProxy = new ethers.Contract(
   dolomite.contracts.expiryProxy.options.address,
   ExpiryProxyV1Abi,
-  new ethers.Wallet(process.env.ACCOUNT_WALLET_PRIVATE_KEY!, provider),
+  signerOrProvider,
 );
 export const liquidatorProxyV1 = new ethers.Contract(
   dolomite.contracts.liquidatorProxyV1.options.address,
   LiquidatorProxyV1Abi,
-  new ethers.Wallet(process.env.ACCOUNT_WALLET_PRIVATE_KEY!, provider),
+  signerOrProvider,
 );
 
 export const liquidatorProxyV6 = new ethers.Contract(
   ModuleDeployments.LiquidatorProxyV6[networkId].address,
   LiquidatorProxyV6Abi,
-  new ethers.Wallet(process.env.ACCOUNT_WALLET_PRIVATE_KEY!, provider),
+  signerOrProvider,
 ) as LiquidatorProxyV6;
 
 export async function loadAccounts() {

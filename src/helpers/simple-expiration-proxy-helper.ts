@@ -3,8 +3,7 @@ import { ISOLATION_MODE_CONVERSION_MARKET_ID_MAP } from '@dolomite-exchange/zap-
 import { ContractTransaction } from 'ethers';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { ApiAccount, ApiBalance } from '../lib/api-types';
-import { GAS_ESTIMATION_MULTIPLIER } from '../lib/constants';
-import { estimateGasOrFallbackIfDisabled } from './gas-estimate-helpers';
+import { estimateGasOrFallbackIfDisabled, getGasLimitForExecution } from './gas-estimate-helpers';
 import { getTypedGasPriceWeiWithModifications } from './gas-price-helpers';
 import { expiryProxy } from './web3';
 
@@ -34,7 +33,7 @@ export async function expireSimple(
     expiresAt.toFixed(0),
     {
       ...getTypedGasPriceWeiWithModifications(),
-      gasLimit: gasLimit.times(GAS_ESTIMATION_MULTIPLIER).toFixed(0),
+      gasLimit: getGasLimitForExecution(gasLimit).toFixed(0),
     },
   );
 }

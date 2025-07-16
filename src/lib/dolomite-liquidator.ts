@@ -16,14 +16,13 @@ import BlockStore from '../stores/block-store';
 import LiquidationStore from '../stores/liquidation-store';
 import MarketStore from '../stores/market-store';
 import RiskParamsStore from '../stores/risk-params-store';
-import { ApiAccount, ApiMarket } from './api-types';
+import { ApiAccount, ApiBalance, ApiMarket } from './api-types';
+import { MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL, MIN_VALUE_LIQUIDATED_FOR_SIMPLE } from './constants';
 import { delay } from './delay';
+import { getLiquidationMode, LiquidationMode } from './liquidation-mode';
 import Logger from './logger';
-import { isCollateralized } from './utils';
 
 export default class DolomiteLiquidator {
-  private MIN_VALUE_LIQUIDATED = new BigNumber(process.env.MIN_VALUE_LIQUIDATED!);
-
   constructor(
     private readonly accountStore: AccountStore,
     private readonly asyncActionStore: AsyncActionStore,
@@ -77,18 +76,19 @@ export default class DolomiteLiquidator {
     const marketMap = this.marketStore.getMarketMap();
 
     let expirableAccounts = this.accountStore.getExpirableDolomiteAccounts()
-      .filter(account => !this.liquidationStore.contains(account))
       .filter(account => {
-        return Object.values(account.balances)
-          .some((balance => {
-            if (balance.wei.lt(INTEGERS.ZERO) && balance.expiresAt) {
-              return isExpired(balance.expiresAt, lastBlockTimestamp)
-            } else {
-              return false;
-            }
-          }));
+        function isApiBalanceExpired(balance: ApiBalance) {
+          if (balance.wei.lt(INTEGERS.ZERO) && balance.expiresAt && lastBlockTimestamp) {
+            return isExpired(balance.expiresAt, lastBlockTimestamp)
+          } else {
+            return false;
+          }
+        }
+
+        return !this.liquidationStore.contains(account)
+          && this.isSufficientDebt(account, marketMap)
+          && Object.values(account.balances).some(isApiBalanceExpired)
       })
-      .filter(account => this.isSufficientDebt(account, marketMap))
 
     const riskParams = this.riskParamsStore.getDolomiteRiskParams();
     if (!riskParams) {
@@ -100,10 +100,12 @@ export default class DolomiteLiquidator {
     }
 
     const liquidatableAccounts = this.accountStore.getLiquidatableDolomiteAccounts()
-      .filter(account => !this.liquidationStore.contains(account))
-      .filter(account => !isCollateralized(account, marketMap, riskParams))
-      .filter(account => this.isSufficientDebt(account, marketMap))
-      .filter(account => !this.isVaporizable(account, marketMap))
+      .filter(account => {
+        return !this.liquidationStore.contains(account)
+          // && !isCollateralized(account, marketMap, riskParams) // TODO: uncomment
+          && this.isSufficientDebt(account, marketMap)
+          && !this.isVaporizable(account, marketMap)
+      })
       .sort((a, b) => this.borrowAmountSorterDesc(a, b, marketMap));
 
     // Do not put an account in both liquidatable and expired; prioritize liquidation
@@ -246,7 +248,17 @@ export default class DolomiteLiquidator {
         return memo;
       }, INTEGERS.ZERO);
 
-    return borrow.gte(this.MIN_VALUE_LIQUIDATED);
+    const mode = getLiquidationMode();
+    let minValueLiquidated: BigNumber;
+    if (mode === LiquidationMode.Generic) {
+      minValueLiquidated = MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL;
+    } else if (mode === LiquidationMode.Simple) {
+      minValueLiquidated = MIN_VALUE_LIQUIDATED_FOR_SIMPLE;
+    } else {
+      throw new Error(`Invalid liquidation mode, found: ${mode}`);
+    }
+
+    return borrow.gte(minValueLiquidated);
   }
 
   isVaporizable = (

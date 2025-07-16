@@ -15,6 +15,7 @@ import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { getAccountRiskOverride } from '../lib/account-risk-override-getter';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { ChainId } from '../lib/chain-id';
+import { GAS_SPIKE_THRESHOLD_USD, NETWORK_ID } from '../lib/constants';
 import { getLiquidationMode, LiquidationMode } from '../lib/liquidation-mode';
 import Logger from '../lib/logger';
 import { DECIMAL_BASE, getAmountsForLiquidation, getLiquidationReward, getOwedPriceForLiquidation } from '../lib/utils';
@@ -25,9 +26,9 @@ import {
 } from './async-liquidations-helper';
 import { getLargestBalanceUSD } from './balance-helpers';
 import { getGasPriceWei, getGasPriceWeiWithModifications, isGasSpikeProtectionEnabled } from './gas-price-helpers';
-import { liquidateV6, estimateGasLiquidateV6 } from './liquidator-proxy-v6-helper';
-import { expireSimple, estimateGasExpireSimple } from './simple-expiration-proxy-helper';
-import { liquidateSimple, estimateGasLiquidateSimple } from './simple-liquidator-proxy-helper';
+import { estimateGasLiquidateV6, liquidateV6 } from './liquidator-proxy-v6-helper';
+import { estimateGasExpireSimple, expireSimple } from './simple-expiration-proxy-helper';
+import { estimateGasLiquidateSimple, liquidateSimple } from './simple-liquidator-proxy-helper';
 import { dolomite } from './web3';
 
 const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? '')?.split(',')
@@ -35,11 +36,6 @@ const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? 
 const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split(',')
   .map((pref) => new BigNumber(pref.trim()));
 
-const minValueLiquidatedForGenericSell = new BigNumber(process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL as string);
-
-const gasSpikeThresholdUsd = new BigNumber(process.env.GAS_SPIKE_THRESHOLD_USD as string);
-
-const NETWORK_ID = Number(process.env.NETWORK_ID);
 let oogaBoogaReferralInfo: ReferralOutput | undefined;
 if (NETWORK_ID === ChainId.Berachain) {
   oogaBoogaReferralInfo = {
@@ -161,22 +157,6 @@ export async function liquidateAccount(
     accountOwner: liquidAccount.owner,
     accountNumber: liquidAccount.number,
   });
-
-  const liquidatable = await dolomite.getters.isAccountLiquidatable(
-    liquidAccount.owner,
-    new BigNumber(liquidAccount.number),
-  );
-
-  if (!liquidatable) {
-    Logger.info({
-      at: 'dolomite-helpers#liquidateAccount',
-      message: 'Account is not liquidatable',
-      accountOwner: liquidAccount.owner,
-      accountNumber: liquidAccount.number,
-    });
-
-    return undefined
-  }
 
   const borrowMarkets: string[] = [];
   const supplyMarkets: string[] = [];
@@ -365,36 +345,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     );
   /* eslint-enable @typescript-eslint/indent */
 
-  const owedValueUsd = owedBalance.wei.abs().times(owedMarket.oraclePrice);
-  if (owedValueUsd.isLessThan(minValueLiquidatedForGenericSell)) {
-    Logger.info({
-      message: 'Skipping generic sell because owed value is too small',
-      liquidAccount: liquidAccount.id,
-      owedMarketId: owedMarket.marketId,
-      heldMarketId: heldMarket.marketId,
-      owedBalance: owedBalance.wei.abs().toFixed(),
-      heldBalance: heldBalance.wei.abs().toFixed(),
-      owedValueUsd: `$${owedValueUsd.div(ONE_DOLLAR).toFormat(6)}`,
-    });
-
-    // TODO: turn this back on when the risk override setter can cope with solid account having no debt
-    // const owedMarkets = Object.values(liquidAccount.balances)
-    //   .filter(b => b.par.lt(INTEGERS.ZERO))
-    //   .map(b => new BigNumber(b.marketId));
-    // const heldMarkets = Object.values(liquidAccount.balances)
-    //   .filter(b => b.par.gt(INTEGERS.ZERO))
-    //   .filter(b => !isIsolationModeMarket(b.marketId))
-    //   .map(b => new BigNumber(b.marketId));
-    // TODO: check held markets length > 0
-    // return _liquidateAccountSimple(
-    //   liquidAccount,
-    //   marginAccountToActionsMap,
-    //   marketMap,
-    //   owedMarkets,
-    //   heldMarkets,
-    // );
-    return undefined;
-  } else if (
+  if (
     Object.keys(marketIdToActionsMap).length === 0
     && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
   ) {
@@ -457,7 +408,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       Logger.info({
         message: 'Performing async liquidation...',
         actions: Object.values(marketIdToActionsMap),
-      })
+      });
       outputs = await zap.getSwapExactAsyncTokensForTokensParamsForLiquidation(
         heldToken,
         new ZapBigNumber(heldWei),
@@ -468,6 +419,17 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
         marketToOracleMap,
         { isLiquidation: true, isVaporizable },
       );
+    }
+
+    if (outputs.length === 0) {
+      // TODO: change how zap SDK is called to use no min amount out (so zaps are always produced); measure output and
+      //  then cut down size of liquidation to use the available liquidity from the output of the trade (but add a
+      //  buffer since we're using all available DEX liquidity)
+      // TODO: setup notification service?
+      Logger.info({
+        message: 'Could not create zaps for liquidation...',
+      });
+      return undefined;
     }
 
     const inputAmount = !isHeldBalanceLargerThanProtocol ? INTEGERS.MAX_UINT : heldWei;
@@ -492,7 +454,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
         }
       }
     }
-    if (!gasLimit || firstError) {
+    if (gasLimit === undefined || firstError !== undefined) {
       return Promise.reject(firstError);
     }
 
@@ -748,7 +710,7 @@ function _isGasSpikeFound(
     .find(m => m.tokenAddress.toLowerCase() === dolomite.payableToken.address.toLowerCase())!.oraclePrice;
   const rewardAmountUsd = debtAmountUsd.times(liquidationReward);
   const gasPriceUsd = gasPrice.times(gasEstimate).times(payablePriceUsd);
-  if (gasPriceUsd.gt(rewardAmountUsd) && gasPriceUsd.gt(gasSpikeThresholdUsd)) {
+  if (gasPriceUsd.gt(rewardAmountUsd) && gasPriceUsd.gt(GAS_SPIKE_THRESHOLD_USD)) {
     Logger.info({
       at: 'dolomite-helpers#_isGasSpikeFound',
       message: 'Skipping liquidation due to gas spike',

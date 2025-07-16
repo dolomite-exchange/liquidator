@@ -86,18 +86,20 @@ export function getTypedGasPriceWeiWithModifications(): GasPriceForEthers {
   }
 
   if (gasResult.type === GasPriceType.EIP_1559) {
+    const baseFee = gasResult.baseFeeWei.multipliedBy(MULTIPLIER).plus(ADDITION_WEI).toFixed(0);
+    const priorityFee = gasResult.priorityFeeWei.plus(ADDITION_WEI).toFixed(0);
     return {
       type: 2,
-      maxFeePerGas: gasResult.baseFeeWei.multipliedBy(MULTIPLIER).plus(ADDITION_WEI).toFixed(0),
-      maxPriorityFeePerGas: gasResult.priorityFeeWei.plus(ADDITION_WEI).toFixed(0),
+      maxFeePerGas: ethers.BigNumber.from(baseFee).add(priorityFee),
+      maxPriorityFeePerGas: priorityFee,
     };
   }
 
   throw new Error(`Invalid gas price result, found: ${gasResult}`);
 }
 
-export function getDefaultGasLimit(): number {
-  return gasResult.gasLimit.toNumber()
+export function getDefaultGasLimit(): Integer {
+  return gasResult.gasLimit;
 }
 
 /**
