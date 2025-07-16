@@ -21,6 +21,7 @@ import { MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL, MIN_VALUE_LIQUIDATED_FOR_SIMPLE 
 import { delay } from './delay';
 import { getLiquidationMode, LiquidationMode } from './liquidation-mode';
 import Logger from './logger';
+import { isCollateralized } from './utils';
 
 export default class DolomiteLiquidator {
   constructor(
@@ -102,7 +103,7 @@ export default class DolomiteLiquidator {
     const liquidatableAccounts = this.accountStore.getLiquidatableDolomiteAccounts()
       .filter(account => {
         return !this.liquidationStore.contains(account)
-          // && !isCollateralized(account, marketMap, riskParams) // TODO: uncomment
+          && !isCollateralized(account, marketMap, riskParams)
           && this.isSufficientDebt(account, marketMap)
           && !this.isVaporizable(account, marketMap)
       })
