@@ -1,8 +1,8 @@
-import '../lib/env';
-import MultiCallWithExceptionHandlerAbi from '../abis/multi-call-with-exception-handler.json';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
-import { dolomite } from '../helpers/web3';
 import { ContractConstantCallOptions } from '@dolomite-exchange/dolomite-margin/dist/src/types';
+import MultiCallWithExceptionHandlerAbi from '../abis/multi-call-with-exception-handler.json';
+import { dolomite } from '../helpers/web3';
+import './env';
 
 export type CallStruct = { target: string; callData: string };
 
