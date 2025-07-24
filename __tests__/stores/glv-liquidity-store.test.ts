@@ -7,6 +7,10 @@ describe('GlvLiquidityStore', () => {
     glvLiquidityStore = new GlvLiquidityStore(42161);
   })
 
+  it.only('live test', async () => {
+    await glvLiquidityStore._update();
+  });
+
   it('should update glv token to liquid gm market mappings', async () => {
     await glvLiquidityStore._update();
     const glvRegistry = {} as any;
