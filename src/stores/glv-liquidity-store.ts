@@ -1,7 +1,7 @@
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import * as axios from 'axios';
 
-import { ethers } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import GlvRegistryAbi from '../abis/glv-registry.json';
 import GmxReaderAbi from '../abis/gmx-reader.json';
 import GmxDataStoreAbi from '../abis/gmx-datastore.json';
@@ -13,7 +13,6 @@ import {
 import { dolomite } from '../helpers/web3';
 import { delay } from '../lib/delay';
 import Logger from '../lib/logger';
-import { ADDRESS_ZERO } from '@dolomite-exchange/zap-sdk/dist/src/lib/Constants';
 import { defaultAbiCoder, keccak256 } from 'ethers/lib/utils';
 
 const GMX_READER_ADDRESS = '0x0537C767cDAC0726c76Bb89e92904fe28fd02fE1';
@@ -25,9 +24,9 @@ const GLV_MAX_MARKET_TOKEN_BALANCE_USD_KEY = '0x210e65e389535740c6f5f16309d04a8f
 
 const FIVE_HUNDRED_THOUSAND_USD = ethers.BigNumber.from('500000000000000000000000000000000000'); // gmx uses 30 decimals
 
-interface GlvToken {
-  withdrawalMarket: string;
-  depositMarket: string;
+interface GlvTokenUpdate {
+  withdrawalMarket: string | undefined;
+  depositMarket: string | undefined;
 }
 
 export interface SignedPriceData {
@@ -93,7 +92,7 @@ export default class GlvLiquidityStore {
       message: 'Updating glv liquidity...',
     });
 
-    const glvTokenToLiquidGmMarket: Record<string, GlvToken> = {};
+    const glvTokenToLiquidGmMarket: Record<string, GlvTokenUpdate> = {};
     const glvLiquidity = await GlvLiquidityStore.getGlvTokenLiquidity();
     const gmxTokenPrices = await GlvLiquidityStore.getTokenPrices();
 
@@ -116,15 +115,15 @@ export default class GlvLiquidityStore {
 
     // Loop through each GLV token
     for (const glv of glvLiquidity.glvs) {
-      glvTokenToLiquidGmMarket[glv.glvToken.toLowerCase()] = { withdrawalMarket: '', depositMarket: '' };
+      glvTokenToLiquidGmMarket[glv.glvToken.toLowerCase()] = { withdrawalMarket: undefined, depositMarket: undefined };
       const glvToken = glv.glvToken.toLowerCase();
 
       // Set initial highest balance market and balance
-      let withdrawalMarket = { address: ADDRESS_ZERO };
+      let withdrawalMarket: string | undefined;
       let withdrawalMarketHighestUsd = ethers.BigNumber.from('0');
 
-      let depositMarket = { address: ADDRESS_ZERO };
-      let depositMarketHighestAvailable = ethers.BigNumber.from('0');
+      let depositMarket: string | undefined;
+      let depositMarketHighestCap = ethers.BigNumber.from('0');
 
       for (let i = 0; i < glv.markets.length; i++) {
         const market = glv.markets[i];
@@ -134,59 +133,50 @@ export default class GlvLiquidityStore {
           gmxReader.methods.getMarket(GMX_DATA_STORE_ADDRESS, market.address)
         );
 
-        // Check if market is a better withdrawal market
-        if (balanceUsd.gt(withdrawalMarketHighestUsd)) {
-          if ((await this._shortTokenAboveMax(market, marketInfo.shortToken, gmxDataStore))
-              || (await this._longTokenAboveMax(market, marketInfo.longToken, gmxDataStore)))
-            {
-            continue;
-          }
+        try {
+          await dolomite.contracts.callConstantContractFunction<any>(
+            oracleAggregator.methods.getPrice(marketInfo.indexToken)
+          );
+        } catch (error: any) {
+          continue;
+        }
 
-          // Check if we have oracle for index token
-          try {
-            await dolomite.contracts.callConstantContractFunction<any>(
-              oracleAggregator.methods.getPrice(marketInfo.indexToken)
-            );
-          } catch (error: any) {
-            continue;
-          }
-
-          withdrawalMarket = market;
+        // Withdraws: We pick the gm market with the highest liquidity and both tokens are below GM market max (so we can swap after the withdrawal)
+        if (balanceUsd.gt(withdrawalMarketHighestUsd) && (await this._shortAndLongTokensBelowMax(market, marketInfo.shortToken, marketInfo.longToken, gmxDataStore))) {
+          withdrawalMarket = market.address;
           withdrawalMarketHighestUsd = balanceUsd;
         }
 
-        // @todo Check if market is a better deposit market
+        // Deposits: We pick the GM market with the highest deposit cap that also has liquidity > 500k USD
         if (balanceUsd.gt(FIVE_HUNDRED_THOUSAND_USD)) {
-          const availableGlvLiquidity = await this._getAvailableGlvLiquidityForGmMarket(glv, market, gmxDataStore);
-          const depositLiquidity = await this._getAvailableGmMarketDepositLiquidity(market, marketInfo.shortToken, marketInfo.longToken, gmxDataStore, gmxTokenPrices);
+          const depositCap = await this._getGmMarketUsdDepositCap(glv, market, marketInfo.shortToken, marketInfo.longToken, gmxDataStore, gmxTokenPrices);
 
-          const available = availableGlvLiquidity.gt(depositLiquidity) ? depositLiquidity : availableGlvLiquidity;
-          if (available.gt(depositMarketHighestAvailable)) {
-            depositMarket = market;
-            depositMarketHighestAvailable = depositLiquidity;
+          if (depositCap.gt(depositMarketHighestCap)) {
+            depositMarket = market.address;
+            depositMarketHighestCap = depositCap;
           }
         }
       }
 
-      // Check if the most liquid market matches market on registry
+      // Check if we need to update the gm market
       const currentWithdrawalGmMarket = await dolomite.contracts.callConstantContractFunction<string>(
         glvRegistry.methods.glvTokenToGmMarketForWithdrawal(glvToken),
       );
-      if (withdrawalMarket.address !== ADDRESS_ZERO && currentWithdrawalGmMarket !== withdrawalMarket.address) {
-        glvTokenToLiquidGmMarket[glvToken].withdrawalMarket = withdrawalMarket.address;
-      }
-
       const currentDepositGmMarket = await dolomite.contracts.callConstantContractFunction<string>(
         glvRegistry.methods.glvTokenToGmMarketForDeposit(glvToken),
       );
-      if (depositMarket.address !== ADDRESS_ZERO && currentDepositGmMarket !== depositMarket.address) {
-        glvTokenToLiquidGmMarket[glvToken].depositMarket = depositMarket.address;
+
+      if (currentWithdrawalGmMarket !== withdrawalMarket) {
+        glvTokenToLiquidGmMarket[glvToken].withdrawalMarket = withdrawalMarket;
+      }
+      if (currentDepositGmMarket !== depositMarket) {
+        glvTokenToLiquidGmMarket[glvToken].depositMarket = depositMarket;
       }
     }
 
     for (const [glvTokenAddress, glvToken] of Object.entries(glvTokenToLiquidGmMarket)) {
       // Update deposit market
-      if (glvToken.depositMarket !== '') {
+      if (glvToken.depositMarket) {
         try {
           const result = await updateGlvTokenToGmMarketForDeposit(glvRegistry, glvTokenAddress, glvToken.depositMarket);
           await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
@@ -208,7 +198,7 @@ export default class GlvLiquidityStore {
       }
 
       // Update withdrawal market
-      if (glvToken.withdrawalMarket !== '') {
+      if (glvToken.withdrawalMarket) {
         try {
           const result = await updateGlvTokenToGmMarketForWithdrawal(glvRegistry, glvTokenAddress, glvToken.withdrawalMarket);
           await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
@@ -236,7 +226,14 @@ export default class GlvLiquidityStore {
     });
   };
 
-  _getAvailableGlvLiquidityForGmMarket = async (glv: any, market: any, gmxDataStore: any) => {
+  _getGmMarketUsdDepositCap = async (
+    glv: any,
+    market: any,
+    shortToken: string,
+    longToken: string,
+    gmxDataStore: any,
+    gmxTokenPrices: any
+  ) => {
     const maxUsd = await dolomite.contracts.callConstantContractFunction<any>(
       gmxDataStore.methods.getUint(
         keccak256(defaultAbiCoder.encode(
@@ -245,19 +242,48 @@ export default class GlvLiquidityStore {
         ))
       )
     );
+    const glvAvailableUsd = BigNumber.from(maxUsd).sub(BigNumber.from(market.balanceUsd));
 
-    const max = ethers.BigNumber.from(maxUsd);
-    const current = ethers.BigNumber.from(market.balanceUsd);
-    return max.sub(current);
+    const shortTokenPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
+      gmxDataStore.methods.getUint(
+        keccak256(defaultAbiCoder.encode(
+          ['bytes32', 'address', 'address'],
+          [POOL_AMOUNT_KEY, market.address, shortToken]
+        ))
+      )
+    );
+    const shortTokenMaxPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
+      gmxDataStore.methods.getUint(
+        keccak256(defaultAbiCoder.encode(
+          ['bytes32', 'address', 'address'],
+          [MAX_POOL_AMOUNT_KEY, market.address, shortToken]
+        ))
+      )
+    );
+    const shortTokenAvailableUsd = BigNumber.from(shortTokenMaxPoolAmount).sub(BigNumber.from(shortTokenPoolAmount)).mul(gmxTokenPrices[shortToken].maxPrice);
+
+    const longTokenPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
+      gmxDataStore.methods.getUint(
+        keccak256(defaultAbiCoder.encode(
+          ['bytes32', 'address', 'address'],
+          [POOL_AMOUNT_KEY, market.address, longToken]
+        ))
+      )
+    );
+    const longTokenMaxPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
+      gmxDataStore.methods.getUint(
+        keccak256(defaultAbiCoder.encode(
+          ['bytes32', 'address', 'address'],
+          [MAX_POOL_AMOUNT_KEY, market.address, longToken]
+        ))
+      )
+    );
+    const longTokenAvailableUsd = BigNumber.from(longTokenMaxPoolAmount).sub(BigNumber.from(longTokenPoolAmount)).mul(gmxTokenPrices[longToken].maxPrice);
+
+    return [glvAvailableUsd, shortTokenAvailableUsd, longTokenAvailableUsd].reduce((min, current) => current.lt(min) ? current : min);
   }
 
-  _getAvailableGmMarketDepositLiquidity = async (
-    market: any,
-    shortToken: string,
-    longToken: string,
-    gmxDataStore: any,
-    gmxTokenPrices: any
-  ) => {
+  _shortAndLongTokensBelowMax = async (market: any, shortToken: string, longToken: string, gmxDataStore: any) => {
     const shortTokenPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
       gmxDataStore.methods.getUint(
         keccak256(defaultAbiCoder.encode(
@@ -295,54 +321,6 @@ export default class GlvLiquidityStore {
     );
     const longAmount = ethers.BigNumber.from(longTokenPoolAmount);
     const longMax = ethers.BigNumber.from(longTokenMaxPoolAmount);
-
-    const shortAvailableUsd = shortMax.sub(shortAmount).mul(gmxTokenPrices[shortToken].maxPrice);
-    const longAvailableUsd = longMax.sub(longAmount).mul(gmxTokenPrices[longToken].maxPrice);
-
-    return longAvailableUsd.gt(shortAvailableUsd) ? shortAvailableUsd : longAvailableUsd;
-  }
-
-  _shortTokenAboveMax = async (market: any, shortToken: string, gmxDataStore: any) => {
-    const shortTokenPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
-      gmxDataStore.methods.getUint(
-        keccak256(defaultAbiCoder.encode(
-          ['bytes32', 'address', 'address'],
-          [POOL_AMOUNT_KEY, market.address, shortToken]
-        ))
-      )
-    );
-    const shortTokenMaxPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
-      gmxDataStore.methods.getUint(
-        keccak256(defaultAbiCoder.encode(
-          ['bytes32', 'address', 'address'],
-          [MAX_POOL_AMOUNT_KEY, market.address, shortToken]
-        ))
-      )
-    );
-    const amount = ethers.BigNumber.from(shortTokenPoolAmount);
-    const max = ethers.BigNumber.from(shortTokenMaxPoolAmount)
-    return amount.gt(max);
-  }
-
-  _longTokenAboveMax = async (market: any, longToken: string, gmxDataStore: any) => {
-    const longTokenPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
-      gmxDataStore.methods.getUint(
-        keccak256(defaultAbiCoder.encode(
-          ['bytes32', 'address', 'address'],
-          [POOL_AMOUNT_KEY, market.address, longToken]
-        ))
-      )
-    );
-    const longTokenMaxPoolAmount = await dolomite.contracts.callConstantContractFunction<any>(
-      gmxDataStore.methods.getUint(
-        keccak256(defaultAbiCoder.encode(
-          ['bytes32', 'address', 'address'],
-          [MAX_POOL_AMOUNT_KEY, market.address, longToken]
-        ))
-      )
-    );
-    const amount = ethers.BigNumber.from(longTokenPoolAmount);
-    const max = ethers.BigNumber.from(longTokenMaxPoolAmount);
-    return amount.gt(max);
+    return shortAmount.lt(shortMax) && longAmount.lt(longMax);
   }
 }
