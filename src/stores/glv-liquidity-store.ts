@@ -22,6 +22,8 @@ const POOL_AMOUNT_KEY = '0x8d6d2afbc2bb1e17cb89b72f19b266a410f6ee8f890812b98b609
 const MAX_POOL_AMOUNT_KEY = '0xe88b5773e3873a6265fa6e9e8dc016218fbded41751726542157f40b640a2083';
 const GLV_MAX_MARKET_TOKEN_BALANCE_USD_KEY = '0x210e65e389535740c6f5f16309d04a8f11dd78de7a459ea229cf71a615dcfcd9';
 
+const GMX_PRECISION = ethers.BigNumber.from('1000000000000000000000000000000'); // 30 decimals
+
 const FIVE_HUNDRED_THOUSAND_USD = ethers.BigNumber.from('500000000000000000000000000000000000'); // gmx uses 30 decimals
 
 interface GlvTokenUpdate {
@@ -40,6 +42,27 @@ export interface SignedPriceData {
  */
 export default class GlvLiquidityStore {
   constructor(private readonly networkId: number) {
+  }
+
+  static async getGmMarketInfo(marketAddress: string): Promise<any> {
+    return axios.default.post('https://gmx.squids.live/gmx-synthetics-arbitrum:prod/api/graphql', {
+      query: `
+        query MyQuery {
+          marketInfos(where: { marketTokenAddress_eq: "${marketAddress}" }) {
+            longOpenInterestInTokens
+            longPoolAmount
+            reserveFactorLong
+            reserveFactorShort
+            shortOpenInterestUsd
+            shortPoolAmount
+          }
+        }
+      `,
+      variables: null,
+      operationName: 'MyQuery',
+    })
+    .then(res => res.data)
+    .then(data => data.data.marketInfos[0]);
   }
 
   static async getGlvTokenLiquidity(): Promise<any> {
@@ -141,10 +164,12 @@ export default class GlvLiquidityStore {
           continue;
         }
 
-        // Withdraws: We pick the gm market with the highest liquidity and both tokens are below GM market max (so we can swap after the withdrawal)
-        if (balanceUsd.gt(withdrawalMarketHighestUsd) && (await this._shortAndLongTokensBelowMax(market, marketInfo.shortToken, marketInfo.longToken, gmxDataStore))) {
+        // Withdraws: We pick the gm market with the highest liquidity (min of GLV usd and sellable usd in GM market) and both tokens are below GM market max (so we can swap after the withdrawal)
+        const sellableUsd = await this._getGmSellableAmount(market, marketInfo.shortToken, marketInfo.longToken, marketInfo.indexToken, gmxTokenPrices);
+        const availableToWithdraw = sellableUsd.lt(balanceUsd) ? sellableUsd : balanceUsd;
+        if (availableToWithdraw.gt(withdrawalMarketHighestUsd) && (await this._shortAndLongTokensBelowMax(market, marketInfo.shortToken, marketInfo.longToken, gmxDataStore))) {
           withdrawalMarket = market.address;
-          withdrawalMarketHighestUsd = balanceUsd;
+          withdrawalMarketHighestUsd = availableToWithdraw;
         }
 
         // Deposits: We pick the GM market with the highest deposit cap that also has liquidity > 500k USD
@@ -322,5 +347,41 @@ export default class GlvLiquidityStore {
     const longAmount = ethers.BigNumber.from(longTokenPoolAmount);
     const longMax = ethers.BigNumber.from(longTokenMaxPoolAmount);
     return shortAmount.lt(shortMax) && longAmount.lt(longMax);
+  }
+
+  _getGmSellableAmount = async (
+    market: any,
+    shortToken: string,
+    longToken: string,
+    indexToken: string,
+    gmxTokenPrices: any
+  ) => {
+    const marketSubgraphInfo = await GlvLiquidityStore.getGmMarketInfo(market.address);
+
+    /**
+        poolUsd = longPoolAmount * longToken.prices.minPrice
+        reservedUsd = longInterestInTokens * indexToken.prices.maxPrice
+        minPoolUsd = (reservedUsd * PRECISION) / reserveFactorLong
+        liquidity = poolUsd - minPoolUsd
+     */
+    const longTokenPoolAmount = ethers.BigNumber.from(marketSubgraphInfo.longPoolAmount);
+    const longPoolUsd = longTokenPoolAmount.mul(gmxTokenPrices[longToken].minPrice);
+    const longReservedUsd = ethers.BigNumber.from(marketSubgraphInfo.longOpenInterestInTokens).mul(gmxTokenPrices[indexToken].maxPrice);
+    const longMinPoolUsd = longReservedUsd.mul(GMX_PRECISION).div(ethers.BigNumber.from(marketSubgraphInfo.reserveFactorLong));
+    const longLiquidity = longPoolUsd.sub(longMinPoolUsd);
+
+    /**
+     * 
+        poolUsd = shortPoolAmount × shortPrice
+        reservedUsd = shortOpenInterestUsd
+        minPoolUsd = (reservedUsd × PRECISION) ÷ reserveFactorShort
+        liquidity = poolUsd - minPoolUsd
+     */
+    const shortPoolUsd = ethers.BigNumber.from(marketSubgraphInfo.shortPoolAmount).mul(gmxTokenPrices[shortToken].minPrice);
+    const shortReservedUsd = ethers.BigNumber.from(marketSubgraphInfo.shortOpenInterestUsd);
+    const shortMinPoolUsd = shortReservedUsd.mul(GMX_PRECISION).div(ethers.BigNumber.from(marketSubgraphInfo.reserveFactorShort));
+    const shortLiquidity = shortPoolUsd.sub(shortMinPoolUsd);
+
+    return longLiquidity.lt(shortLiquidity) ? longLiquidity : shortLiquidity;
   }
 }
