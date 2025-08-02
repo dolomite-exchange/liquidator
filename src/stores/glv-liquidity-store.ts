@@ -155,6 +155,7 @@ export default class GlvLiquidityStore {
       let depositMarket: string | undefined;
       let depositMarketHighestCap = ethers.BigNumber.from('0');
 
+      const invalidMarkets: string[] = [];
       for (let i = 0; i < glv.markets.length; i++) {
         const market = glv.markets[i];
         if (market.isDisabled === true) {
@@ -172,10 +173,7 @@ export default class GlvLiquidityStore {
             oracleAggregator.methods.getPrice(marketInfo.indexToken),
           );
         } catch (error: any) {
-          Logger.warn({
-            at: __filename,
-            message: `Could not get price for ${market.address}`,
-          })
+          invalidMarkets.push(market.address);
           // eslint-disable-next-line no-continue
           continue;
         }
@@ -213,6 +211,14 @@ export default class GlvLiquidityStore {
           depositMarket = market.address;
           depositMarketHighestCap = availableToDeposit;
         }
+      }
+
+      if (invalidMarkets.length > 0) {
+        Logger.warn({
+          at: __filename,
+          message: `Could not get prices for ${invalidMarkets.length} markets`,
+          markets: invalidMarkets,
+        });
       }
 
       // Check if we need to update the gm market
