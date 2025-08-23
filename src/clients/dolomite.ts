@@ -154,13 +154,15 @@ export async function getLiquidatableDolomiteAccounts(
 export async function getLiquidatableDolomiteAccountsWithCertainSupplyAsset(
   marketIndexMap: { [marketId: string]: MarketIndex },
   tokenAddress: string,
+  allSupplyAccounts: boolean,
   blockNumber: number,
   lastId: string | undefined,
 ): Promise<{ accounts: ApiAccount[] }> {
+  const hasBorrowValue = !allSupplyAccounts ? 'hasBorrowValue: true' : '';
   const query = `
             query getActiveMarginAccounts($tokenAddress: String, $blockNumber: Int, $lastId: ID) {
                 marginAccounts(
-                  where: { hasBorrowValue: true id_gt: $lastId supplyTokens_contains: [$tokenAddress]  }
+                  where: { ${hasBorrowValue} id_gt: $lastId supplyTokens_contains: [$tokenAddress]  }
                   block: { number: $blockNumber }
                   orderBy: id
                   first: ${Pageable.MAX_PAGE_SIZE}

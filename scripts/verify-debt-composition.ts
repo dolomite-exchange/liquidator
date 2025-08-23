@@ -1,4 +1,4 @@
-import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
 import {
@@ -16,9 +16,10 @@ import Pageable from '../src/lib/pageable';
 import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
+import { writeFileSync } from 'node:fs';
 
+const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
 // const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
-const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
 
 const TEN = new BigNumber('10');
 
@@ -40,8 +41,7 @@ interface TransformedApiAccount extends ApiAccount {
 const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | undefined>> = {
   [ChainId.ArbitrumOne]: {},
   [ChainId.Base]: {},
-  [ChainId.Berachain]: {
-  },
+  [ChainId.Berachain]: {},
   [ChainId.Botanix]: {},
   [ChainId.Ethereum]: {},
   [ChainId.Ink]: {},
@@ -68,7 +68,20 @@ function formatApiBalance(balance: TransformedApiBalance): string {
     .toFormat(6)} (${balance.amountUsd.toFormat(2)} USD) ${balance.tokenSymbol}`;
 }
 
-function formatAccountData(accounts: ApiAccount[], marketMap: Record<string, ApiMarket>, value: 'supply' | 'borrow') {
+function formatAccountData(
+  accounts: ApiAccount[],
+  marketMap: Record<string, ApiMarket>,
+  marketId: Integer,
+  value: 'supply' | 'borrow',
+) {
+  const formattedAccounts = accounts.map(a => ({
+    owner: a.owner,
+    number: a.number.toFixed(),
+  }))
+  writeFileSync(
+    `${__dirname}/output/${value}-${process.env.MARKET_ID}-accounts.json`,
+    JSON.stringify(formattedAccounts, null, 2),
+  );
   const transformedAccounts = getTransformedAccounts(accounts, marketMap);
   transformedAccounts.sort((a, b) => {
     if (a.borrowUSD.eq(b.borrowUSD)) {
@@ -78,16 +91,26 @@ function formatAccountData(accounts: ApiAccount[], marketMap: Record<string, Api
   });
 
   if (accounts.length > 0) {
-    console.log('transformedAccounts.length', transformedAccounts.length)
     const medianAccount = transformedAccounts[Math.floor(transformedAccounts.length / 2)];
     const biggestAccount = transformedAccounts[transformedAccounts.length - 1];
     const averageAccountDebt = transformedAccounts.reduce((acc, b) => acc.plus(b.borrowUSD), INTEGERS.ZERO)
       .div(transformedAccounts.length);
+    let totalOfMarketId = INTEGERS.ZERO;
+    for (const account of transformedAccounts) {
+      const balances = Object.values(account.balances);
+      for (const balance of balances) {
+        if (marketId.eq(balance.marketId)) {
+          totalOfMarketId = totalOfMarketId.plus(balance.wei);
+        }
+      }
+    }
+
     Logger.info({
       message: `Stats on ${value} accounts`,
       medianAccountDebt: `$${medianAccount.borrowUSD.toFormat(2)}`,
       biggestAccountDebt: `$${biggestAccount.borrowUSD.toFormat(2)}`,
       averageAccountDebt: `$${averageAccountDebt.toFormat(2)}`,
+      totalOfMarketId: totalOfMarketId.toFixed(),
       largeAccounts: {
         thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
         accounts: transformedAccounts.filter(a => a.borrowUSD.abs().gte(LARGE_AMOUNT_THRESHOLD_USD))
@@ -177,12 +200,13 @@ async function start() {
     const { accounts: nextAccounts } = await getLiquidatableDolomiteAccountsWithCertainSupplyAsset(
       marketIndexMap,
       tokenAddress,
+      false,
       blockNumber,
       lastId,
     );
     return nextAccounts;
   });
-  formatAccountData(supplyAccounts, marketMap, 'supply');
+  formatAccountData(supplyAccounts, marketMap, marketId, 'supply');
 
   const borrowAccounts = await Pageable.getPageableValues(async (lastId) => {
     const { accounts: nextAccounts } = await getLiquidatableDolomiteAccountsWithCertainBorrowAsset(
@@ -193,7 +217,7 @@ async function start() {
     );
     return nextAccounts;
   });
-  formatAccountData(borrowAccounts, marketMap, 'borrow');
+  formatAccountData(borrowAccounts, marketMap, marketId, 'borrow');
 
   const totalSupplyAccountDebt = supplyAccounts.reduce((acc, account) => {
     const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
