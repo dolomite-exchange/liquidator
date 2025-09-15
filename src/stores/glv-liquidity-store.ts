@@ -141,8 +141,14 @@ export default class GlvLiquidityStore {
       ModuleDeployments.OracleAggregatorV2[this.networkId].address,
     );
 
+    Logger.info({
+      at: 'GlvLiquidityStore#_update',
+      message: `Found ${glvLiquidity.glvs.length} GLV assets to loop through...`,
+    });
+
     // Loop through each GLV token
-    for (const glv of glvLiquidity.glvs) {
+    for (let i = 0; i < glvLiquidity.glvs.length; i++) {
+      const glv = glvLiquidity.glvs[i];
       glvTokenToLiquidGmMarket[glv.glvToken.toLowerCase()] = { withdrawalMarket: undefined, depositMarket: undefined };
 
       const { longToken, shortToken } = glv;
@@ -152,16 +158,22 @@ export default class GlvLiquidityStore {
       let withdrawalMarketAddress: string | undefined;
       let withdrawalMarketHighestUsd = ethers.BigNumber.from('0');
 
-      let depositMarket: string | undefined;
+      let depositMarket: string | undefined = undefined;
       let depositMarketHighestCap = ethers.BigNumber.from('0');
 
       const invalidMarkets: string[] = [];
+
+      Logger.info({
+        at: 'GlvLiquidityStore#_update',
+        message: `Found ${glv.markets.length} markets for the ${glv.name} token`,
+      });
       for (let i = 0; i < glv.markets.length; i++) {
         const market = glv.markets[i];
         if (market.isDisabled === true) {
           // eslint-disable-next-line no-continue
           continue;
         }
+
         const balanceUsd = ethers.BigNumber.from(market.balanceUsd);
 
         const marketInfo = await dolomite.contracts.callConstantContractFunction<any>(
