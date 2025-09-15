@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import v8 from 'v8';
@@ -16,7 +17,6 @@ import Pageable from '../src/lib/pageable';
 import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
-import { writeFileSync } from 'node:fs';
 
 const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
 // const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);

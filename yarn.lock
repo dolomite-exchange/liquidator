@@ -347,10 +347,10 @@
   resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.1.7.tgz#ab583dfefa99dcd9cebb8b2eafd3743c96da8f36"
   integrity sha512-Wl4zWDO3+6Ezd7rHc2sK21+YQbRxvtwLKm/XMxuHdqskVZH4NbSaF94qa6h9MaDYq4TLkjzNuA2CpA12QYLASA==
 
-"@dolomite-exchange/zap-sdk@^0.5.0":
-  version "0.5.0"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.5.0.tgz#a1eb3a1251f8f65ab306bf8dc4d0aee6c7a84a3e"
-  integrity sha512-1YYBJ71DW2JdZtUMG5bKivkuFdvSXvoDugOrmsM5JTwervqN4+/iFHEIfFvlIMXMwTLPwkOQl0g4/FemGBBotQ==
+"@dolomite-exchange/zap-sdk@^0.5.3":
+  version "0.5.3"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.5.3.tgz#2aff6c3c25cb30a6ff967c76ef60acf5e0dade1d"
+  integrity sha512-YtbRKonIaPXwtR0ggqAItdg50j5RLpTtmls+WrjFaFdLHB+FCZwCeej8umrRyFu0+/TVheQTLAqy9LlrD9OZMw==
   dependencies:
     "@dolomite-exchange/modules-deployments" "^0.1.7"
     axios "^0.30.0"
