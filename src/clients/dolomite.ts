@@ -9,7 +9,6 @@ import {
   ApiToken as ZapApiToken,
   BigNumber as ZapBigNumber,
 } from '@dolomite-exchange/zap-sdk';
-import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 import axios from 'axios';
 import * as ethers from 'ethers';
 import AccountRiskOverrideSetterAbi from '../abis/account-risk-override-setter.json';
@@ -41,11 +40,9 @@ import {
   GraphqlAmmPairData,
   GraphqlAsyncDepositResult,
   GraphqlAsyncWithdrawalResult,
-  GraphqlInterestIndex,
   GraphqlInterestRate,
   GraphqlLiquidationsResult,
   GraphqlMarketResult,
-  GraphqlOraclePrice,
   GraphqlRiskParams,
   GraphqlRiskParamsResult,
   GraphqlTimestampToBlockResult,
@@ -701,22 +698,15 @@ export async function getTotalYield(blockNumbers: number[], user: address): Prom
         reserve1
         totalSupply
       }
-      interestRates_${blockNumber}:interestRates(block: { number: ${blockNumber} }) {
-        supplyInterestRate
-        token {
-          id
+      tokens_${blockNumber}:tokens(block: { number: ${blockNumber} }) {
+        id
+        supplyLiquidity
+        supplyLiquidityUSD
+        interestRate {
+          supplyInterestRate
         }
-      }
-      interestIndexes_${blockNumber}:interestIndexes(block: { number: ${blockNumber} }) {
-        supplyIndex
-        token {
-          id
-        }
-      }
-      oraclePrices_${blockNumber}:oraclePrices(block: { number: ${blockNumber} }) {
-        price
-        token {
-          id
+        interestIndex {
+          supplyIndex
         }
       }
       ammLiquidityPosition_${blockNumber}:ammLiquidityPositions(where: { user: "${user}" } block: { number: ${blockNumber} }) {
@@ -757,10 +747,6 @@ export async function getTotalYield(blockNumbers: number[], user: address): Prom
     totalYield.swapYield = totalYield.swapYield.plus(tempTotalYield.swapYield);
     totalYield.lendingYield = totalYield.lendingYield.plus(tempTotalYield.lendingYield);
     totalYield.totalYield = totalYield.totalYield.plus(tempTotalYield.totalYield);
-    Logger.info({
-      message: 'Sleeping for 3s to reduce rate limiting...',
-    })
-    await sleep(3000);
   }
 
   return totalYield;
@@ -1169,6 +1155,13 @@ function mapGraphqlAccountToApiAccount(
   };
 }
 
+interface TokenWithData {
+  id: string;
+  oraclePrice: Decimal;
+  supplyIndex: Decimal;
+  supplyInterestRate: Decimal;
+}
+
 function reduceResultIntoTotalYield(
   result: GraphqlAmmDataForUserResult,
   blockNumbers: number[],
@@ -1179,34 +1172,25 @@ function reduceResultIntoTotalYield(
     const blockNumberYesterday = i === 0 ? undefined : blockNumbersAsc[i - 1];
     const ammPair = result.data[`ammPair_${blockNumber}`]?.[0] as GraphqlAmmPairData | undefined;
     const ammPairYesterday = result.data[`ammPair_${blockNumberYesterday}`]?.[0] as GraphqlAmmPairData | undefined;
-    const interestRateMap = (result.data[`interestRates_${blockNumber}`] as GraphqlInterestRate[])?.reduce<Record<string, BigNumber>>(
-      (map, interestRate) => {
-        map[interestRate.token.id] = new BigNumber(interestRate.supplyInterestRate).div(365);
-        return map;
-      },
-      {},
-    );
-    const interestIndexMap = (result.data[`interestIndexes_${blockNumber}`] as GraphqlInterestIndex[])?.reduce<Record<string, BigNumber>>(
-      (map, interestIndex) => {
-        map[interestIndex.token.id] = new BigNumber(interestIndex.supplyIndex);
-        return map;
-      },
-      {},
-    );
-    const oraclePriceMap = (result.data[`oraclePrices_${blockNumber}`] as GraphqlOraclePrice[])?.reduce<Record<string, BigNumber>>(
-      (map, price) => {
-        map[price.token.id] = new BigNumber(price.price);
+    const tokensMap = (result.data[`tokens_${blockNumber}`] as any[])?.reduce<Record<string, TokenWithData>>(
+      (map, token) => {
+        map[token.id] = {
+          id: token.id,
+          oraclePrice: new BigNumber(token.supplyLiquidityUSD).div(token.supplyLiquidity),
+          supplyIndex: new BigNumber(token.interestIndex.supplyIndex),
+          supplyInterestRate: new BigNumber(token.interestRate.supplyInterestRate).div(365),
+        };
         return map;
       },
       {},
     );
     const ammLiquidityPosition = result.data[`ammLiquidityPosition_${blockNumber}`]?.[0] as GraphqlAmmLiquidityPosition | undefined;
-    if (!ammPair || !interestRateMap || !interestIndexMap || !oraclePriceMap) {
+    if (!ammPair || !tokensMap) {
       return memo
     }
 
-    const wethInterestRate = interestRateMap['0x82af49447d8a07e3bd95bd0d56f35241523fbab1'];
-    const bridgedUsdcInterestRate = interestRateMap['0xff970a61a04b1ca14834a43f5de4533ebddb5cc8'];
+    const wethInterestRate = tokensMap['0x82af49447d8a07e3bd95bd0d56f35241523fbab1'].supplyInterestRate;
+    const bridgedUsdcInterestRate = tokensMap['0xff970a61a04b1ca14834a43f5de4533ebddb5cc8'].supplyInterestRate;
     const equityPercent = ammLiquidityPosition
       ? new BigNumber(ammLiquidityPosition.liquidityTokenBalance).div(ammPair.totalSupply)
       : INTEGERS.ZERO;
@@ -1220,18 +1204,21 @@ function reduceResultIntoTotalYield(
     const swapYield = volumeUSD.times(equityPercent).times(0.003);
 
     const lendingYield = (result.data[`marginAccounts_${blockNumber}`] as GraphqlTokenValue[]).reduce((
-      valueUsd,
+      totalYieldUsd,
       tokenValue,
     ) => {
       const valuePar = new BigNumber(tokenValue.valuePar);
-      if (valuePar.eq(INTEGERS.ZERO)) {
-        return valueUsd;
+      if (valuePar.lte(INTEGERS.ZERO)) {
+        return totalYieldUsd;
       }
 
-      const index = interestIndexMap[tokenValue.token.id];
-      const interestRate = interestRateMap[tokenValue.token.id];
-      const price = oraclePriceMap[tokenValue.token.id];
-      return valueUsd.plus(valuePar.times(index).times(interestRate).times(price));
+      const tokenAddress = tokenValue.token.id;
+      const index = tokensMap[tokenAddress].supplyIndex;
+      const interestRate = tokensMap[tokenAddress].supplyInterestRate;
+      const price = tokensMap[tokenAddress].oraclePrice;
+      const valueUsd = valuePar.times(index).times(price);
+
+      return totalYieldUsd.plus(valueUsd.times(interestRate));
     }, INTEGERS.ZERO);
     const totalYield = lpLendingYield.plus(swapYield).plus(lendingYield);
     return {

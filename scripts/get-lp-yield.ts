@@ -2,10 +2,27 @@
 import '../src/lib/env';
 /** @formatter:on */
 import { address, BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { Network } from '@dolomite-exchange/zap-sdk';
 import v8 from 'v8';
 import { getTimestampToBlockNumberMap, getTotalYield } from '../src/clients/dolomite';
+import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 
+const LAUNCH_TIMESTAMP_MAP: Record<Network, number> = {
+  [Network.ARBITRUM_ONE]: 1665619200, // October 13, 2022, at 00:00:00 AM UTC
+  [Network.BASE]: 1734566400, // December 19, 2024, at 00:00:00 AM UTC
+  [Network.BERACHAIN]: 1737763200, // January 25, 2025, at 00:00:00 AM UTC
+  [Network.BOTANIX]: 1750636800, // June 23, 2025, at 00:00:00 AM UTC
+  [Network.ETHEREUM]: 1750550400, // June 22, 2025, at 00:00:00 AM UTC
+  [Network.INK]: 1734566400, // December 19, 2024, at 00:00:00 AM UTC
+  [Network.MANTLE]: 1714348800, // April 29, 2024, at 00:00:00 AM UTC
+  [Network.POLYGON_ZKEVM]: 1706832000, // February 2, 2025, at 00:00:00 AM UTC
+  [Network.X_LAYER]: 1714348800, // April 29, 2025, at 00:00:00 AM UTC
+}
+
+/**
+ * Gets the yield earned by a user over a certain duration
+ */
 async function start() {
   let userAddress: address;
   if (process.env.USER_ADDRESS) {
@@ -24,14 +41,23 @@ async function start() {
     userAddress,
   });
 
-  // const currentDate = Math.floor(new Date().getTime() / 1000 / 86400) * 86400;
-  // const launchTimestamp = 1665619200; // October 13, 2022 at 12:00:00 AM UTC
-  const startTimestamp = 1672531200; // January 1, 2023 (00:00:00 UTC)
-  const endTimestamp = 1704067200; // December 31, 2023 (00:00:00 UTC)
+  const launchTimestamp = LAUNCH_TIMESTAMP_MAP[dolomite.networkId];
+  let startTimestamp = 1704067200; // January 1, 2024 (00:00:00 UTC)
+  if (startTimestamp < launchTimestamp) {
+    startTimestamp = launchTimestamp;
+  }
+
+  const endTimestamp = 1735603200; // December 31, 2025 (00:00:00 UTC)
   const timestamps: number[] = [];
   for (let i = startTimestamp; i < endTimestamp; i += 86400) {
     timestamps.push(i);
   }
+
+  if (timestamps.length === 0) {
+    console.warn('Could not produce yield because there are no timestamps!');
+    return false;
+  }
+
   const timestampToBlockNumberMap = await getTimestampToBlockNumberMap(timestamps);
   const result = await getTotalYield(
     Object.values(timestampToBlockNumberMap),
@@ -42,16 +68,16 @@ async function start() {
   console.log('----------------------------------------------------')
   console.log('-------------------- Yield Data --------------------');
   console.log('----------------------------------------------------')
-  console.log('LP Lending yield:', `$${result.lpLendingYield.toFixed(2)}`);
-  console.log('Lending yield:', `$${result.lendingYield.toFixed(2)}`);
-  console.log('Swap yield:', `$${result.swapYield.toFixed(2)}`);
-  console.log('Total yield:', `$${result.totalYield.toFixed(2)}`);
+  console.log('LP Lending yield:', `$${result.lpLendingYield.toFormat(2)}`);
+  console.log('Lending yield:', `$${result.lendingYield.toFormat(2)}`);
+  console.log('Swap yield:', `$${result.swapYield.toFormat(2)}`);
+  console.log('Total yield:', `$${result.totalYield.toFormat(2)}`);
   console.log('Tabulation period:', `${result.totalEntries} days (${startTimestampString} - ${endTimestampString})`);
   console.log();
   const annualizedData = new BigNumber(365).div(result.totalEntries)
-  console.log('Annualized lending yield:', `$${result.lendingYield.times(annualizedData).toFixed(2)}`);
-  console.log('Annualized swap yield:', `$${result.swapYield.times(annualizedData).toFixed(2)}`);
-  console.log('Annualized total yield:', `$${result.totalYield.times(annualizedData).toFixed(2)}`);
+  console.log('Annualized lending yield:', `$${result.lendingYield.times(annualizedData).toFormat(2)}`);
+  console.log('Annualized swap yield:', `$${result.swapYield.times(annualizedData).toFormat(2)}`);
+  console.log('Annualized total yield:', `$${result.totalYield.times(annualizedData).toFormat(2)}`);
   console.log('----------------------------------------------------')
 
   return true
