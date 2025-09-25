@@ -20,6 +20,7 @@ consoleScripts.js
 
 start-docker-test.sh
 start-ts-node-test.sh
+start-swap-revenues-ts-node.sh
 
 output.log
 

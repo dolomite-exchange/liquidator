@@ -26,9 +26,9 @@ export interface GasPriceEip1559 {
 
 export interface GasPriceForEthers {
   type: number
-  gasPrice?: ethers.BigNumberish;
-  maxFeePerGas?: ethers.BigNumberish;
-  maxPriorityFeePerGas?: ethers.BigNumberish;
+  gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
 }
 
 export type GasPriceResult = GasPriceStandard | GasPriceEip1559;
@@ -90,7 +90,7 @@ export function getTypedGasPriceWeiWithModifications(): GasPriceForEthers {
     const priorityFee = gasResult.priorityFeeWei.plus(ADDITION_WEI).toFixed(0);
     return {
       type: 2,
-      maxFeePerGas: ethers.BigNumber.from(baseFee).add(priorityFee),
+      maxFeePerGas: ethers.BigNumber.from(baseFee).add(priorityFee).toString(),
       maxPriorityFeePerGas: priorityFee,
     };
   }

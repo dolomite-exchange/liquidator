@@ -39,6 +39,7 @@ const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split('
 let oogaBoogaReferralInfo: ReferralOutput | undefined;
 if (NETWORK_ID === ChainId.Berachain) {
   oogaBoogaReferralInfo = {
+    ensoApiKey: process.env.ENSO_API_KEY,
     odosReferralCode: undefined,
     oogaBoogaApiKey: process.env.OOGA_BOOGA_API_KEY,
     referralAddress: undefined,

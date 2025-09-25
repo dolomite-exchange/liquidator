@@ -394,8 +394,9 @@ export async function getDolomiteMarkets(
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
   const marketPriceResults = await aggregateWithExceptionHandler(marketPriceCalls);
 
-  const marketToDolomiteApiMarket: Record<string, {
+  const tokenAddressToDolomiteApiMarket: Record<string, {
     supplyWei: Decimal;
+    borrowWei: Decimal;
     maxSupplyWei: Decimal | undefined
   } | undefined> = {};
   try {
@@ -409,8 +410,9 @@ export async function getDolomiteMarkets(
       });
 
     resultJson.forEach(token => {
-      marketToDolomiteApiMarket[token.marketId] = {
+      tokenAddressToDolomiteApiMarket[token.id] = {
         supplyWei: new BigNumber(token.supplyLiquidity),
+        borrowWei: new BigNumber(token.borrowLiquidity),
         maxSupplyWei: token.riskInfo.supplyMaxWei ? new BigNumber(token.riskInfo.supplyMaxWei) : undefined,
       }
     });
@@ -446,8 +448,9 @@ export async function getDolomiteMarkets(
         marginPremium: new BigNumber(decimalToString(market.marginPremium)),
         liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
         isBorrowingDisabled: market.isBorrowingDisabled,
-        supplyLiquidity: marketToDolomiteApiMarket[market.id]?.supplyWei,
-        maxSupplyLiquidity: marketToDolomiteApiMarket[market.id]?.maxSupplyWei,
+        supplyLiquidity: tokenAddressToDolomiteApiMarket[market.id]?.supplyWei,
+        borrowLiquidity: tokenAddressToDolomiteApiMarket[market.id]?.borrowWei,
+        maxSupplyLiquidity: tokenAddressToDolomiteApiMarket[market.id]?.maxSupplyWei,
       };
       return apiMarket;
     })

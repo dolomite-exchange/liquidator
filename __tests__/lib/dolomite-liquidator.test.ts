@@ -266,6 +266,7 @@ function getTestMarkets(): ApiMarket[] {
       decimals: 18,
       isBorrowingDisabled: false,
       supplyLiquidity: undefined,
+      borrowLiquidity: undefined,
       maxSupplyLiquidity: undefined,
     },
     {
@@ -280,6 +281,7 @@ function getTestMarkets(): ApiMarket[] {
       decimals: 18,
       isBorrowingDisabled: false,
       supplyLiquidity: undefined,
+      borrowLiquidity: undefined,
       maxSupplyLiquidity: undefined,
     },
     {
@@ -294,6 +296,7 @@ function getTestMarkets(): ApiMarket[] {
       decimals: 18,
       isBorrowingDisabled: false,
       supplyLiquidity: undefined,
+      borrowLiquidity: undefined,
       maxSupplyLiquidity: undefined,
     },
     {
@@ -308,6 +311,7 @@ function getTestMarkets(): ApiMarket[] {
       decimals: 18,
       isBorrowingDisabled: false,
       supplyLiquidity: undefined,
+      borrowLiquidity: undefined,
       maxSupplyLiquidity: undefined,
     },
   ];

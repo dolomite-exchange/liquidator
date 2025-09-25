@@ -1,0 +1,610 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_dolomiteRegistry",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_dolomiteMargin",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_MARGIN",
+    "outputs": [
+      {
+        "internalType": "contract IDolomiteMargin",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_MARGIN_OWNER",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DOLOMITE_REGISTRY",
+    "outputs": [
+      {
+        "internalType": "contract IDolomiteRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_caller",
+        "type": "address"
+      }
+    ],
+    "name": "isCallerAuthorized",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "_isAuthorized",
+        "type": "bool"
+      }
+    ],
+    "name": "setIsCallerAuthorized",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "accountNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "marketIdsPath",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "inputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minOutputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "enum IGenericTraderBase.TraderType",
+                "name": "traderType",
+                "type": "uint8"
+              },
+              {
+                "internalType": "uint256",
+                "name": "makerAccountIndex",
+                "type": "uint256"
+              },
+              {
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes",
+                "name": "tradeData",
+                "type": "bytes"
+              }
+            ],
+            "internalType": "struct IGenericTraderBase.TraderParam[]",
+            "name": "tradersPath",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo[]",
+            "name": "makerAccounts",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+                "name": "balanceCheckFlag",
+                "type": "uint8"
+              },
+              {
+                "internalType": "enum IGenericTraderProxyV2.EventEmissionType",
+                "name": "eventType",
+                "type": "uint8"
+              }
+            ],
+            "internalType": "struct IGenericTraderProxyV2.UserConfig",
+            "name": "userConfig",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct IGenericTraderProxyV2.SwapExactInputForOutputParams",
+        "name": "_params",
+        "type": "tuple"
+      }
+    ],
+    "name": "swapExactInputForOutput",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "accountNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "marketIdsPath",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "inputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minOutputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "enum IGenericTraderBase.TraderType",
+                "name": "traderType",
+                "type": "uint8"
+              },
+              {
+                "internalType": "uint256",
+                "name": "makerAccountIndex",
+                "type": "uint256"
+              },
+              {
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes",
+                "name": "tradeData",
+                "type": "bytes"
+              }
+            ],
+            "internalType": "struct IGenericTraderBase.TraderParam[]",
+            "name": "tradersPath",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo[]",
+            "name": "makerAccounts",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "fromAccountNumber",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "toAccountNumber",
+                "type": "uint256"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint256",
+                    "name": "marketId",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "amountWei",
+                    "type": "uint256"
+                  }
+                ],
+                "internalType": "struct IGenericTraderProxyV2.TransferAmount[]",
+                "name": "transferAmounts",
+                "type": "tuple[]"
+              }
+            ],
+            "internalType": "struct IGenericTraderProxyV2.TransferCollateralParam",
+            "name": "transferCollateralParams",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "marketId",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint32",
+                "name": "expiryTimeDelta",
+                "type": "uint32"
+              }
+            ],
+            "internalType": "struct IGenericTraderProxyV2.ExpiryParam",
+            "name": "expiryParams",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+                "name": "balanceCheckFlag",
+                "type": "uint8"
+              },
+              {
+                "internalType": "enum IGenericTraderProxyV2.EventEmissionType",
+                "name": "eventType",
+                "type": "uint8"
+              }
+            ],
+            "internalType": "struct IGenericTraderProxyV2.UserConfig",
+            "name": "userConfig",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct IGenericTraderProxyV2.SwapExactInputForOutputAndModifyPositionParams",
+        "name": "_params",
+        "type": "tuple"
+      }
+    ],
+    "name": "swapExactInputForOutputAndModifyPosition",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_accountOwner",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "accountNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "marketIdsPath",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "inputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minOutputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "enum IGenericTraderBase.TraderType",
+                "name": "traderType",
+                "type": "uint8"
+              },
+              {
+                "internalType": "uint256",
+                "name": "makerAccountIndex",
+                "type": "uint256"
+              },
+              {
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes",
+                "name": "tradeData",
+                "type": "bytes"
+              }
+            ],
+            "internalType": "struct IGenericTraderBase.TraderParam[]",
+            "name": "tradersPath",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo[]",
+            "name": "makerAccounts",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "fromAccountNumber",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "toAccountNumber",
+                "type": "uint256"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint256",
+                    "name": "marketId",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "amountWei",
+                    "type": "uint256"
+                  }
+                ],
+                "internalType": "struct IGenericTraderProxyV2.TransferAmount[]",
+                "name": "transferAmounts",
+                "type": "tuple[]"
+              }
+            ],
+            "internalType": "struct IGenericTraderProxyV2.TransferCollateralParam",
+            "name": "transferCollateralParams",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "marketId",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint32",
+                "name": "expiryTimeDelta",
+                "type": "uint32"
+              }
+            ],
+            "internalType": "struct IGenericTraderProxyV2.ExpiryParam",
+            "name": "expiryParams",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+                "name": "balanceCheckFlag",
+                "type": "uint8"
+              },
+              {
+                "internalType": "enum IGenericTraderProxyV2.EventEmissionType",
+                "name": "eventType",
+                "type": "uint8"
+              }
+            ],
+            "internalType": "struct IGenericTraderProxyV2.UserConfig",
+            "name": "userConfig",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct IGenericTraderProxyV2.SwapExactInputForOutputAndModifyPositionParams",
+        "name": "_params",
+        "type": "tuple"
+      }
+    ],
+    "name": "swapExactInputForOutputAndModifyPositionForDifferentAccount",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_accountOwner",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "accountNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "marketIdsPath",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "inputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minOutputAmountWei",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "enum IGenericTraderBase.TraderType",
+                "name": "traderType",
+                "type": "uint8"
+              },
+              {
+                "internalType": "uint256",
+                "name": "makerAccountIndex",
+                "type": "uint256"
+              },
+              {
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes",
+                "name": "tradeData",
+                "type": "bytes"
+              }
+            ],
+            "internalType": "struct IGenericTraderBase.TraderParam[]",
+            "name": "tradersPath",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "number",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IDolomiteStructs.AccountInfo[]",
+            "name": "makerAccounts",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "internalType": "enum AccountBalanceLib.BalanceCheckFlag",
+                "name": "balanceCheckFlag",
+                "type": "uint8"
+              },
+              {
+                "internalType": "enum IGenericTraderProxyV2.EventEmissionType",
+                "name": "eventType",
+                "type": "uint8"
+              }
+            ],
+            "internalType": "struct IGenericTraderProxyV2.UserConfig",
+            "name": "userConfig",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct IGenericTraderProxyV2.SwapExactInputForOutputParams",
+        "name": "_params",
+        "type": "tuple"
+      }
+    ],
+    "name": "swapExactInputForOutputForDifferentAccount",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

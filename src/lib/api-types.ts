@@ -53,12 +53,15 @@ export interface ApiMarket {
   liquidationRewardPremium: Integer;
   isBorrowingDisabled: boolean;
   supplyLiquidity: Decimal | undefined;
+  borrowLiquidity: Decimal | undefined;
   maxSupplyLiquidity: Decimal | undefined;
 }
 
 export interface ApiTokenResponse {
+  id: string;
   marketId: string;
   supplyLiquidity: string;
+  borrowLiquidity: string;
   riskInfo: {
     supplyMaxWei: string | null;
   };

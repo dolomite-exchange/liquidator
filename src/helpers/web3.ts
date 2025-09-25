@@ -2,6 +2,8 @@ import { DolomiteMargin, Web3 } from '@dolomite-exchange/dolomite-margin';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { ethers } from 'ethers';
 import ExpiryProxyV1Abi from '../abis/expiry-proxy-v1.json';
+import GenericTraderProxyV2Abi from '../abis/generic-trader-proxy-v2.json';
+import { GenericTraderProxyV2 } from '../abis/GenericTraderV2';
 import LiquidatorProxyV1Abi from '../abis/liquidator-proxy-v1.json';
 import LiquidatorProxyV6Abi from '../abis/liquidator-proxy-v6.json';
 import { LiquidatorProxyV6 } from '../abis/LiquidatorProxyV6';
@@ -44,6 +46,12 @@ export const liquidatorProxyV6 = new ethers.Contract(
   LiquidatorProxyV6Abi,
   signerOrProvider,
 ) as LiquidatorProxyV6;
+
+export const genericTraderProxyV2 = new ethers.Contract(
+  ModuleDeployments.GenericTraderProxyV2[networkId].address,
+  GenericTraderProxyV2Abi,
+  signerOrProvider,
+) as GenericTraderProxyV2;
 
 export async function loadAccounts() {
   if (!accountWalletAddress) {
