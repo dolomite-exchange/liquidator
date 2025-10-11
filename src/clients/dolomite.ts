@@ -1130,7 +1130,7 @@ function mapGraphqlAccountToApiAccount(
     const index = (valuePar.lt('0') ? indexObject.borrow : indexObject.supply)
       .times(DECIMAL_BASE);
     memo[value.token.marketId] = {
-      marketId: Number(value.token.marketId),
+      marketId: Number.parseInt(value.token.marketId, 10),
       tokenName: value.token.name,
       tokenSymbol: value.token.symbol,
       tokenDecimals: Number.parseInt(value.token.decimals, 10),

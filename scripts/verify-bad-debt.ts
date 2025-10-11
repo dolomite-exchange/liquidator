@@ -25,7 +25,8 @@ const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
 
 const TEN = new BigNumber('10');
 
-const TICKERS_TO_IGNORE: string[] = [];
+const MARKET_IDS_TO_IGNORE: number[] = [];
+// const MARKET_IDS_TO_IGNORE: number[] = [6, 41];
 
 const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
 const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
@@ -56,7 +57,7 @@ function formatApiBalance(balance: ApiBalance): string {
 }
 
 function shouldIgnoreAccount(account: ApiAccount): boolean {
-  return Object.values(account.balances).some(b => TICKERS_TO_IGNORE.includes(b.tokenSymbol));
+  return Object.values(account.balances).some(b => MARKET_IDS_TO_IGNORE.includes(b.marketId));
 }
 
 async function start() {
@@ -156,7 +157,7 @@ async function start() {
     }
 
     const marginRatio = (riskOverride?.marginRatioOverride ?? riskParams.liquidationRatio).div(DECIMAL_BASE);
-    if (borrow.gt(supply)) {
+    if (borrow.gt(supply) && !shouldIgnoreAccount(account)) {
       if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
         Logger.warn({
           message: `Found bad debt for more than $${SMALL_BORROW_THRESHOLD.toFormat(2)}`,
