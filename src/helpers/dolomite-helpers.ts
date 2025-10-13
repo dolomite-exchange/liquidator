@@ -36,15 +36,14 @@ const collateralPreferences: Integer[] = (process.env.COLLATERAL_PREFERENCES ?? 
 const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split(',')
   .map((pref) => new BigNumber(pref.trim()));
 
-let oogaBoogaReferralInfo: ReferralOutput | undefined;
+const referralInfo: ReferralOutput | undefined = {
+  ensoApiKey: process.env.ENSO_API_KEY,
+  odosReferralCode: undefined,
+  oogaBoogaApiKey: process.env.OOGA_BOOGA_API_KEY,
+  referralAddress: undefined,
+};
 if (NETWORK_ID === ChainId.Berachain) {
-  oogaBoogaReferralInfo = {
-    ensoApiKey: process.env.ENSO_API_KEY,
-    odosReferralCode: undefined,
-    oogaBoogaApiKey: process.env.OOGA_BOOGA_API_KEY,
-    referralAddress: undefined,
-  };
-  if (!oogaBoogaReferralInfo.oogaBoogaApiKey) {
+  if (!referralInfo.oogaBoogaApiKey) {
     throw new Error('No API key found for Ooga Booga');
   }
 }
@@ -62,7 +61,7 @@ export const zap = new DolomiteZap({
   defaultIsLiquidation: IS_LIQUIDATION,
   defaultSlippageTolerance: THIRTY_BASIS_POINTS,
   defaultBlockTag: BLOCK_TAG,
-  referralInfo: oogaBoogaReferralInfo,
+  referralInfo: referralInfo,
   useProxyServer: USE_PROXY_SERVER,
   gasMultiplier: new ZapBigNumber(2),
 });
