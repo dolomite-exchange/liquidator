@@ -74,7 +74,7 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
 
 export function getGasPriceWeiWithModifications(): Integer {
   const gas = getGasPriceWei();
-  return gas.multipliedBy(MULTIPLIER).plus(ADDITION_WEI);
+  return gas.multipliedBy(MULTIPLIER).plus(ADDITION_WEI).integerValue();
 }
 
 export function getTypedGasPriceWeiWithModifications(): GasPriceForEthers {

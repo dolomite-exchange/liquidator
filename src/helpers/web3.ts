@@ -53,7 +53,7 @@ export const genericTraderProxyV2 = new ethers.Contract(
   signerOrProvider,
 ) as GenericTraderProxyV2;
 
-export async function loadAccounts() {
+export async function loadAccounts(): Promise<string> {
   if (!accountWalletAddress) {
     throw new Error('ACCOUNT_WALLET_ADDRESS is not defined!');
   }

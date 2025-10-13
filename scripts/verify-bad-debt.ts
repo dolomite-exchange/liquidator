@@ -21,12 +21,14 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const SMALL_BORROW_THRESHOLD = new BigNumber(100);
+const VAPORIZE_EXCESS = process.env.VAPORIZE_EXCESS === 'true';
+
+const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
 
 const TEN = new BigNumber('10');
 
-// const MARKET_IDS_TO_IGNORE: number[] = [];
-const MARKET_IDS_TO_IGNORE: number[] = [6, 41];
+const MARKET_IDS_TO_IGNORE: number[] = [];
+// const MARKET_IDS_TO_IGNORE: number[] = [6, 41];
 
 const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
 const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
@@ -102,6 +104,12 @@ async function start() {
     message: 'Finished updating accounts and markets',
   });
 
+  let nonce = 0;
+  if (VAPORIZE_EXCESS) {
+    const wallet = await loadAccounts();
+    nonce = await dolomite.web3.eth.getTransactionCount(wallet);
+  }
+
   const marketMap = marketStore.getMarketMap();
 
   // These accounts are not actually liquidatable, but rather accounts that have ANY debt.
@@ -167,17 +175,18 @@ async function start() {
           borrowUSD: borrow.toFormat(6),
         });
 
-        if (supply.eq(INTEGERS.ZERO) && process.env.VAPORIZE_EXCESS === 'true') {
+        if (supply.eq(INTEGERS.ZERO) && VAPORIZE_EXCESS) {
           await loadAccounts();
           const vaporMarket = Object.values(account.balances).find(b => b.wei.lt(INTEGERS.ZERO));
           const txResult = await dolomite.operation.initiate()
             .vaporize({
               primaryAccountOwner: dolomite.getDefaultAccount(),
-              primaryAccountId: INTEGERS.ZERO,
+              // primaryAccountId: INTEGERS.ZERO,
+              primaryAccountId: new BigNumber('84454885947697425406201769899678634598380862356089082229045977777208920484641'),
               vaporAccountOwner: account.owner,
               vaporAccountId: account.number,
               vaporMarketId: new BigNumber(vaporMarket!.marketId),
-              payoutMarketId: new BigNumber(vaporMarket!.marketId !== 17 ? 17 : 2),
+              payoutMarketId: new BigNumber(vaporMarket!.marketId !== 2 ? 2 : 0),
               amount: {
                 value: INTEGERS.ZERO,
                 denomination: AmountDenomination.Principal,
@@ -185,8 +194,10 @@ async function start() {
               },
             })
             .commit({
+              gas: 10_000_000,
               gasPrice: getGasPriceWeiWithModifications().toFixed(),
               confirmationType: ConfirmationType.Hash,
+              nonce: nonce++,
             });
 
           Logger.info({
