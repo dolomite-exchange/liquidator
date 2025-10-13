@@ -1,11 +1,13 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
+import { BigNumber as ZapBigNumber } from '@dolomite-exchange/zap-sdk';
 import {
   emitDepositCancelled,
   emitWithdrawalExecuted,
   liquidateAccount,
   liquidateExpiredAccount,
   retryAsyncAction,
+  zap,
 } from '../helpers/dolomite-helpers';
 import { isExpired } from '../helpers/time-helpers';
 import AccountStore from '../stores/account-store';
@@ -239,6 +241,11 @@ export default class DolomiteLiquidator {
     account: ApiAccount,
     marketMap: { [marketId: string]: ApiMarket },
   ): boolean => {
+    if (Object.values(account.balances).some(b => zap.getIsAsyncAssetByMarketId(new ZapBigNumber(b.marketId)))) {
+      // Always return true if the account holds GM tokens
+      return true;
+    }
+
     const borrow = Object.values(account.balances)
       .reduce((memo, balance) => {
         if (balance.wei.lt(INTEGERS.ZERO)) {

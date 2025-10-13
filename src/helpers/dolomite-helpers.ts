@@ -346,10 +346,9 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     );
   /* eslint-enable @typescript-eslint/indent */
 
-  if (
-    Object.keys(marketIdToActionsMap).length === 0
-    && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
-  ) {
+  if (Object.keys(marketIdToActionsMap).length
+    === 0
+    && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))) {
     Logger.info({
       message: 'Performing async liquidation preparation',
       owedMarketId: owedMarket.marketId,

@@ -21,12 +21,12 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
+const SMALL_BORROW_THRESHOLD = new BigNumber(100);
 
 const TEN = new BigNumber('10');
 
-const MARKET_IDS_TO_IGNORE: number[] = [];
-// const MARKET_IDS_TO_IGNORE: number[] = [6, 41];
+// const MARKET_IDS_TO_IGNORE: number[] = [];
+const MARKET_IDS_TO_IGNORE: number[] = [6, 41];
 
 const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
 const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
@@ -177,7 +177,7 @@ async function start() {
               vaporAccountOwner: account.owner,
               vaporAccountId: account.number,
               vaporMarketId: new BigNumber(vaporMarket!.marketId),
-              payoutMarketId: new BigNumber(vaporMarket!.marketId !== 0 ? 0 : 2),
+              payoutMarketId: new BigNumber(vaporMarket!.marketId !== 17 ? 17 : 2),
               amount: {
                 value: INTEGERS.ZERO,
                 denomination: AmountDenomination.Principal,
