@@ -42,9 +42,14 @@ const referralInfo: ReferralOutput | undefined = {
   oogaBoogaApiKey: process.env.OOGA_BOOGA_API_KEY,
   referralAddress: undefined,
 };
-if (NETWORK_ID === ChainId.Berachain) {
+if (NETWORK_ID === ChainId.Berachain || NETWORK_ID === ChainId.Botanix) {
   if (!referralInfo.oogaBoogaApiKey) {
     throw new Error('No API key found for Ooga Booga');
+  }
+}
+if (NETWORK_ID === ChainId.Ethereum) {
+  if (!referralInfo.ensoApiKey) {
+    throw new Error('No API key found for Enso');
   }
 }
 
