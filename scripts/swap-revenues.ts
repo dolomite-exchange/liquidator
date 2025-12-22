@@ -1,4 +1,4 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import { BigNumber as ZapBigNumber, MinimalApiToken } from '@dolomite-exchange/zap-sdk';
 import { ContractTransaction, ethers } from 'ethers';
@@ -13,6 +13,7 @@ import {
   swapViaGenericTraderProxy,
 } from '../src/helpers/generic-trader-proxy-v2-helper';
 import { dolomite, loadAccounts } from '../src/helpers/web3';
+import { ApiMarket } from '../src/lib/api-types';
 import '../src/lib/env';
 import Logger from '../src/lib/logger';
 import BlockStore from '../src/stores/block-store';
@@ -87,57 +88,26 @@ async function start() {
       continue;
     }
 
-    let keepFactor = INTEGERS.ONE;
-    if (market.symbol === 'WBERA') {
-      keepFactor = new BigNumber(0.8);
-    }
+    const keepFactor = INTEGERS.ONE;
 
     const maretId = new BigNumber(market.marketId);
     const rawBalance = await dolomite.getters.getAccountWei(SOLID_ACCOUNT.owner, INTEGERS.ZERO, maretId);
-    const balance = rawBalance.times(keepFactor).dividedToIntegerBy(INTEGERS.ONE);
+    const balance = rawBalance.times(keepFactor).integerValue();
     const balanceUSD = balance.times(market.oraclePrice).div(TEN.pow(36));
     if (balanceUSD.lt(100)) {
       // eslint-disable-next-line no-continue
       continue;
     }
 
-    const heldToken: MinimalApiToken = {
-      marketId: new ZapBigNumber(market.marketId),
-      symbol: market.symbol,
-    };
-    const zaps = await zap.getSwapExactTokensForTokensParams(
-      heldToken,
-      new ZapBigNumber(balance.toFixed()),
-      usdcToken,
-      new ZapBigNumber(1),
-      SOLID_ACCOUNT.owner,
-      { slippageTolerance: 0.05 },
-    );
-    if (zaps.length === 0) {
-      Logger.warn({
-        message: `Could not generate zaps for ${market.symbol} (${market.marketId})`,
-      });
-      // eslint-disable-next-line no-continue
-      continue;
+    const result = await swap(market, usdcToken, balance, balanceUSD, nonce);
+    if (result.transaction) {
+      transaction = result.transaction;
     }
-
-    Logger.info({
-      message: `Performing swap for ${market.symbol} (${market.marketId})`,
-      balance: balance.div(TEN.pow(market.decimals)).toFormat(6),
-      balanceUSD: `$${balanceUSD.toFormat(2)}`,
-      minOutputAmount: `${zaps[0].amountWeisPath[zaps[0].amountWeisPath.length - 1].toFixed(0)} USDC (wei)`,
-    });
-
-    const inputAmount = keepFactor.eq(INTEGERS.ONE) ? INTEGERS.MAX_UINT : balance;
-    const gasLimit = await estimateGasSwapViaGenericTraderProxy(inputAmount, zaps[0]);
-    transaction = await swapViaGenericTraderProxy(inputAmount, zaps[0], gasLimit, { nonce: nonce++ });
-    Logger.info({
-      message: `Transaction hash: ${transaction.hash}`,
-    });
+    nonce = result.nonce;
   }
 
   if (transaction) {
-    await transaction.wait();
+    await transaction.wait(2);
   }
 
   const balance = await dolomite.token.getBalance(
@@ -162,6 +132,68 @@ async function start() {
   }
 
   return true;
+}
+
+async function swap(
+  market: ApiMarket,
+  usdcToken: MinimalApiToken,
+  balance: Integer,
+  balanceUSD: Decimal,
+  nonce: number,
+  attemptNumber: number = 0,
+): Promise<{ transaction: ContractTransaction | undefined; nonce: number }> {
+  if (attemptNumber === 3) {
+    return { transaction: undefined, nonce };
+  }
+
+  const heldToken: MinimalApiToken = {
+    marketId: new ZapBigNumber(market.marketId),
+    symbol: market.symbol,
+  };
+  const zaps = await zap.getSwapExactTokensForTokensParams(
+    heldToken,
+    new ZapBigNumber(balance.toFixed()),
+    usdcToken,
+    new ZapBigNumber(1),
+    SOLID_ACCOUNT.owner,
+    { slippageTolerance: 0.05 },
+  );
+  if (zaps.length === 0) {
+    Logger.warn({
+      message: `Could not generate zaps for ${market.symbol} (${market.marketId})`,
+    });
+    return { transaction: undefined, nonce };
+  }
+
+  Logger.info({
+    message: `Performing swap for ${market.symbol} (${market.marketId})`,
+    balance: balance.div(TEN.pow(market.decimals)).toFormat(6),
+    balanceUSD: `$${balanceUSD.toFormat(2)}`,
+    minOutputAmount: `${zaps[0].amountWeisPath[zaps[0].amountWeisPath.length - 1].toFixed(0)} USDC (wei)`,
+  });
+
+  const keepFactor = INTEGERS.ONE;
+  const inputAmount = keepFactor.eq(INTEGERS.ONE) ? INTEGERS.MAX_UINT : balance;
+  const gasLimit = await estimateGasSwapViaGenericTraderProxy(inputAmount, zaps[0]);
+  const transaction = await swapViaGenericTraderProxy(inputAmount, zaps[0], gasLimit, { nonce: nonce++ });
+  Logger.info({
+    message: `Transaction hash: ${transaction.hash}`,
+  });
+
+  try {
+    const receipt = await transaction.wait();
+    if (receipt.status === 0) {
+      // noinspection ExceptionCaughtLocallyJS
+      throw new Error('Transaction failed!');
+    }
+  } catch (e) {
+    Logger.info({
+      message: 'Transaction failed! Trying again...',
+    });
+    return swap(market, usdcToken, balance, balanceUSD, nonce, attemptNumber + 1);
+  }
+
+  return { transaction, nonce };
 }
 
 start().catch(error => {
