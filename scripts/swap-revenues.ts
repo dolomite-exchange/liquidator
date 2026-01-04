@@ -114,10 +114,12 @@ async function start() {
     D_USDC_ADDRESS,
     SOLID_ACCOUNT.owner,
   );
+  const [totalAssets, totalSupply] = await Promise.all([dUsdc.totalAssets(), dUsdc.totalSupply()]);
   if (balance.gt(new BigNumber(100).times(TEN.pow(6)))) {
     Logger.info({
       message: 'Transferring dUSDC to Safe',
       balance: balance.div(TEN.pow(6)).toFormat(2),
+      balanceUSD: `$${balance.times(totalAssets.toString()).div(totalSupply.toString()).div(TEN.pow(6)).toFormat(2)}`,
     });
     const result = await dolomite.token.transfer(
       D_USDC_ADDRESS,

@@ -46,7 +46,7 @@ export default class GlvLiquidityStore {
     return axios.default.post('https://gmx.squids.live/gmx-synthetics-arbitrum:prod/api/graphql', {
       query: `
         query MyQuery {
-          marketInfos(where: { marketTokenAddress_eq: "${marketAddress}" }) {
+          marketInfos(where: { marketTokenAddress_eq: "${marketAddress}" } limit: 1) {
             marketTokenAddress
             longOpenInterestInTokens
             longPoolAmount
