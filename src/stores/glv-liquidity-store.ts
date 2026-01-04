@@ -22,7 +22,10 @@ const GLV_MAX_MARKET_TOKEN_BALANCE_USD_KEY = '0x210e65e389535740c6f5f16309d04a8f
 
 const GMX_PRECISION = ethers.BigNumber.from('1000000000000000000000000000000'); // 30 decimals
 
-// const FIVE_HUNDRED_THOUSAND_USD = ethers.BigNumber.from('500000000000000000000000000000000000'); // gmx uses 30 decimals
+/**
+ * GMX uses 30 decimals
+ */
+// const FIVE_HUNDRED_THOUSAND_USD = ethers.BigNumber.from('500000000000000000000000000000000000');
 
 interface GlvTokenUpdate {
   withdrawalMarket: string | undefined;
@@ -158,7 +161,7 @@ export default class GlvLiquidityStore {
       let withdrawalMarketAddress: string | undefined;
       let withdrawalMarketHighestUsd = ethers.BigNumber.from('0');
 
-      let depositMarket: string | undefined = undefined;
+      let depositMarket: string | undefined;
       let depositMarketHighestCap = ethers.BigNumber.from('0');
 
       const invalidMarkets: string[] = [];
@@ -167,8 +170,8 @@ export default class GlvLiquidityStore {
         at: 'GlvLiquidityStore#_update',
         message: `Found ${glv.markets.length} markets for the ${glv.name} token`,
       });
-      for (let i = 0; i < glv.markets.length; i++) {
-        const market = glv.markets[i];
+      for (let j = 0; j < glv.markets.length; j++) {
+        const market = glv.markets[j];
         if (market.isDisabled === true) {
           // eslint-disable-next-line no-continue
           continue;
