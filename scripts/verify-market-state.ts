@@ -1,11 +1,13 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
+import { writeFileSync } from 'node:fs';
 import v8 from 'v8';
-import { getDolomiteRiskParams } from '../src/clients/dolomite';
+import { getDolomiteRiskParams, getLiquidatableDolomiteAccountsWithCertainSupplyAsset } from '../src/clients/dolomite';
 import { updateGasPrice } from '../src/helpers/gas-price-helpers';
 import { dolomite } from '../src/helpers/web3';
 import '../src/lib/env';
 import Logger from '../src/lib/logger';
+import Pageable from '../src/lib/pageable';
 import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
@@ -61,13 +63,23 @@ async function start() {
 
   const marketMap = marketStore.getMarketMap();
 
-  // These accounts are not actually liquidatable, but rather accounts that have ANY debt.
-  const accounts = accountStore.getLiquidatableDolomiteAccounts().filter(account => {
-    return Object.keys(account.balances).some(k => marketId.eq(k) && account.balances[k].par.gt(INTEGERS.ZERO))
+  const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
+  const { tokenAddress } = marketMap[marketId.toFixed()];
+
+  const accounts = await Pageable.getPageableValues(async (lastId) => {
+    const { accounts: nextAccounts } = await getLiquidatableDolomiteAccountsWithCertainSupplyAsset(
+      marketIndexMap,
+      tokenAddress,
+      true,
+      blockNumber,
+      lastId,
+    );
+    return nextAccounts;
   });
 
   let totalCollateralAmount = INTEGERS.ZERO;
   let totalDebtAmount = INTEGERS.ZERO;
+  const rawAccounts: any[] = [];
   for (let i = 0; i < accounts.length; i += 1) {
     const account = accounts[i];
     const initial = {
@@ -103,6 +115,11 @@ async function start() {
       borrowAssets: borrowAssets.join(', '),
     })
 
+    rawAccounts.push({
+      owner: account.owner,
+      number: account.number,
+      debtMarkets: Object.values(account.balances).filter(b => b.par.lt(INTEGERS.ZERO)).map(b => b.marketId),
+    });
     totalCollateralAmount = totalCollateralAmount.plus(supply);
     totalDebtAmount = totalDebtAmount.plus(borrow);
   }
@@ -114,6 +131,7 @@ async function start() {
     totalDebtAmount: `$${formatNumber(totalDebtAmount.toNumber())}`,
   });
 
+  writeFileSync(`${__dirname}/output/market-state-${marketId}.json`, JSON.stringify(rawAccounts, null, 2));
   return true;
 }
 

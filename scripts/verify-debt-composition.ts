@@ -1,6 +1,6 @@
-import { writeFileSync } from 'node:fs';
 import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
+import { writeFileSync } from 'node:fs';
 import v8 from 'v8';
 import {
   getDolomiteRiskParams,
@@ -74,10 +74,18 @@ function formatAccountData(
   marketId: Integer,
   value: 'supply' | 'borrow',
 ) {
-  const formattedAccounts = accounts.map(a => ({
-    owner: a.owner,
-    number: a.number.toFixed(),
-  }))
+  const divisor = new BigNumber(10).pow(marketMap[marketId.toFixed()].decimals);
+  const formattedAccounts = accounts
+    .map(a => ({
+      owner: a.owner,
+      number: a.number.toFixed(),
+      balance: Object.values(a.balances).find(f => marketId.eq(f.marketId))!.wei.div(divisor),
+    }))
+    .sort((a, b) => a.balance.comparedTo(b.balance))
+    .map(a => ({
+      ...a,
+      balance: a.balance.toFormat(2),
+    }));
   writeFileSync(
     `${__dirname}/output/${value}-${process.env.MARKET_ID}-accounts.json`,
     JSON.stringify(formattedAccounts, null, 2),
