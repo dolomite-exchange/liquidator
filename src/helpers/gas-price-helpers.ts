@@ -87,11 +87,11 @@ export function getTypedGasPriceWeiWithModifications(): GasPriceForEthers {
 
   if (gasResult.type === GasPriceType.EIP_1559) {
     const baseFee = gasResult.baseFeeWei.multipliedBy(MULTIPLIER).plus(ADDITION_WEI).toFixed(0);
-    const priorityFee = gasResult.priorityFeeWei.plus(ADDITION_WEI).toFixed(0);
+    const priorityFee = ethers.BigNumber.from(gasResult.priorityFeeWei.plus(ADDITION_WEI).toFixed(0));
     return {
       type: 2,
-      maxFeePerGas: ethers.BigNumber.from(baseFee).add(priorityFee).toString(),
-      maxPriorityFeePerGas: priorityFee,
+      maxFeePerGas: ethers.BigNumber.from(baseFee).add(priorityFee).toHexString(),
+      maxPriorityFeePerGas: priorityFee.toHexString(),
     };
   }
 

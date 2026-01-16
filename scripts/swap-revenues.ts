@@ -22,6 +22,7 @@ import MarketStore from '../src/stores/market-store';
 const D_USDC_ADDRESS = '0x444868B6e8079ac2c55eea115250f92C2b2c4D14';
 const SAFE_ADDRESS = '0xa75c21C5BE284122a87A37a76cc6C4DD3E55a1D4';
 const TEN = new BigNumber('10');
+const MIN_BALANCE_TO_SWAP_USD = new BigNumber('100');
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL!);
 
@@ -94,7 +95,7 @@ async function start() {
     const rawBalance = await dolomite.getters.getAccountWei(SOLID_ACCOUNT.owner, INTEGERS.ZERO, maretId);
     const balance = rawBalance.times(keepFactor).integerValue();
     const balanceUSD = balance.times(market.oraclePrice).div(TEN.pow(36));
-    if (balanceUSD.lt(100)) {
+    if (balanceUSD.lt(MIN_BALANCE_TO_SWAP_USD)) {
       // eslint-disable-next-line no-continue
       continue;
     }
@@ -167,11 +168,12 @@ async function swap(
     return { transaction: undefined, nonce };
   }
 
+  const minOutputAmount = zaps[0].amountWeisPath[zaps[0].amountWeisPath.length - 1];
   Logger.info({
     message: `Performing swap for ${market.symbol} (${market.marketId})`,
     balance: balance.div(TEN.pow(market.decimals)).toFormat(6),
     balanceUSD: `$${balanceUSD.toFormat(2)}`,
-    minOutputAmount: `${zaps[0].amountWeisPath[zaps[0].amountWeisPath.length - 1].toFixed(0)} USDC (wei)`,
+    minOutputAmount: `${minOutputAmount.div(TEN.pow(6)).toFormat(2)} USDC (wei)`,
   });
 
   const keepFactor = INTEGERS.ONE;
