@@ -118,7 +118,7 @@ function formatAccountData(
       medianAccountDebt: `$${medianAccount.borrowUSD.toFormat(2)}`,
       biggestAccountDebt: `$${biggestAccount.borrowUSD.toFormat(2)}`,
       averageAccountDebt: `$${averageAccountDebt.toFormat(2)}`,
-      totalOfMarketId: totalOfMarketId.toFixed(),
+      totalOfMarketId: totalOfMarketId.div(divisor).toFormat(6),
       largeAccounts: {
         thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
         accounts: transformedAccounts.filter(a => a.borrowUSD.abs().gte(LARGE_AMOUNT_THRESHOLD_USD))
