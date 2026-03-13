@@ -13,7 +13,7 @@ import axios from 'axios';
 import * as ethers from 'ethers';
 import AccountRiskOverrideSetterAbi from '../abis/account-risk-override-setter.json';
 import { isMarketIgnored } from '../helpers/market-helpers';
-import { dolomite } from '../helpers/web3';
+import { dolomite, liquidatorProxyV6 } from '../helpers/web3';
 import {
   ALL_E_MODE_CATEGORIES,
   ApiAccount,
@@ -394,6 +394,15 @@ export async function getDolomiteMarkets(
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
   const marketPriceResults = await aggregateWithExceptionHandler(marketPriceCalls);
 
+  const isPartialLiquidationSupportedCalls = filteredMarketRiskInfos.map(market => {
+    const { marketId } = market.token;
+    return {
+      target: liquidatorProxyV6.address,
+      callData: liquidatorProxyV6.interface.encodeFunctionData('isPartialLiquidationSupportedByMarketId', [marketId]),
+    };
+  });
+  const isPartialLiquidationSupportedResults = await aggregateWithExceptionHandler(isPartialLiquidationSupportedCalls);
+
   const tokenAddressToDolomiteApiMarket: Record<string, {
     supplyWei: Decimal;
     borrowWei: Decimal;
@@ -437,6 +446,9 @@ export async function getDolomiteMarkets(
       const oraclePrice = marketPriceResults[i].success
         ? dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i].returnData)
         : INTEGERS.ZERO;
+      const isPartialLiquidationSupported = isPartialLiquidationSupportedResults[i].success
+        ? dolomite.web3.eth.abi.decodeParameter('bool', marketPriceResults[i].returnData)
+        : false;
       const apiMarket: ApiMarket = {
         id: market.id,
         marketId: marketId.toNumber(),
@@ -448,6 +460,7 @@ export async function getDolomiteMarkets(
         marginPremium: new BigNumber(decimalToString(market.marginPremium)),
         liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
         isBorrowingDisabled: market.isBorrowingDisabled,
+        isPartialLiquidationSupported: isPartialLiquidationSupported as boolean,
         supplyLiquidity: tokenAddressToDolomiteApiMarket[market.id]?.supplyWei,
         borrowLiquidity: tokenAddressToDolomiteApiMarket[market.id]?.borrowWei,
         maxSupplyLiquidity: tokenAddressToDolomiteApiMarket[market.id]?.maxSupplyWei,

@@ -3,6 +3,7 @@ export enum ChainId {
   Base = 8453,
   Berachain = 80094,
   Botanix = 3637,
+  Bsc = 56,
   Ethereum = 1,
   Ink = 57073,
   Mantle = 5000,
@@ -24,6 +25,10 @@ export function isBerachain(chainId: ChainId): boolean {
 
 export function isBotanix(chainId: ChainId): boolean {
   return chainId === ChainId.Botanix;
+}
+
+export function isBsc(chainId: ChainId): boolean {
+  return chainId === ChainId.Bsc;
 }
 
 export function isEthereum(chainId: ChainId): boolean {

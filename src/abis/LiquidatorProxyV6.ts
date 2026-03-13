@@ -21,12 +21,11 @@ import type {
 import type { Provider } from "@ethersproject/providers";
 
 export declare namespace IDolomiteStructs {
-  export type AccountInfoStruct = { owner: string; number: BigNumberish };
+  export type DecimalStruct = { value: BigNumberish };
 
-  export type AccountInfoStructOutput = [string, BigNumber] & {
-    owner: string;
-    number: BigNumber;
-  };
+  export type DecimalStructOutput = [BigNumber] & { value: BigNumber };
+
+  export type AccountInfoStruct = { owner: string; number: BigNumberish };
 }
 
 export declare namespace IGenericTraderBase {
@@ -35,13 +34,6 @@ export declare namespace IGenericTraderBase {
     makerAccountIndex: BigNumberish;
     trader: string;
     tradeData: BytesLike;
-  };
-
-  export type TraderParamStructOutput = [number, BigNumber, string, string] & {
-    traderType: number;
-    makerAccountIndex: BigNumber;
-    trader: string;
-    tradeData: string;
   };
 }
 
@@ -57,28 +49,6 @@ export declare namespace ILiquidatorProxyV6 {
     expirationTimestamp: BigNumberish;
     withdrawAllReward: boolean;
   };
-
-  export type LiquidateParamsStructOutput = [
-    IDolomiteStructs.AccountInfoStructOutput,
-    IDolomiteStructs.AccountInfoStructOutput,
-    BigNumber[],
-    BigNumber,
-    BigNumber,
-    IGenericTraderBase.TraderParamStructOutput[],
-    IDolomiteStructs.AccountInfoStructOutput[],
-    BigNumber,
-    boolean
-  ] & {
-    solidAccount: IDolomiteStructs.AccountInfoStructOutput;
-    liquidAccount: IDolomiteStructs.AccountInfoStructOutput;
-    marketIdsPath: BigNumber[];
-    inputAmountWei: BigNumber;
-    minOutputAmountWei: BigNumber;
-    tradersPath: IGenericTraderBase.TraderParamStructOutput[];
-    makerAccounts: IDolomiteStructs.AccountInfoStructOutput[];
-    expirationTimestamp: BigNumber;
-    withdrawAllReward: boolean;
-  };
 }
 
 export interface LiquidatorProxyV6Interface extends utils.Interface {
@@ -88,9 +58,19 @@ export interface LiquidatorProxyV6Interface extends utils.Interface {
     "DOLOMITE_REGISTRY()": FunctionFragment;
     "EXPIRY()": FunctionFragment;
     "LIQUIDATOR_ASSET_REGISTRY()": FunctionFragment;
+    "dolomiteRake()": FunctionFragment;
     "initialize()": FunctionFragment;
+    "isPartialLiquidationSupportedByMarketId(uint256)": FunctionFragment;
+    "isWhitelistedPartialLiquidator(address)": FunctionFragment;
     "liquidate(((address,uint256),(address,uint256),uint256[],uint256,uint256,(uint8,uint256,address,bytes)[],(address,uint256)[],uint256,bool))": FunctionFragment;
     "liquidateViaProxyWithStrictInputMarket(((address,uint256),(address,uint256),uint256[],uint256,uint256,(uint8,uint256,address,bytes)[],(address,uint256)[],uint256,bool))": FunctionFragment;
+    "ownerInitializeV2((uint256),(uint256),address,uint256[])": FunctionFragment;
+    "ownerSetDolomiteRake((uint256))": FunctionFragment;
+    "ownerSetIsPartialLiquidator(address,bool)": FunctionFragment;
+    "ownerSetMarketToPartialLiquidationSupported(uint256[],bool[])": FunctionFragment;
+    "ownerSetPartialLiquidationThreshold((uint256))": FunctionFragment;
+    "partialLiquidationThreshold()": FunctionFragment;
+    "version()": FunctionFragment;
   };
 
   getFunction(
@@ -100,9 +80,19 @@ export interface LiquidatorProxyV6Interface extends utils.Interface {
       | "DOLOMITE_REGISTRY"
       | "EXPIRY"
       | "LIQUIDATOR_ASSET_REGISTRY"
+      | "dolomiteRake"
       | "initialize"
+      | "isPartialLiquidationSupportedByMarketId"
+      | "isWhitelistedPartialLiquidator"
       | "liquidate"
       | "liquidateViaProxyWithStrictInputMarket"
+      | "ownerInitializeV2"
+      | "ownerSetDolomiteRake"
+      | "ownerSetIsPartialLiquidator"
+      | "ownerSetMarketToPartialLiquidationSupported"
+      | "ownerSetPartialLiquidationThreshold"
+      | "partialLiquidationThreshold"
+      | "version"
   ): FunctionFragment;
 
   encodeFunctionData(
@@ -123,8 +113,20 @@ export interface LiquidatorProxyV6Interface extends utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "dolomiteRake",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "initialize",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isPartialLiquidationSupportedByMarketId",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isWhitelistedPartialLiquidator",
+    values: [string]
   ): string;
   encodeFunctionData(
     functionFragment: "liquidate",
@@ -134,6 +136,36 @@ export interface LiquidatorProxyV6Interface extends utils.Interface {
     functionFragment: "liquidateViaProxyWithStrictInputMarket",
     values: [ILiquidatorProxyV6.LiquidateParamsStruct]
   ): string;
+  encodeFunctionData(
+    functionFragment: "ownerInitializeV2",
+    values: [
+      IDolomiteStructs.DecimalStruct,
+      IDolomiteStructs.DecimalStruct,
+      string,
+      BigNumberish[]
+    ]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "ownerSetDolomiteRake",
+    values: [IDolomiteStructs.DecimalStruct]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "ownerSetIsPartialLiquidator",
+    values: [string, boolean]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "ownerSetMarketToPartialLiquidationSupported",
+    values: [BigNumberish[], boolean[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "ownerSetPartialLiquidationThreshold",
+    values: [IDolomiteStructs.DecimalStruct]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "partialLiquidationThreshold",
+    values?: undefined
+  ): string;
+  encodeFunctionData(functionFragment: "version", values?: undefined): string;
 
   decodeFunctionResult(
     functionFragment: "DOLOMITE_MARGIN",
@@ -152,18 +184,67 @@ export interface LiquidatorProxyV6Interface extends utils.Interface {
     functionFragment: "LIQUIDATOR_ASSET_REGISTRY",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "dolomiteRake",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "initialize", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "isPartialLiquidationSupportedByMarketId",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "isWhitelistedPartialLiquidator",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "liquidate", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "liquidateViaProxyWithStrictInputMarket",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "ownerInitializeV2",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "ownerSetDolomiteRake",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "ownerSetIsPartialLiquidator",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "ownerSetMarketToPartialLiquidationSupported",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "ownerSetPartialLiquidationThreshold",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "partialLiquidationThreshold",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "version", data: BytesLike): Result;
 
   events: {
+    "DolomiteRakeSet((uint256))": EventFragment;
     "Initialized(uint8)": EventFragment;
+    "MarketToPartialLiquidationSupportedSet(uint256[],bool[])": EventFragment;
+    "PartialLiquidationThresholdSet((uint256))": EventFragment;
+    "PartialLiquidatorSet(address,bool)": EventFragment;
   };
 
+  getEvent(nameOrSignatureOrTopic: "DolomiteRakeSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Initialized"): EventFragment;
+  getEvent(
+    nameOrSignatureOrTopic: "MarketToPartialLiquidationSupportedSet"
+  ): EventFragment;
+  getEvent(
+    nameOrSignatureOrTopic: "PartialLiquidationThresholdSet"
+  ): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "PartialLiquidatorSet"): EventFragment;
 }
 
 export interface LiquidatorProxyV6 extends BaseContract {
@@ -184,9 +265,23 @@ export interface LiquidatorProxyV6 extends BaseContract {
 
     LIQUIDATOR_ASSET_REGISTRY(overrides?: CallOverrides): Promise<[string]>;
 
+    dolomiteRake(
+      overrides?: CallOverrides
+    ): Promise<[IDolomiteStructs.DecimalStructOutput]>;
+
     initialize(
       overrides?: Overrides & { from?: string }
     ): Promise<ContractTransaction>;
+
+    isPartialLiquidationSupportedByMarketId(
+      _marketId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
+
+    isWhitelistedPartialLiquidator(
+      _account: string,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
     liquidate(
       _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
@@ -197,6 +292,42 @@ export interface LiquidatorProxyV6 extends BaseContract {
       _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
       overrides?: Overrides & { from?: string }
     ): Promise<ContractTransaction>;
+
+    ownerInitializeV2(
+      _dolomiteRake: IDolomiteStructs.DecimalStruct,
+      _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+      _initialPartialLiquidator: string,
+      _initialPartialLiquidationMarketIds: BigNumberish[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    ownerSetDolomiteRake(
+      _dolomiteRake: IDolomiteStructs.DecimalStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    ownerSetIsPartialLiquidator(
+      _partialLiquidator: string,
+      _isPartialLiquidator: boolean,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    ownerSetMarketToPartialLiquidationSupported(
+      _marketIds: BigNumberish[],
+      _isSupported: boolean[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    ownerSetPartialLiquidationThreshold(
+      _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    partialLiquidationThreshold(
+      overrides?: CallOverrides
+    ): Promise<[IDolomiteStructs.DecimalStructOutput]>;
+
+    version(overrides?: CallOverrides): Promise<[number]>;
   };
 
   DOLOMITE_MARGIN(overrides?: CallOverrides): Promise<string>;
@@ -209,9 +340,23 @@ export interface LiquidatorProxyV6 extends BaseContract {
 
   LIQUIDATOR_ASSET_REGISTRY(overrides?: CallOverrides): Promise<string>;
 
+  dolomiteRake(
+    overrides?: CallOverrides
+  ): Promise<IDolomiteStructs.DecimalStructOutput>;
+
   initialize(
     overrides?: Overrides & { from?: string }
   ): Promise<ContractTransaction>;
+
+  isPartialLiquidationSupportedByMarketId(
+    _marketId: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  isWhitelistedPartialLiquidator(
+    _account: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   liquidate(
     _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
@@ -222,6 +367,42 @@ export interface LiquidatorProxyV6 extends BaseContract {
     _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
     overrides?: Overrides & { from?: string }
   ): Promise<ContractTransaction>;
+
+  ownerInitializeV2(
+    _dolomiteRake: IDolomiteStructs.DecimalStruct,
+    _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+    _initialPartialLiquidator: string,
+    _initialPartialLiquidationMarketIds: BigNumberish[],
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  ownerSetDolomiteRake(
+    _dolomiteRake: IDolomiteStructs.DecimalStruct,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  ownerSetIsPartialLiquidator(
+    _partialLiquidator: string,
+    _isPartialLiquidator: boolean,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  ownerSetMarketToPartialLiquidationSupported(
+    _marketIds: BigNumberish[],
+    _isSupported: boolean[],
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  ownerSetPartialLiquidationThreshold(
+    _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  partialLiquidationThreshold(
+    overrides?: CallOverrides
+  ): Promise<IDolomiteStructs.DecimalStructOutput>;
+
+  version(overrides?: CallOverrides): Promise<number>;
 
   callStatic: {
     DOLOMITE_MARGIN(overrides?: CallOverrides): Promise<string>;
@@ -234,7 +415,21 @@ export interface LiquidatorProxyV6 extends BaseContract {
 
     LIQUIDATOR_ASSET_REGISTRY(overrides?: CallOverrides): Promise<string>;
 
+    dolomiteRake(
+      overrides?: CallOverrides
+    ): Promise<IDolomiteStructs.DecimalStructOutput>;
+
     initialize(overrides?: CallOverrides): Promise<void>;
+
+    isPartialLiquidationSupportedByMarketId(
+      _marketId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    isWhitelistedPartialLiquidator(
+      _account: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     liquidate(
       _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
@@ -245,6 +440,42 @@ export interface LiquidatorProxyV6 extends BaseContract {
       _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    ownerInitializeV2(
+      _dolomiteRake: IDolomiteStructs.DecimalStruct,
+      _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+      _initialPartialLiquidator: string,
+      _initialPartialLiquidationMarketIds: BigNumberish[],
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    ownerSetDolomiteRake(
+      _dolomiteRake: IDolomiteStructs.DecimalStruct,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    ownerSetIsPartialLiquidator(
+      _partialLiquidator: string,
+      _isPartialLiquidator: boolean,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    ownerSetMarketToPartialLiquidationSupported(
+      _marketIds: BigNumberish[],
+      _isSupported: boolean[],
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    ownerSetPartialLiquidationThreshold(
+      _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    partialLiquidationThreshold(
+      overrides?: CallOverrides
+    ): Promise<IDolomiteStructs.DecimalStructOutput>;
+
+    version(overrides?: CallOverrides): Promise<number>;
   };
 
   estimateGas: {
@@ -258,7 +489,19 @@ export interface LiquidatorProxyV6 extends BaseContract {
 
     LIQUIDATOR_ASSET_REGISTRY(overrides?: CallOverrides): Promise<BigNumber>;
 
+    dolomiteRake(overrides?: CallOverrides): Promise<BigNumber>;
+
     initialize(overrides?: Overrides & { from?: string }): Promise<BigNumber>;
+
+    isPartialLiquidationSupportedByMarketId(
+      _marketId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    isWhitelistedPartialLiquidator(
+      _account: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     liquidate(
       _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
@@ -269,6 +512,40 @@ export interface LiquidatorProxyV6 extends BaseContract {
       _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
       overrides?: Overrides & { from?: string }
     ): Promise<BigNumber>;
+
+    ownerInitializeV2(
+      _dolomiteRake: IDolomiteStructs.DecimalStruct,
+      _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+      _initialPartialLiquidator: string,
+      _initialPartialLiquidationMarketIds: BigNumberish[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    ownerSetDolomiteRake(
+      _dolomiteRake: IDolomiteStructs.DecimalStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    ownerSetIsPartialLiquidator(
+      _partialLiquidator: string,
+      _isPartialLiquidator: boolean,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    ownerSetMarketToPartialLiquidationSupported(
+      _marketIds: BigNumberish[],
+      _isSupported: boolean[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    ownerSetPartialLiquidationThreshold(
+      _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    partialLiquidationThreshold(overrides?: CallOverrides): Promise<BigNumber>;
+
+    version(overrides?: CallOverrides): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -286,8 +563,20 @@ export interface LiquidatorProxyV6 extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    dolomiteRake(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     initialize(
       overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    isPartialLiquidationSupportedByMarketId(
+      _marketId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    isWhitelistedPartialLiquidator(
+      _account: string,
+      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     liquidate(
@@ -299,5 +588,41 @@ export interface LiquidatorProxyV6 extends BaseContract {
       _liquidateParams: ILiquidatorProxyV6.LiquidateParamsStruct,
       overrides?: Overrides & { from?: string }
     ): Promise<PopulatedTransaction>;
+
+    ownerInitializeV2(
+      _dolomiteRake: IDolomiteStructs.DecimalStruct,
+      _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+      _initialPartialLiquidator: string,
+      _initialPartialLiquidationMarketIds: BigNumberish[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    ownerSetDolomiteRake(
+      _dolomiteRake: IDolomiteStructs.DecimalStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    ownerSetIsPartialLiquidator(
+      _partialLiquidator: string,
+      _isPartialLiquidator: boolean,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    ownerSetMarketToPartialLiquidationSupported(
+      _marketIds: BigNumberish[],
+      _isSupported: boolean[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    ownerSetPartialLiquidationThreshold(
+      _partialLiquidationThreshold: IDolomiteStructs.DecimalStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    partialLiquidationThreshold(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    version(overrides?: CallOverrides): Promise<PopulatedTransaction>;
   };
 }

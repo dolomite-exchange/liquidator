@@ -9,7 +9,7 @@ export function isCollateralized(
   account: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
-): boolean {
+): { isCollateralized: boolean, partialLiquidation: boolean } {
   const riskOverride = getAccountRiskOverride(account, riskParams);
   const initial = {
     borrow: INTEGERS.ZERO,
@@ -39,7 +39,12 @@ export function isCollateralized(
     }, initial);
 
   const liquidationRatio = riskOverride ? riskOverride.marginRatioOverride : riskParams.liquidationRatio;
-  return supply.gte(borrow.times(liquidationRatio).dividedToIntegerBy(DECIMAL_BASE));
+  const partialLiquidationThreshold = DECIMAL_BASE.times(0.95); // 95%
+  const healthScore = supply.times(DECIMAL_BASE).div(borrow).times(DECIMAL_BASE).div(liquidationRatio)
+  return {
+    isCollateralized: supply.gte(borrow.times(liquidationRatio).dividedToIntegerBy(DECIMAL_BASE)),
+    partialLiquidation: healthScore.gte(partialLiquidationThreshold),
+  };
 }
 
 export function getPartial(amount: Integer, numerator: Integer, denominator: Integer): Integer {

@@ -105,7 +105,7 @@ export default class DolomiteLiquidator {
     const liquidatableAccounts = this.accountStore.getLiquidatableDolomiteAccounts()
       .filter(account => {
         return !this.liquidationStore.contains(account)
-          && !isCollateralized(account, marketMap, riskParams)
+          && !isCollateralized(account, marketMap, riskParams).isCollateralized
           && this.isSufficientDebt(account, marketMap)
           && !this.isVaporizable(account, marketMap)
       })
@@ -186,6 +186,7 @@ export default class DolomiteLiquidator {
           riskParams,
           marginAccountToRetryableActionsMap,
           lastBlockTimestamp,
+          isCollateralized(account, marketMap, riskParams).partialLiquidation,
         );
         if (result) {
           Logger.info({

@@ -34,6 +34,26 @@
     "anonymous": false,
     "inputs": [
       {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "dolomiteRake",
+        "type": "tuple"
+      }
+    ],
+    "name": "DolomiteRakeSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "uint8",
         "name": "version",
@@ -41,6 +61,64 @@
       }
     ],
     "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256[]",
+        "name": "marketIds",
+        "type": "uint256[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool[]",
+        "name": "isSupported",
+        "type": "bool[]"
+      }
+    ],
+    "name": "MarketToPartialLiquidationSupportedSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "partialLiquidationThreshold",
+        "type": "tuple"
+      }
+    ],
+    "name": "PartialLiquidationThresholdSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "partialLiquidator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "isPartialLiquidator",
+        "type": "bool"
+      }
+    ],
+    "name": "PartialLiquidatorSet",
     "type": "event"
   },
   {
@@ -110,9 +188,67 @@
   },
   {
     "inputs": [],
+    "name": "dolomiteRake",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_marketId",
+        "type": "uint256"
+      }
+    ],
+    "name": "isPartialLiquidationSupportedByMarketId",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
+    ],
+    "name": "isWhitelistedPartialLiquidator",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -349,6 +485,157 @@
     "name": "liquidateViaProxyWithStrictInputMarket",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "_dolomiteRake",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "_partialLiquidationThreshold",
+        "type": "tuple"
+      },
+      {
+        "internalType": "address",
+        "name": "_initialPartialLiquidator",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "_initialPartialLiquidationMarketIds",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "ownerInitializeV2",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "_dolomiteRake",
+        "type": "tuple"
+      }
+    ],
+    "name": "ownerSetDolomiteRake",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_partialLiquidator",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "_isPartialLiquidator",
+        "type": "bool"
+      }
+    ],
+    "name": "ownerSetIsPartialLiquidator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "_marketIds",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "bool[]",
+        "name": "_isSupported",
+        "type": "bool[]"
+      }
+    ],
+    "name": "ownerSetMarketToPartialLiquidationSupported",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "_partialLiquidationThreshold",
+        "type": "tuple"
+      }
+    ],
+    "name": "ownerSetPartialLiquidationThreshold",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "partialLiquidationThreshold",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IDolomiteStructs.Decimal",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ]

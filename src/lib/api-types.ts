@@ -52,6 +52,7 @@ export interface ApiMarket {
   marginPremium: Integer;
   liquidationRewardPremium: Integer;
   isBorrowingDisabled: boolean;
+  isPartialLiquidationSupported: boolean;
   supplyLiquidity: Decimal | undefined;
   borrowLiquidity: Decimal | undefined;
   maxSupplyLiquidity: Decimal | undefined;
