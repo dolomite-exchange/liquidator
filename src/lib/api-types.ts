@@ -120,6 +120,7 @@ export interface ApiRiskParam {
   liquidationReward: Integer;
   numberOfMarkets: number;
   riskOverrideSettings: ApiRiskOverrideSettings;
+  dolomiteFeeRake: Decimal;
 }
 
 export interface ApiLiquidation {

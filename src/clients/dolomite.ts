@@ -1,7 +1,7 @@
 /* eslint-disable max-len */
 import { address, BigNumber, Decimal, Networks } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
-import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
+import { decimalToString, stringToDecimal } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import {
   ApiAsyncAction,
   ApiAsyncActionType,
@@ -602,6 +602,8 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
     }
   }
 
+  const feeRake = await liquidatorProxyV6.dolomiteRake();
+
   const riskParams: ApiRiskParam[] = subgraphResult.data.dolomiteMargins.map(riskParam => {
     return {
       dolomiteMargin: ethers.utils.getAddress(riskParam.id),
@@ -612,6 +614,7 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
         marketIdToCategoryMap,
         marketIdToRiskFeatureMap,
       },
+      dolomiteFeeRake: stringToDecimal(feeRake.value.toString()),
     };
   });
 

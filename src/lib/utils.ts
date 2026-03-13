@@ -112,16 +112,31 @@ export function getOwedPriceForLiquidation(
 
 export function getAmountsForLiquidation(
   owedWei: Integer,
+  owedPrice: Integer,
   owedPriceAdj: Integer,
   heldWei: Integer,
   heldPrice: Integer,
   heldProtocolBalance: Integer,
+  dolomiteFeeRake: Decimal,
 ): { owedWei: Integer, heldWei: Integer, isVaporizable: boolean } {
   const maxHeldWei = heldProtocolBalance.lt(heldWei) ? heldProtocolBalance : heldWei;
   if (owedWei.times(owedPriceAdj).gt(maxHeldWei.times(heldPrice))) {
-    return { owedWei: heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj), heldWei: maxHeldWei, isVaporizable: true };
+    const owedWeiAdj = heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj);
+    const heldWeiWithoutReward = owedWeiToHeldWei(owedWeiAdj, owedPrice, heldPrice);
+    const reward = maxHeldWei.minus(heldWeiWithoutReward);
+    return {
+      owedWei: owedWeiAdj,
+      heldWei: maxHeldWei.minus(reward.times(dolomiteFeeRake).integerValue()),
+      isVaporizable: true,
+    };
   } else {
-    return { owedWei, heldWei: owedWeiToHeldWei(owedWei, owedPriceAdj, heldPrice), isVaporizable: false };
+    const heldWeiWithReward = owedWeiToHeldWei(owedWei, owedPriceAdj, heldPrice);
+    const reward = heldWeiWithReward.minus(owedWeiToHeldWei(owedWei, owedPrice, heldPrice))
+    return {
+      owedWei,
+      heldWei: heldWeiWithReward.minus(reward.times(dolomiteFeeRake).integerValue()),
+      isVaporizable: false,
+    };
   }
 }
 

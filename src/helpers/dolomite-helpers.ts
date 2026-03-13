@@ -327,16 +327,19 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   );
   const owedMarket = marketMap[owedBalance.marketId];
   const heldMarket = marketMap[heldBalance.marketId];
+  const owedPrice = owedMarket.oraclePrice;
   const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskOverride, riskParams);
   const heldProtocolBalance = protocolBalanceMap[heldBalance.marketId] ?? INTEGERS.MAX_UINT;
   const isHeldBalanceLargerThanProtocol = heldBalance.wei.abs().gt(heldProtocolBalance);
   const isPartialLiquidationSupported = partialLiquidation && heldMarket.isPartialLiquidationSupported;
   const { owedWei, heldWei, isVaporizable } = getAmountsForLiquidation(
     owedBalance.wei.abs().dividedToIntegerBy(isPartialLiquidationSupported ? 2 : 1),
+    owedPrice,
     owedPriceAdj,
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
     heldProtocolBalance,
+    riskParams.dolomiteFeeRake,
   );
   /* eslint-disable @typescript-eslint/indent */
   const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])
@@ -389,6 +392,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       heldWeiForLiquidation: heldWei.toFixed(),
       owedPriceAdj: owedPriceAdj.toFixed(),
       heldPrice: heldMarket.oraclePrice.toFixed(),
+      partialLiquidation: isPartialLiquidationSupported,
     });
 
     const heldToken: MinimalApiToken = {
