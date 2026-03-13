@@ -331,5 +331,6 @@ function getTestRiskParams(): ApiRiskParam {
       marketIdToCategoryMap: {},
       marketIdToRiskFeatureMap: {},
     },
+    liquidationFeeRake: new BigNumber(0.10),
   };
 }

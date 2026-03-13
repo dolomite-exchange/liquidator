@@ -626,7 +626,7 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
         marketIdToCategoryMap,
         marketIdToRiskFeatureMap,
       },
-      dolomiteFeeRake: stringToDecimal(feeRake.value.toString()),
+      liquidationFeeRake: stringToDecimal(feeRake.value.toString()),
     };
   });
 

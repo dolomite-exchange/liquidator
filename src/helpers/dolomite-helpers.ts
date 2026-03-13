@@ -339,7 +339,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
     heldProtocolBalance,
-    riskParams.dolomiteFeeRake,
+    riskParams.liquidationFeeRake,
   );
   /* eslint-disable @typescript-eslint/indent */
   const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])
