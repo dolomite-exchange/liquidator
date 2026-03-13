@@ -12,6 +12,7 @@ import {
 import axios from 'axios';
 import * as ethers from 'ethers';
 import AccountRiskOverrideSetterAbi from '../abis/account-risk-override-setter.json';
+import { IDolomiteStructs } from '../abis/LiquidatorProxyV6';
 import { isMarketIgnored } from '../helpers/market-helpers';
 import { dolomite, liquidatorProxyV6 } from '../helpers/web3';
 import {
@@ -602,7 +603,18 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
     }
   }
 
-  const feeRake = await liquidatorProxyV6.dolomiteRake();
+  const value = ethers.BigNumber.from('0');
+  let feeRake: IDolomiteStructs.DecimalStructOutput = Object.assign([value] as [ethers.BigNumber], {
+    value,
+  });
+  try {
+    feeRake = await liquidatorProxyV6.dolomiteRake();
+  } catch (error) {
+    Logger.warn({
+      at: 'getDolomiteRiskParams',
+      message: 'Could not get dolomiteRate',
+    });
+  }
 
   const riskParams: ApiRiskParam[] = subgraphResult.data.dolomiteMargins.map(riskParam => {
     return {
