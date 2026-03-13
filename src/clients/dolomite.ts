@@ -447,7 +447,7 @@ export async function getDolomiteMarkets(
         ? dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i].returnData)
         : INTEGERS.ZERO;
       const isPartialLiquidationSupported = isPartialLiquidationSupportedResults[i].success
-        ? dolomite.web3.eth.abi.decodeParameter('bool', marketPriceResults[i].returnData)
+        ? dolomite.web3.eth.abi.decodeParameter('bool', isPartialLiquidationSupportedResults[i].returnData)
         : false;
       const apiMarket: ApiMarket = {
         id: market.id,
