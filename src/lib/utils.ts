@@ -81,13 +81,16 @@ export function getLiquidationReward(
   riskOverride: RiskOverride | undefined,
   riskParams: ApiRiskParam,
 ): Decimal {
-  const liquidationReward = riskOverride ? riskOverride.liquidationRewardOverride : riskParams.liquidationReward;
-  let reward = liquidationReward.minus(DECIMAL_BASE);
+  if (riskOverride) {
+    return riskOverride.liquidationRewardOverride.minus(DECIMAL_BASE).div(DECIMAL_BASE);
+  }
 
-  const heldRewardPremium = riskOverride ? DECIMAL_BASE : heldMarket.liquidationRewardPremium;
+  let reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
+
+  const heldRewardPremium = heldMarket.liquidationRewardPremium;
   reward = reward.plus(getPartial(reward, heldRewardPremium, DECIMAL_BASE));
 
-  const owedRewardPremium = riskOverride ? DECIMAL_BASE : owedMarket.liquidationRewardPremium;
+  const owedRewardPremium = owedMarket.liquidationRewardPremium;
   reward = reward.plus(getPartial(reward, owedRewardPremium, DECIMAL_BASE));
 
   return reward.div(DECIMAL_BASE);
@@ -99,13 +102,17 @@ export function getOwedPriceForLiquidation(
   riskOverride: RiskOverride | undefined,
   riskParams: ApiRiskParam,
 ): Integer {
-  const liquidationReward = riskOverride ? riskOverride.liquidationRewardOverride : riskParams.liquidationReward;
-  let reward = liquidationReward.minus(DECIMAL_BASE);
+  if (riskOverride) {
+    const reward = riskOverride.liquidationRewardOverride;
+    return getPartial(owedMarket.oraclePrice, reward, DECIMAL_BASE)
+  }
 
-  const heldRewardPremium = riskOverride ? DECIMAL_BASE : heldMarket.liquidationRewardPremium;
+  let reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
+
+  const heldRewardPremium = heldMarket.liquidationRewardPremium;
   reward = reward.plus(getPartial(reward, heldRewardPremium, DECIMAL_BASE));
 
-  const owedRewardPremium = riskOverride ? DECIMAL_BASE : owedMarket.liquidationRewardPremium;
+  const owedRewardPremium = owedMarket.liquidationRewardPremium;
   reward = reward.plus(getPartial(reward, owedRewardPremium, DECIMAL_BASE));
   return owedMarket.oraclePrice.plus(getPartial(owedMarket.oraclePrice, reward, DECIMAL_BASE));
 }
