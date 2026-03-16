@@ -173,8 +173,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
     return getStandardOrEip1559GasPrice();
   } else if (isMantle(networkId)) {
     return {
-      type: GasPriceType.STANDARD,
-      gasPriceWei: new BigNumber(await dolomite.mantleGasInfo!.getPriceInWei()),
+      ...(await getStandardOrEip1559GasPrice()),
       gasLimit: new BigNumber('180000000000'),
     };
   } else {
