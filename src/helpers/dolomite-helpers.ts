@@ -340,6 +340,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     heldMarket.oraclePrice,
     heldProtocolBalance,
     riskParams.liquidationFeeRake,
+    !!zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId)),
   );
   /* eslint-disable @typescript-eslint/indent */
   const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])

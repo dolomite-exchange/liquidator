@@ -125,7 +125,12 @@ export function getAmountsForLiquidation(
   heldPrice: Integer,
   heldProtocolBalance: Integer,
   dolomiteFeeRake: Decimal,
+  isIsolationMode: boolean,
 ): { owedWei: Integer, heldWei: Integer, isVaporizable: boolean } {
+  if (isIsolationMode) {
+    dolomiteFeeRake = INTEGERS.ZERO;
+  }
+
   const maxHeldWei = heldProtocolBalance.lt(heldWei) ? heldProtocolBalance : heldWei;
   if (owedWei.times(owedPriceAdj).gt(maxHeldWei.times(heldPrice))) {
     const owedWeiAdj = heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj);
