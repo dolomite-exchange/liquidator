@@ -18,9 +18,10 @@ import '../src/lib/env';
 import Logger from '../src/lib/logger';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
+import DolomiteRegistryAbi from '../src/abis/dolomite-registry.json';
 
 const D_USDC_ADDRESS = '0x444868B6e8079ac2c55eea115250f92C2b2c4D14';
-const SAFE_ADDRESS = '0xa75c21C5BE284122a87A37a76cc6C4DD3E55a1D4';
 const TEN = new BigNumber('10');
 const MIN_BALANCE_TO_SWAP_USD = new BigNumber('100');
 
@@ -75,6 +76,11 @@ async function start() {
     marketId: new ZapBigNumber((await dUsdc.marketId()).toString()),
     symbol: 'USDC',
   };
+  const dolomiteRegistry = new dolomite.web3.eth.Contract(
+    DolomiteRegistryAbi,
+    ModuleDeployments.DolomiteRegistryProxy[networkId].address,
+  )
+  const treasury = await dolomite.contracts.callConstantContractFunction(dolomiteRegistry.methods.treasury());
 
   let transaction: ContractTransaction | undefined;
   let nonce = await dolomite.web3.eth.getTransactionCount(SOLID_ACCOUNT.owner);
@@ -125,7 +131,7 @@ async function start() {
     const result = await dolomite.token.transfer(
       D_USDC_ADDRESS,
       SOLID_ACCOUNT.owner,
-      SAFE_ADDRESS,
+      treasury,
       balance,
       getTypedGasPriceWeiWithModifications(),
     );
