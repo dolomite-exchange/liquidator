@@ -47,6 +47,7 @@ const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | un
     // 1: new BigNumber('6'), // BERA
   },
   [ChainId.Botanix]: {},
+  [ChainId.Bsc]: {},
   [ChainId.Ethereum]: {},
   [ChainId.Ink]: {},
   [ChainId.Mantle]: {},
@@ -181,8 +182,8 @@ async function start() {
           const txResult = await dolomite.operation.initiate()
             .vaporize({
               primaryAccountOwner: dolomite.getDefaultAccount(),
-              // primaryAccountId: INTEGERS.ZERO,
-              primaryAccountId: new BigNumber('84454885947697425406201769899678634598380862356089082229045977777208920484641'),
+              primaryAccountId: INTEGERS.ZERO,
+              // primaryAccountId: new BigNumber('84454885947697425406201769899678634598380862356089082229045977777208920484641'),
               vaporAccountOwner: account.owner,
               vaporAccountId: account.number,
               vaporMarketId: new BigNumber(vaporMarket!.marketId),

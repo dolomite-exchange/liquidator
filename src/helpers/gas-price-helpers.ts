@@ -1,7 +1,17 @@
 import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import axios from 'axios';
 import { ethers } from 'ethers';
-import { ChainId, isArbitrum, isBase, isBerachain, isBotanix, isEthereum, isInk, isMantle } from '../lib/chain-id';
+import {
+  ChainId,
+  isArbitrum,
+  isBase,
+  isBerachain,
+  isBotanix,
+  isBsc,
+  isEthereum,
+  isInk,
+  isMantle,
+} from '../lib/chain-id';
 import Logger from '../lib/logger';
 
 export enum GasPriceType {
@@ -153,6 +163,8 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
     return getStandardOrEip1559GasPrice();
   } else if (isBotanix(networkId)) {
     return getStandardOrEip1559GasPrice();
+  } else if (isBsc(networkId)) {
+    return getStandardOrEip1559GasPrice();
   } else if (isEthereum(networkId)) {
     return getStandardOrEip1559GasPrice();
   } else if (isInk(networkId)) {
@@ -161,8 +173,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
     return getStandardOrEip1559GasPrice();
   } else if (isMantle(networkId)) {
     return {
-      type: GasPriceType.STANDARD,
-      gasPriceWei: new BigNumber(await dolomite.mantleGasInfo!.getPriceInWei()),
+      ...(await getStandardOrEip1559GasPrice()),
       gasLimit: new BigNumber('180000000000'),
     };
   } else {

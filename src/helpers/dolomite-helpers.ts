@@ -66,6 +66,7 @@ export const zap = new DolomiteZap({
   defaultIsLiquidation: IS_LIQUIDATION,
   defaultSlippageTolerance: THIRTY_BASIS_POINTS,
   defaultBlockTag: BLOCK_TAG,
+  // eslint-disable-next-line object-shorthand
   referralInfo: referralInfo,
   useProxyServer: USE_PROXY_SERVER,
   gasMultiplier: new ZapBigNumber(2),
@@ -151,6 +152,7 @@ export async function liquidateAccount(
   riskParams: ApiRiskParam,
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
+  partialLiquidation: boolean,
 ): Promise<ContractTransaction | undefined> {
   if (process.env.LIQUIDATIONS_ENABLED !== 'true') {
     return undefined;
@@ -195,6 +197,7 @@ export async function liquidateAccount(
       marginAccountToActionsMap,
       lastBlockTimestamp,
       false,
+      partialLiquidation,
     );
   } else if (liquidationMode === LiquidationMode.Simple) {
     return _liquidateAccountSimple(liquidAccount, marginAccountToActionsMap, marketMap, riskParams);
@@ -232,6 +235,7 @@ export async function liquidateExpiredAccount(
       marginAccountToActionsMap,
       lastBlockTimestamp,
       true,
+      false,
     );
   } else if (liquidationMode === LiquidationMode.Simple) {
     return _liquidateExpiredAccountInternalSimple(
@@ -302,6 +306,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   marginAccountToActionsMap: Record<string, ApiAsyncAction[] | undefined>,
   lastBlockTimestamp: DateTime,
   isExpiring: boolean,
+  partialLiquidation: boolean,
 ): Promise<ContractTransaction | undefined> {
   const riskOverride = getAccountRiskOverride(liquidAccount, riskParams);
   const owedBalance = getLargestBalanceUSD(
@@ -322,15 +327,20 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
   );
   const owedMarket = marketMap[owedBalance.marketId];
   const heldMarket = marketMap[heldBalance.marketId];
+  const owedPrice = owedMarket.oraclePrice;
   const owedPriceAdj = getOwedPriceForLiquidation(owedMarket, heldMarket, riskOverride, riskParams);
   const heldProtocolBalance = protocolBalanceMap[heldBalance.marketId] ?? INTEGERS.MAX_UINT;
   const isHeldBalanceLargerThanProtocol = heldBalance.wei.abs().gt(heldProtocolBalance);
+  const isPartialLiquidationSupported = partialLiquidation && heldMarket.isPartialLiquidationSupported;
   const { owedWei, heldWei, isVaporizable } = getAmountsForLiquidation(
-    owedBalance.wei.abs(),
+    owedBalance.wei.abs().dividedToIntegerBy(isPartialLiquidationSupported ? 2 : 1),
+    owedPrice,
     owedPriceAdj,
     heldBalance.wei.abs(),
     heldMarket.oraclePrice,
     heldProtocolBalance,
+    riskParams.liquidationFeeRake,
+    !!zap.getIsolationModeConverterByMarketId(new ZapBigNumber(heldMarket.marketId)),
   );
   /* eslint-disable @typescript-eslint/indent */
   const marketIdToActionsMap = (marginAccountToActionsMap[liquidAccount.id] ?? [])
@@ -350,9 +360,10 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     );
   /* eslint-enable @typescript-eslint/indent */
 
-  if (Object.keys(marketIdToActionsMap).length
-    === 0
-    && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))) {
+  if (
+    Object.keys(marketIdToActionsMap).length === 0
+    && zap.getIsAsyncAssetByMarketId(new ZapBigNumber(heldMarket.marketId))
+  ) {
     Logger.info({
       message: 'Performing async liquidation preparation',
       owedMarketId: owedMarket.marketId,
@@ -382,6 +393,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       heldWeiForLiquidation: heldWei.toFixed(),
       owedPriceAdj: owedPriceAdj.toFixed(),
       heldPrice: heldMarket.oraclePrice.toFixed(),
+      partialLiquidation: isPartialLiquidationSupported,
     });
 
     const heldToken: MinimalApiToken = {

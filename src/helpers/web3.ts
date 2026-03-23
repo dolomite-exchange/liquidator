@@ -10,6 +10,7 @@ import { LiquidatorProxyV6 } from '../abis/LiquidatorProxyV6';
 import { ChainId } from '../lib/chain-id';
 import Logger from '../lib/logger';
 import '../lib/env';
+import { getGasPriceWeiWithModifications, updateGasPrice } from './gas-price-helpers';
 
 const accountWalletAddress = process.env.ACCOUNT_WALLET_ADDRESS?.toLowerCase() ?? '';
 const opts = { defaultAccount: accountWalletAddress };
@@ -98,6 +99,8 @@ export async function loadAccounts(): Promise<string> {
 }
 
 export async function initializeDolomiteLiquidations() {
+  await updateGasPrice(dolomite);
+
   await checkOperatorIsApproved(dolomite.contracts.expiryProxy.options.address);
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV1.options.address);
   await checkOperatorIsApproved(dolomite.contracts.liquidatorProxyV4WithGenericTrader.options.address);
@@ -109,17 +112,17 @@ async function checkOperatorIsApproved(operator?: string) {
     return
   }
 
-  if (!(await getIsGlobalOperator(operator)) && !(await getIsLocalOperator(operator))) {
+  if (!(await getIsGlobalOperator(operator)) && await getIsLocalOperator(operator)) {
     Logger.info({
       at: 'web3#loadAccounts',
-      message: `Proxy contract at ${operator} has not been approved. Approving...`,
+      message: `Proxy contract at ${operator} has been approved but is disabled globally. Disapproving...`,
       address: accountWalletAddress,
       operator,
     });
 
-    await dolomite.permissions.approveOperator(
+    await dolomite.permissions.disapproveOperator(
       operator,
-      { from: accountWalletAddress },
+      { from: accountWalletAddress, gasPrice: getGasPriceWeiWithModifications().toFixed() },
     );
   }
 }

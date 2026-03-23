@@ -13,6 +13,7 @@
     "compose-clean": "docker-compose rm -f",
     "migrate": "echo 'Nothing to migrate'",
     "seed": "echo 'Nothing to seed'",
+    "execute:check-partial-liquidations-supported": "STATS=true npx ts-node scripts/check-partial-liquidations-supported.ts",
     "execute:get-active-users-csv": "STATS=true npx ts-node scripts/get-active-users-csv.ts",
     "execute:get-accrued-earnings": "STATS=true npx ts-node scripts/get-accrued-earnings.ts",
     "execute:get-daily-stats": "STATS=true npx ts-node scripts/get-daily-stats.ts",
@@ -41,7 +42,7 @@
   "homepage": "https://github.com/dolomite-exchange/liquidator#readme",
   "dependencies": {
     "@dolomite-exchange/dolomite-margin": "^0.14.4",
-    "@dolomite-exchange/zap-sdk": "^0.5.6",
+    "@dolomite-exchange/zap-sdk": "^0.5.8",
     "axios": "^1.8.2",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",

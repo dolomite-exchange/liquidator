@@ -18,8 +18,8 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
-// const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
+// const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
+const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
 
 const TEN = new BigNumber('10');
 
@@ -43,6 +43,7 @@ const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | un
   [ChainId.Base]: {},
   [ChainId.Berachain]: {},
   [ChainId.Botanix]: {},
+  [ChainId.Bsc]: {},
   [ChainId.Ethereum]: {},
   [ChainId.Ink]: {},
   [ChainId.Mantle]: {},
@@ -118,7 +119,7 @@ function formatAccountData(
       medianAccountDebt: `$${medianAccount.borrowUSD.toFormat(2)}`,
       biggestAccountDebt: `$${biggestAccount.borrowUSD.toFormat(2)}`,
       averageAccountDebt: `$${averageAccountDebt.toFormat(2)}`,
-      totalOfMarketId: totalOfMarketId.toFixed(),
+      totalOfMarketId: totalOfMarketId.div(divisor).toFormat(6),
       largeAccounts: {
         thresholdUsd: `$${LARGE_AMOUNT_THRESHOLD_USD.toFormat(2)}`,
         accounts: transformedAccounts.filter(a => a.borrowUSD.abs().gte(LARGE_AMOUNT_THRESHOLD_USD))

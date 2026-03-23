@@ -9,7 +9,7 @@ export function isCollateralized(
   account: ApiAccount,
   marketMap: { [marketId: string]: ApiMarket },
   riskParams: ApiRiskParam,
-): boolean {
+): { isCollateralized: boolean, partialLiquidation: boolean } {
   const riskOverride = getAccountRiskOverride(account, riskParams);
   const initial = {
     borrow: INTEGERS.ZERO,
@@ -39,7 +39,12 @@ export function isCollateralized(
     }, initial);
 
   const liquidationRatio = riskOverride ? riskOverride.marginRatioOverride : riskParams.liquidationRatio;
-  return supply.gte(borrow.times(liquidationRatio).dividedToIntegerBy(DECIMAL_BASE));
+  const partialLiquidationThreshold = DECIMAL_BASE.times(0.95); // 95%
+  const healthScore = supply.times(DECIMAL_BASE).div(borrow).times(DECIMAL_BASE).div(liquidationRatio)
+  return {
+    isCollateralized: supply.gte(borrow.times(liquidationRatio).dividedToIntegerBy(DECIMAL_BASE)),
+    partialLiquidation: healthScore.gte(partialLiquidationThreshold),
+  };
 }
 
 export function getPartial(amount: Integer, numerator: Integer, denominator: Integer): Integer {
@@ -76,13 +81,16 @@ export function getLiquidationReward(
   riskOverride: RiskOverride | undefined,
   riskParams: ApiRiskParam,
 ): Decimal {
-  const liquidationReward = riskOverride ? riskOverride.liquidationRewardOverride : riskParams.liquidationReward;
-  let reward = liquidationReward.minus(DECIMAL_BASE);
+  if (riskOverride) {
+    return riskOverride.liquidationRewardOverride.minus(DECIMAL_BASE).div(DECIMAL_BASE);
+  }
 
-  const heldRewardPremium = riskOverride ? DECIMAL_BASE : heldMarket.liquidationRewardPremium;
+  let reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
+
+  const heldRewardPremium = heldMarket.liquidationRewardPremium;
   reward = reward.plus(getPartial(reward, heldRewardPremium, DECIMAL_BASE));
 
-  const owedRewardPremium = riskOverride ? DECIMAL_BASE : owedMarket.liquidationRewardPremium;
+  const owedRewardPremium = owedMarket.liquidationRewardPremium;
   reward = reward.plus(getPartial(reward, owedRewardPremium, DECIMAL_BASE));
 
   return reward.div(DECIMAL_BASE);
@@ -94,29 +102,53 @@ export function getOwedPriceForLiquidation(
   riskOverride: RiskOverride | undefined,
   riskParams: ApiRiskParam,
 ): Integer {
-  const liquidationReward = riskOverride ? riskOverride.liquidationRewardOverride : riskParams.liquidationReward;
-  let reward = liquidationReward.minus(DECIMAL_BASE);
+  if (riskOverride) {
+    const reward = riskOverride.liquidationRewardOverride;
+    return getPartial(owedMarket.oraclePrice, reward, DECIMAL_BASE)
+  }
 
-  const heldRewardPremium = riskOverride ? DECIMAL_BASE : heldMarket.liquidationRewardPremium;
+  let reward = riskParams.liquidationReward.minus(DECIMAL_BASE);
+
+  const heldRewardPremium = heldMarket.liquidationRewardPremium;
   reward = reward.plus(getPartial(reward, heldRewardPremium, DECIMAL_BASE));
 
-  const owedRewardPremium = riskOverride ? DECIMAL_BASE : owedMarket.liquidationRewardPremium;
+  const owedRewardPremium = owedMarket.liquidationRewardPremium;
   reward = reward.plus(getPartial(reward, owedRewardPremium, DECIMAL_BASE));
   return owedMarket.oraclePrice.plus(getPartial(owedMarket.oraclePrice, reward, DECIMAL_BASE));
 }
 
 export function getAmountsForLiquidation(
   owedWei: Integer,
+  owedPrice: Integer,
   owedPriceAdj: Integer,
   heldWei: Integer,
   heldPrice: Integer,
   heldProtocolBalance: Integer,
+  dolomiteFeeRake: Decimal,
+  isIsolationMode: boolean,
 ): { owedWei: Integer, heldWei: Integer, isVaporizable: boolean } {
+  if (isIsolationMode) {
+    dolomiteFeeRake = INTEGERS.ZERO;
+  }
+
   const maxHeldWei = heldProtocolBalance.lt(heldWei) ? heldProtocolBalance : heldWei;
   if (owedWei.times(owedPriceAdj).gt(maxHeldWei.times(heldPrice))) {
-    return { owedWei: heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj), heldWei: maxHeldWei, isVaporizable: true };
+    const owedWeiAdj = heldWeiToOwedWei(maxHeldWei, heldPrice, owedPriceAdj);
+    const heldWeiWithoutReward = owedWeiToHeldWei(owedWeiAdj, owedPrice, heldPrice);
+    const reward = maxHeldWei.minus(heldWeiWithoutReward);
+    return {
+      owedWei: owedWeiAdj,
+      heldWei: maxHeldWei.minus(reward.times(dolomiteFeeRake).integerValue()),
+      isVaporizable: true,
+    };
   } else {
-    return { owedWei, heldWei: owedWeiToHeldWei(owedWei, owedPriceAdj, heldPrice), isVaporizable: false };
+    const heldWeiWithReward = owedWeiToHeldWei(owedWei, owedPriceAdj, heldPrice);
+    const reward = heldWeiWithReward.minus(owedWeiToHeldWei(owedWei, owedPrice, heldPrice))
+    return {
+      owedWei,
+      heldWei: heldWeiWithReward.minus(reward.times(dolomiteFeeRake).integerValue()),
+      isVaporizable: false,
+    };
   }
 }
 
