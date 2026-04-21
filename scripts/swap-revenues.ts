@@ -1,9 +1,12 @@
 import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { BigNumber as ZapBigNumber, MinimalApiToken } from '@dolomite-exchange/zap-sdk';
+import { ADDRESS_ZERO } from '@dolomite-exchange/zap-sdk/src/lib/Constants';
 import { ContractTransaction, ethers } from 'ethers';
 import v8 from 'v8';
 import DolomiteERC4626Abi from '../src/abis/dolomite-erc-4626.json';
+import DolomiteRegistryAbi from '../src/abis/dolomite-registry.json';
 import { DolomiteERC4626 } from '../src/abis/DolomiteERC4626';
 import { getDolomiteRiskParams, SOLID_ACCOUNT } from '../src/clients/dolomite';
 import { zap } from '../src/helpers/dolomite-helpers';
@@ -18,8 +21,6 @@ import '../src/lib/env';
 import Logger from '../src/lib/logger';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
-import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
-import DolomiteRegistryAbi from '../src/abis/dolomite-registry.json';
 
 const D_USDC_ADDRESS = '0x444868B6e8079ac2c55eea115250f92C2b2c4D14';
 const TEN = new BigNumber('10');
@@ -50,6 +51,15 @@ async function start() {
     return Promise.reject(new Error(message));
   }
 
+  const dolomiteRegistry = new dolomite.web3.eth.Contract(
+    DolomiteRegistryAbi,
+    ModuleDeployments.DolomiteRegistryProxy[networkId].address,
+  )
+  const treasury = await dolomite.contracts.callConstantContractFunction(dolomiteRegistry.methods.treasury());
+  if (treasury === ADDRESS_ZERO) {
+    return Promise.reject(new Error('Treasury address is zero!'));
+  }
+
   await loadAccounts();
 
   Logger.info({
@@ -61,6 +71,7 @@ async function start() {
     networkId,
     solidAccount: SOLID_ACCOUNT.owner,
     subgraphUrl: process.env.SUBGRAPH_URL,
+    treasuryAddress: treasury,
   });
 
   await marketStore._update();
@@ -76,11 +87,6 @@ async function start() {
     marketId: new ZapBigNumber((await dUsdc.marketId()).toString()),
     symbol: 'USDC',
   };
-  const dolomiteRegistry = new dolomite.web3.eth.Contract(
-    DolomiteRegistryAbi,
-    ModuleDeployments.DolomiteRegistryProxy[networkId].address,
-  )
-  const treasury = await dolomite.contracts.callConstantContractFunction(dolomiteRegistry.methods.treasury());
 
   let transaction: ContractTransaction | undefined;
   let nonce = await dolomite.web3.eth.getTransactionCount(SOLID_ACCOUNT.owner);
