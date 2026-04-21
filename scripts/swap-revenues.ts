@@ -97,8 +97,8 @@ async function start() {
 
     const keepFactor = INTEGERS.ONE;
 
-    const maretId = new BigNumber(market.marketId);
-    const rawBalance = await dolomite.getters.getAccountWei(SOLID_ACCOUNT.owner, INTEGERS.ZERO, maretId);
+    const marketId = new BigNumber(market.marketId);
+    const rawBalance = await dolomite.getters.getAccountWei(SOLID_ACCOUNT.owner, INTEGERS.ZERO, marketId);
     const balance = rawBalance.times(keepFactor).integerValue();
     const balanceUSD = balance.times(market.oraclePrice).div(TEN.pow(36));
     if (balanceUSD.lt(MIN_BALANCE_TO_SWAP_USD)) {

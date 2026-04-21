@@ -18,8 +18,8 @@ import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
-// const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
-const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
+const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${1_000_000}`);
+// const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
 
 const TEN = new BigNumber('10');
 
@@ -171,6 +171,12 @@ async function start() {
     const message = 'MARKET_ID out of range'
     Logger.error(message);
     return Promise.reject(new Error(message));
+  }
+
+  for (let i = 0; i < marketCount.toNumber(); i++) {
+    if (!await dolomite.getters.getMarketIsClosing(new BigNumber(i))) {
+      console.log('market address:', await dolomite.getters.getMarketTokenAddress(new BigNumber(i)));
+    }
   }
 
   const marketName = await dolomite.token.getName(await dolomite.getters.getMarketTokenAddress(marketId));
