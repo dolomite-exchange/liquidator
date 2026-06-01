@@ -38,10 +38,15 @@ const owedPreferences: Integer[] = (process.env.OWED_PREFERENCES ?? '')?.split('
 
 const referralInfo: ReferralOutput | undefined = {
   ensoApiKey: process.env.ENSO_API_KEY,
-  odosReferralCode: undefined,
+  odosReferralCode: new ZapBigNumber(process.env.ODOS_API_KEY ?? ''),
   oogaBoogaApiKey: process.env.OOGA_BOOGA_API_KEY,
   referralAddress: undefined,
 };
+if (NETWORK_ID === ChainId.ArbitrumOne) {
+  if (referralInfo.odosReferralCode?.isNaN()) {
+    throw new Error('Invalid ODOS referral code');
+  }
+}
 if (NETWORK_ID === ChainId.Berachain || NETWORK_ID === ChainId.Botanix) {
   if (!referralInfo.oogaBoogaApiKey) {
     throw new Error('No API key found for Ooga Booga');
