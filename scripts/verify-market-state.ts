@@ -6,6 +6,7 @@ import { getDolomiteRiskParams, getLiquidatableDolomiteAccountsWithCertainSupply
 import { updateGasPrice } from '../src/helpers/gas-price-helpers';
 import { dolomite } from '../src/helpers/web3';
 import '../src/lib/env';
+import { ApiBalance } from '../src/lib/api-types';
 import Logger from '../src/lib/logger';
 import Pageable from '../src/lib/pageable';
 import AccountStore from '../src/stores/account-store';
@@ -93,18 +94,20 @@ async function start() {
       borrow,
       supplyAssets,
       borrowAssets,
-    } = Object.values(account.balances).reduce((acc, balance) => {
-      const market = marketMap[balance.marketId.toString()];
-      const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR);
-      if (balance.wei.lt(INTEGERS.ZERO)) {
-        acc.borrow = acc.borrow.plus(value.abs());
-        acc.borrowAssets.push(balance.marketId)
-      } else {
-        acc.supply = acc.supply.plus(value);
-        acc.supplyAssets.push(balance.marketId)
-      }
-      return acc;
-    }, initial);
+    } = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
+      .reduce((acc, balance) => {
+        const market = marketMap[balance.marketId.toString()];
+        const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR);
+        if (balance.wei.lt(INTEGERS.ZERO)) {
+          acc.borrow = acc.borrow.plus(value.abs());
+          acc.borrowAssets.push(balance.marketId)
+        } else {
+          acc.supply = acc.supply.plus(value);
+          acc.supplyAssets.push(balance.marketId)
+        }
+        return acc;
+      }, initial);
 
     Logger.info({
       message: `Account balance for ${account.id}`,
@@ -118,7 +121,10 @@ async function start() {
     rawAccounts.push({
       owner: account.owner,
       number: account.number,
-      debtMarkets: Object.values(account.balances).filter(b => b.par.lt(INTEGERS.ZERO)).map(b => b.marketId),
+      debtMarkets: Object.values(account.balances)
+        .filter((b): b is ApiBalance => !!b)
+        .filter(b => b.par.lt(INTEGERS.ZERO))
+        .map(b => b.marketId),
     });
     totalCollateralAmount = totalCollateralAmount.plus(supply);
     totalDebtAmount = totalDebtAmount.plus(borrow);

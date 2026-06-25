@@ -19,7 +19,7 @@ function getWithdrawAllReward(
   const multiplier = TEN.pow(outputMarket.decimals);
   const currentWei = outputMarket.supplyLiquidity?.times(multiplier);
   const maxSupplyWei = outputMarket.maxSupplyLiquidity?.times(multiplier);
-  const outputBalance = liquidAccount.balances[outputMarketId.toFixed()].wei; // must be negative here
+  const outputBalance = liquidAccount.balances[outputMarketId.toFixed()]!.wei; // must be negative here
   // Reward is the amount ABOVE 0 when the debt is repaid
   const reward = outputBalance.plus(zapOutput.amountWeisPath[zapOutput.amountWeisPath.length - 1].toFixed());
   return !(!currentWei || !maxSupplyWei || reward.plus(currentWei).lt(maxSupplyWei));

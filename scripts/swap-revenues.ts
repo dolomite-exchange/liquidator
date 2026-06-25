@@ -2,7 +2,7 @@ import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin'
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { BigNumber as ZapBigNumber, MinimalApiToken } from '@dolomite-exchange/zap-sdk';
-import { ADDRESS_ZERO } from '@dolomite-exchange/zap-sdk/src/lib/Constants';
+import { ADDRESS_ZERO } from '@dolomite-exchange/zap-sdk/dist/src/lib/Constants';
 import { ContractTransaction, ethers } from 'ethers';
 import v8 from 'v8';
 import DolomiteERC4626Abi from '../src/abis/dolomite-erc-4626.json';
@@ -18,13 +18,15 @@ import {
 import { dolomite, loadAccounts } from '../src/helpers/web3';
 import { ApiMarket } from '../src/lib/api-types';
 import '../src/lib/env';
+import { ChainId } from '../src/lib/chain-id';
 import Logger from '../src/lib/logger';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
 const D_USDC_ADDRESS = '0x444868B6e8079ac2c55eea115250f92C2b2c4D14';
 const TEN = new BigNumber('10');
-const MIN_BALANCE_TO_SWAP_USD = new BigNumber('100');
+const MIN_BALANCE_TO_SWAP_USD = new BigNumber('10');
+const MIN_BALANCE_TO_SWAP_USD_ETHEREUM = new BigNumber('100');
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL!);
 
@@ -37,6 +39,9 @@ async function start() {
   const blockNumber = blockStore.getBlockNumber()!;
   const { riskParams } = await getDolomiteRiskParams(blockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
+  const minBalanceToSwapUsd = networkId === ChainId.Ethereum
+    ? MIN_BALANCE_TO_SWAP_USD_ETHEREUM
+    : MIN_BALANCE_TO_SWAP_USD;
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
@@ -68,6 +73,7 @@ async function start() {
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
+    minBalanceToSwapUsd: `$${minBalanceToSwapUsd.toFormat(2)}`,
     networkId,
     solidAccount: SOLID_ACCOUNT.owner,
     subgraphUrl: process.env.SUBGRAPH_URL,
@@ -107,7 +113,7 @@ async function start() {
     const rawBalance = await dolomite.getters.getAccountWei(SOLID_ACCOUNT.owner, INTEGERS.ZERO, marketId);
     const balance = rawBalance.times(keepFactor).integerValue();
     const balanceUSD = balance.times(market.oraclePrice).div(TEN.pow(36));
-    if (balanceUSD.lt(MIN_BALANCE_TO_SWAP_USD)) {
+    if (balanceUSD.lt(minBalanceToSwapUsd)) {
       // eslint-disable-next-line no-continue
       continue;
     }

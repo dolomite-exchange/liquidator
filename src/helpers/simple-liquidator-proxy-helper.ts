@@ -1,6 +1,7 @@
 import { BigNumber, Integer } from '@dolomite-exchange/dolomite-margin';
 import { ISOLATION_MODE_CONVERSION_MARKET_ID_MAP } from '@dolomite-exchange/zap-sdk';
 import { ContractTransaction } from 'ethers';
+import { parseEther } from 'ethers/lib/utils';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
 import { ApiAccount } from '../lib/api-types';
 import { estimateGasOrFallbackIfDisabled, getGasLimitForExecution } from './gas-estimate-helpers';
@@ -26,12 +27,10 @@ export async function liquidateSimple(
   }
 
   return liquidatorProxyV1.functions.liquidate(
-    SOLID_ACCOUNT.owner,
-    SOLID_ACCOUNT.number,
-    liquidAccount.owner,
-    liquidAccount.number,
-    new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
-    new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string),
+    { owner: SOLID_ACCOUNT.owner, number: SOLID_ACCOUNT.number.toFixed(0) },
+    { owner: liquidAccount.owner, number: liquidAccount.number.toFixed(0) },
+    { value: parseEther(process.env.MIN_ACCOUNT_COLLATERALIZATION as string) },
+    new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string).toFixed(0),
     owedMarketsConverted,
     collateralMarketsConverted,
     {
@@ -59,12 +58,10 @@ export async function estimateGasLiquidateSimple(
   return estimateGasOrFallbackIfDisabled(
     async () => {
       const gasLimit = await liquidatorProxyV1.estimateGas.liquidate(
-        SOLID_ACCOUNT.owner,
-        SOLID_ACCOUNT.number,
-        liquidAccount.owner,
-        liquidAccount.number,
-        new BigNumber(process.env.MIN_ACCOUNT_COLLATERALIZATION as string),
-        new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string),
+        { owner: SOLID_ACCOUNT.owner, number: SOLID_ACCOUNT.number.toFixed(0) },
+        { owner: liquidAccount.owner, number: liquidAccount.number.toFixed(0) },
+        { value: parseEther(process.env.MIN_ACCOUNT_COLLATERALIZATION as string) },
+        new BigNumber(process.env.MIN_VALUE_LIQUIDATED as string).toFixed(0),
         owedMarketsConverted,
         collateralMarketsConverted,
       );

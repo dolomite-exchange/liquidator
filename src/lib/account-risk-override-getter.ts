@@ -1,5 +1,12 @@
 import { Decimal } from '@dolomite-exchange/dolomite-margin';
-import { ApiAccount, ApiRiskParam, EModeCategory, EModeCategoryStruct, EModeRiskFeature } from './api-types';
+import {
+  ApiAccount,
+  ApiBalance,
+  ApiRiskParam,
+  EModeCategory,
+  EModeCategoryStruct,
+  EModeRiskFeature,
+} from './api-types';
 
 export interface RiskOverride {
   marginRatioOverride: Decimal;
@@ -19,7 +26,7 @@ export function getAccountRiskOverride(
 }
 
 function getRiskFeatureOverride(account: ApiAccount, riskInfo: ApiRiskParam): RiskOverride | undefined {
-  const balances = Object.values(account.balances);
+  const balances = Object.values(account.balances).filter((b): b is ApiBalance => !!b);
   for (const balance of balances) {
     const riskFeature = riskInfo.riskOverrideSettings.marketIdToRiskFeatureMap[balance.marketId];
     if (riskFeature?.feature === EModeRiskFeature.SINGLE_COLLATERAL_WITH_STRICT_DEBT) {
@@ -39,7 +46,7 @@ function getRiskFeatureOverride(account: ApiAccount, riskInfo: ApiRiskParam): Ri
 
 function getRiskCategoryOverride(account: ApiAccount, riskInfo: ApiRiskParam): RiskOverride | undefined {
   let exclusiveCategory: EModeCategoryStruct | undefined;
-  const balances = Object.values(account.balances);
+  const balances = Object.values(account.balances).filter((b): b is ApiBalance => !!b);
   for (const balance of balances) {
     const param = riskInfo.riskOverrideSettings.marketIdToCategoryMap[balance.marketId];
     if (!param || param.category === EModeCategory.NONE) {

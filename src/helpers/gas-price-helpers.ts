@@ -1,4 +1,4 @@
-import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import axios from 'axios';
 import { ethers } from 'ethers';
 import {
@@ -12,7 +12,9 @@ import {
   isInk,
   isMantle,
 } from '../lib/chain-id';
+import logger from '../lib/logger';
 import Logger from '../lib/logger';
+import { dolomite } from './web3';
 
 export enum GasPriceType {
   STANDARD = 'STANDARD',
@@ -160,7 +162,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
   } else if (isBase(networkId)) {
     return getStandardOrEip1559GasPrice();
   } else if (isBerachain(networkId)) {
-    return getStandardOrEip1559GasPrice();
+    return getBerachainGasPrice();
   } else if (isBotanix(networkId)) {
     return getStandardOrEip1559GasPrice();
   } else if (isBsc(networkId)) {
@@ -208,4 +210,54 @@ async function getStandardOrEip1559GasPrice(): Promise<GasPriceResult> {
     priorityFeeWei: new BigNumber(feeData.maxPriorityFeePerGas.toString()),
     gasLimit: STANDARD_BLOCK_GAS_LIMIT,
   };
+}
+
+const TEN = new BigNumber(10);
+
+async function getBerachainGasPrice(): Promise<GasPriceResult> {
+  const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL);
+  const feeData = await provider.getFeeData();
+  if (feeData.maxPriorityFeePerGas === null || feeData.lastBaseFeePerGas === null) {
+    return Promise.reject(new Error('No gas data found!'));
+  }
+
+  let priorityFeeWei: BigNumber;
+  try {
+    priorityFeeWei = await getPriorityFeeForBerachain();
+  } catch (e) {
+    logger.error({
+      message: 'Could not get priority fee for Berachain due to error',
+      error: e,
+    });
+    priorityFeeWei = new BigNumber(feeData.maxPriorityFeePerGas.toString());
+  }
+
+  return {
+    type: GasPriceType.EIP_1559,
+    baseFeeWei: new BigNumber(feeData.lastBaseFeePerGas.toString()),
+    priorityFeeWei,
+    gasLimit: STANDARD_BLOCK_GAS_LIMIT,
+  };
+}
+
+async function getPriorityFeeForBerachain(): Promise<BigNumber> {
+  let wbtcPrice: Decimal;
+  let beraPrice: Decimal;
+  try {
+    const data = await fetch('https://api.dolomite.io/tokens/80094/prices').then(res => res.json());
+    wbtcPrice = new BigNumber(data.prices['0x0555e30da8f98308edb960aa94c0db47230d2b9c'])
+    beraPrice = new BigNumber(data.prices['0x6969696969696969696969696969696969696969'])
+  } catch (e) {
+    wbtcPrice = (await dolomite.getters.getMarketPrice(new BigNumber(4))).div(TEN.pow(28));
+    beraPrice = (await dolomite.getters.getMarketPrice(new BigNumber(1))).div(TEN.pow(18));
+  }
+  const gasLimit = new BigNumber(125_000);
+
+  return wbtcPrice
+    .div(TEN.pow(8))
+    .div(beraPrice)
+    .div(gasLimit)
+    .times(TEN.pow(18))
+    .times(1.05) // Add a 5% buffer
+    .integerValue();
 }

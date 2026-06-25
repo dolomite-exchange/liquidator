@@ -23,7 +23,8 @@ import MarketStore from '../src/stores/market-store';
 
 const VAPORIZE_EXCESS = process.env.VAPORIZE_EXCESS === 'true';
 
-const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
+// const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
+const SMALL_BORROW_THRESHOLD = new BigNumber(0);
 
 const TEN = new BigNumber('10');
 
@@ -60,7 +61,9 @@ function formatApiBalance(balance: ApiBalance): string {
 }
 
 function shouldIgnoreAccount(account: ApiAccount): boolean {
-  return Object.values(account.balances).some(b => MARKET_IDS_TO_IGNORE.includes(b.marketId));
+  return Object.values(account.balances)
+    .filter((b): b is ApiBalance => !!b)
+    .some(b => MARKET_IDS_TO_IGNORE.includes(b.marketId));
 }
 
 async function start() {
@@ -136,6 +139,7 @@ async function start() {
       supplyAdj,
       borrowAdj,
     } = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
       .reduce((acc, balance) => {
         const market = marketMap[balance.marketId.toString()];
         const priceMultiplier = new BigNumber(10).pow(36 - balance.tokenDecimals);
@@ -171,19 +175,22 @@ async function start() {
         Logger.warn({
           message: `Found bad debt for more than $${SMALL_BORROW_THRESHOLD.toFormat(2)}`,
           account: account.id,
-          markets: Object.values(account.balances).map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
+          markets: Object.values(account.balances)
+            .filter((b): b is ApiBalance => !!b)
+            .map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
           supplyUSD: supply.toFormat(6),
           borrowUSD: borrow.toFormat(6),
         });
 
         if (supply.eq(INTEGERS.ZERO) && VAPORIZE_EXCESS) {
           await loadAccounts();
-          const vaporMarket = Object.values(account.balances).find(b => b.wei.lt(INTEGERS.ZERO));
+          const vaporMarket = Object.values(account.balances)
+            .filter((b): b is ApiBalance => !!b)
+            .find(b => b.wei.lt(INTEGERS.ZERO));
           const txResult = await dolomite.operation.initiate()
             .vaporize({
               primaryAccountOwner: dolomite.getDefaultAccount(),
               primaryAccountId: INTEGERS.ZERO,
-              // primaryAccountId: new BigNumber('84454885947697425406201769899678634598380862356089082229045977777208920484641'),
               vaporAccountOwner: account.owner,
               vaporAccountId: account.number,
               vaporMarketId: new BigNumber(vaporMarket!.marketId),
@@ -235,7 +242,7 @@ async function start() {
         Logger.info({
           message: 'Found almost liquid account!',
           account: account.id,
-          markets: Object.values(account.balances).map(formatApiBalance),
+          markets: Object.values(account.balances).filter((b): b is ApiBalance => !!b).map(formatApiBalance),
           supplyUSD: supply.toFormat(6),
           borrowUSD: borrow.toFormat(6),
           ...extraData,
@@ -270,20 +277,22 @@ async function start() {
     Logger.warn({
       message: 'Found liquid account!',
       account: account.id,
-      markets: Object.values(account.balances).map(formatApiBalance),
+      markets: Object.values(account.balances).filter((b): b is ApiBalance => !!b).map(formatApiBalance),
       supplyUSD: `$${account.supplyUSD.toFormat(66)}`,
       borrowUSD: `$${account.borrowUSD.toFormat(66)}`,
     });
   });
 
   const totalAccountDebt = accounts.reduce((acc, account) => {
-    const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
-      if (balance.wei.gte(INTEGERS.ZERO)) {
-        return memo;
-      }
-      const market = marketMap[balance.marketId.toString()];
-      return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
-    }, INTEGERS.ZERO);
+    const totalBorrowUsd = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
+      .reduce((memo, balance) => {
+        if (balance.wei.gte(INTEGERS.ZERO)) {
+          return memo;
+        }
+        const market = marketMap[balance.marketId.toString()];
+        return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
+      }, INTEGERS.ZERO);
     return acc.plus(totalBorrowUsd);
   }, INTEGERS.ZERO).toNumber();
 

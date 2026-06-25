@@ -175,7 +175,7 @@ export async function liquidateAccount(
 
   Object.keys(liquidAccount.balances)
     .forEach((marketId) => {
-      const par = new BigNumber(liquidAccount.balances[marketId].par);
+      const par = new BigNumber(liquidAccount.balances[marketId]!.par);
 
       if (par.lt(INTEGERS.ZERO)) {
         borrowMarkets.push(marketId);
@@ -225,7 +225,7 @@ export async function liquidateExpiredAccount(
 
   Logger.info({
     at: 'dolomite-helpers#liquidateExpiredAccount',
-    message: 'Starting account expiry liquidation',
+    message: 'Starting account expiration',
     accountOwner: expiredAccount.owner,
     accountNumber: expiredAccount.number,
   });
@@ -270,13 +270,13 @@ async function _liquidateAccountSimple(
   const gasLimit = await estimateGasLiquidateSimple(liquidAccount, owedMarkets, collateralMarkets);
   if (isGasSpikeProtectionEnabled()) {
     const debtAmountUsd: Integer = owedMarkets.reduce((acc, m) => {
-      const amountWei = liquidAccount.balances[m.toFixed()].wei;
+      const amountWei = liquidAccount.balances[m.toFixed()]?.wei ?? INTEGERS.ZERO;
       const priceUsd = marketMap[m.toFixed()].oraclePrice;
       return acc.plus(amountWei.times(priceUsd))
     }, INTEGERS.ZERO);
 
     const largestOwedBalance = Object.values(liquidAccount.balances)
-      .filter(b => b.wei.lt(INTEGERS.ZERO))
+      .filter((b): b is ApiBalance => !!b && b.wei.lt(INTEGERS.ZERO))
       .sort((a, b) => {
         const aValue = a.wei.abs().times(marketMap[a.marketId].oraclePrice);
         const bValue = b.wei.abs().times(marketMap[b.marketId].oraclePrice);
@@ -285,7 +285,7 @@ async function _liquidateAccountSimple(
     const largestOwedMarket = marketMap[largestOwedBalance[0].marketId];
 
     const largestHeldBalance = Object.values(liquidAccount.balances)
-      .filter(b => b.wei.gt(INTEGERS.ZERO))
+      .filter((b): b is ApiBalance => !!b && b.wei.gt(INTEGERS.ZERO))
       .sort((a, b) => {
         const aValue = a.wei.times(marketMap[a.marketId].oraclePrice);
         const bValue = b.wei.times(marketMap[b.marketId].oraclePrice);
@@ -315,7 +315,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
 ): Promise<ContractTransaction | undefined> {
   const riskOverride = getAccountRiskOverride(liquidAccount, riskParams);
   const owedBalance = getLargestBalanceUSD(
-    Object.values(liquidAccount.balances),
+    Object.values(liquidAccount.balances).filter((b): b is ApiBalance => !!b),
     true,
     marketMap,
     protocolBalanceMap,
@@ -323,7 +323,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     isExpiring,
   );
   const heldBalance = getLargestBalanceUSD(
-    Object.values(liquidAccount.balances),
+    Object.values(liquidAccount.balances).filter((b): b is ApiBalance => !!b),
     false,
     marketMap,
     protocolBalanceMap,
@@ -524,14 +524,14 @@ async function _liquidateExpiredAccountInternalSimple(
 
   const preferredHeldBalances = heldMarketIds.reduce<ApiBalance[]>((memo, marketId) => {
     const balance = expiredAccount.balances[marketId.toFixed()];
-    if (balance.wei.gt(INTEGERS.ZERO)) {
+    if (balance?.wei.gt(INTEGERS.ZERO)) {
       return [...memo, balance];
     }
     return memo
   }, []);
   const preferredOwedBalances = owedMarketIds.reduce<ApiBalance[]>((memo, marketId) => {
     const balance = expiredAccount.balances[marketId.toFixed()];
-    if (balance.expiresAt && balance.expiresAt.lt(lastBlockTimestamp.toSeconds()) && balance.wei.lt(INTEGERS.ZERO)) {
+    if (balance?.expiresAt && balance.expiresAt.lt(lastBlockTimestamp.toSeconds()) && balance.wei.lt(INTEGERS.ZERO)) {
       return [...memo, balance];
     }
     return memo
@@ -688,7 +688,7 @@ async function _prepareLiquidationForAsyncMarket(
 
   const rewardPercentage = riskParams.liquidationReward.div(DECIMAL_BASE);
   const debtAmountUsd: Integer = Object.keys(liquidAccount.balances).reduce((acc, m) => {
-    const amountWei = liquidAccount.balances[m].wei;
+    const amountWei = liquidAccount.balances[m]!.wei;
     if (amountWei.gt(INTEGERS.ZERO)) {
       return acc;
     }

@@ -75,7 +75,7 @@ async function start() {
         return false;
       }
       for (let j = 0; j < keys.length; j += 1) {
-        if (!a.balances[keys[j]].par.eq(0)) {
+        if (!a.balances[keys[j]]!.par.eq(0)) {
           return true;
         }
       }

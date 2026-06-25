@@ -4,6 +4,7 @@ import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
+import { ApiBalance } from '../src/lib/api-types';
 import Logger from '../src/lib/logger';
 import Pageable from '../src/lib/pageable';
 import BlockStore from '../src/stores/block-store';
@@ -61,6 +62,7 @@ async function start() {
   for (let i = 0; i < accounts.length; i += 1) {
     const account = accounts[i];
     const dolomiteBalance = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
       .reduce((memo, balance) => {
         if (balance.marketId === YT_GLP_MARKET_ID) {
           // increase the borrow size by the premium

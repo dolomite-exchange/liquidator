@@ -80,7 +80,9 @@ function formatAccountData(
     .map(a => ({
       owner: a.owner,
       number: a.number.toFixed(),
-      balance: Object.values(a.balances).find(f => marketId.eq(f.marketId))!.wei.div(divisor),
+      balance: Object.values(a.balances)
+        .filter((b): b is ApiBalance => !!b)
+        .find(f => marketId.eq(f.marketId))!.wei.div(divisor),
     }))
     .sort((a, b) => a.balance.comparedTo(b.balance))
     .map(a => ({
@@ -235,23 +237,27 @@ async function start() {
   formatAccountData(borrowAccounts, marketMap, marketId, 'borrow');
 
   const totalSupplyAccountDebt = supplyAccounts.reduce((acc, account) => {
-    const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
-      if (balance.wei.gte(INTEGERS.ZERO)) {
-        return memo;
-      }
-      const market = marketMap[balance.marketId.toString()];
-      return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
-    }, INTEGERS.ZERO);
+    const totalBorrowUsd = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
+      .reduce((memo, balance) => {
+        if (balance.wei.gte(INTEGERS.ZERO)) {
+          return memo;
+        }
+        const market = marketMap[balance.marketId.toString()];
+        return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
+      }, INTEGERS.ZERO);
     return acc.plus(totalBorrowUsd);
   }, INTEGERS.ZERO).toNumber();
   const totalSupplyAccountAssets = supplyAccounts.reduce((acc, account) => {
-    const totalBorrowUsd = Object.values(account.balances).reduce((memo, balance) => {
-      if (balance.wei.lte(INTEGERS.ZERO)) {
-        return memo;
-      }
-      const market = marketMap[balance.marketId.toString()];
-      return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
-    }, INTEGERS.ZERO);
+    const totalBorrowUsd = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
+      .reduce((memo, balance) => {
+        if (balance.wei.lte(INTEGERS.ZERO)) {
+          return memo;
+        }
+        const market = marketMap[balance.marketId.toString()];
+        return memo.plus(balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs());
+      }, INTEGERS.ZERO);
     return acc.plus(totalBorrowUsd);
   }, INTEGERS.ZERO).toNumber();
   Logger.info({
@@ -265,15 +271,17 @@ async function start() {
     acc,
     account,
   ) => {
-    const { debt, collateral } = Object.values(account.balances).reduce((memo, balance) => {
-      const isCollateral = balance.wei.gte(INTEGERS.ZERO);
-      const market = marketMap[balance.marketId.toString()];
-      const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs();
-      return {
-        debt: isCollateral ? memo.debt : memo.debt.plus(value),
-        collateral: !isCollateral ? memo.collateral : memo.collateral.plus(value),
-      };
-    }, { debt: INTEGERS.ZERO, collateral: INTEGERS.ZERO });
+    const { debt, collateral } = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
+      .reduce((memo, balance) => {
+        const isCollateral = balance.wei.gte(INTEGERS.ZERO);
+        const market = marketMap[balance.marketId.toString()];
+        const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR).abs();
+        return {
+          debt: isCollateral ? memo.debt : memo.debt.plus(value),
+          collateral: !isCollateral ? memo.collateral : memo.collateral.plus(value),
+        };
+      }, { debt: INTEGERS.ZERO, collateral: INTEGERS.ZERO });
     return {
       debt: acc.debt.plus(debt),
       collateral: acc.collateral.plus(collateral),
@@ -308,6 +316,7 @@ function getTransformedAccounts(
       borrow,
       transformedBalances,
     } = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
       .reduce((acc, balance) => {
         const market = marketMap[balance.marketId.toString()];
         const value = balance.wei.times(market.oraclePrice).div(ONE_DOLLAR);

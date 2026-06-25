@@ -24,10 +24,8 @@ export async function expireSimple(
   }
 
   return expiryProxy.functions.expire(
-    SOLID_ACCOUNT.owner,
-    SOLID_ACCOUNT.number,
-    expiredAccount.owner,
-    expiredAccount.number,
+    { owner: SOLID_ACCOUNT.owner, number: SOLID_ACCOUNT.number.toFixed(0) },
+    { owner: expiredAccount.owner, number: expiredAccount.number.toFixed(0) },
     owedBalance.marketId,
     heldBalance.marketId,
     expiresAt.toFixed(0),
@@ -54,10 +52,8 @@ export async function estimateGasExpireSimple(
   return estimateGasOrFallbackIfDisabled(
     async () => {
       const gasLimit = await expiryProxy.estimateGas.expire(
-        SOLID_ACCOUNT.owner,
-        SOLID_ACCOUNT.number,
-        expiredAccount.owner,
-        expiredAccount.number,
+        { owner: SOLID_ACCOUNT.owner, number: SOLID_ACCOUNT.number.toFixed(0) },
+        { owner: expiredAccount.owner, number: expiredAccount.number.toFixed(0) },
         owedBalance.marketId,
         heldBalance.marketId,
         expiresAt.toFixed(0),

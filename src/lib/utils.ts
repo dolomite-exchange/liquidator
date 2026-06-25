@@ -1,7 +1,7 @@
 import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import { getAccountRiskOverride, RiskOverride } from './account-risk-override-getter';
-import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
+import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from './api-types';
 
 export const DECIMAL_BASE = new BigNumber(10).pow(18);
 
@@ -19,6 +19,7 @@ export function isCollateralized(
     borrow,
     supply,
   } = Object.values(account.balances)
+    .filter((b): b is ApiBalance => !!b)
     .reduce((memo, balance) => {
       const market = marketMap[balance.marketId.toString()];
       const value = balance.wei.times(market.oraclePrice);

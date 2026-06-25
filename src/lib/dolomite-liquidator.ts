@@ -90,7 +90,7 @@ export default class DolomiteLiquidator {
 
         return !this.liquidationStore.contains(account)
           && this.isSufficientDebt(account, marketMap)
-          && Object.values(account.balances).some(isApiBalanceExpired)
+          && Object.values(account.balances).filter((b): b is ApiBalance => !!b).some(isApiBalanceExpired)
       })
 
     const riskParams = this.riskParamsStore.getDolomiteRiskParams();
@@ -242,20 +242,20 @@ export default class DolomiteLiquidator {
     account: ApiAccount,
     marketMap: { [marketId: string]: ApiMarket },
   ): boolean => {
-    if (Object.values(account.balances).some(b => zap.getIsAsyncAssetByMarketId(new ZapBigNumber(b.marketId)))) {
+    const balances = Object.values(account.balances).filter((b): b is ApiBalance => !!b);
+    if (balances.some(b => zap.getIsAsyncAssetByMarketId(new ZapBigNumber(b.marketId)))) {
       // Always return true if the account holds GM tokens
       return true;
     }
 
-    const borrow = Object.values(account.balances)
-      .reduce((memo, balance) => {
-        if (balance.wei.lt(INTEGERS.ZERO)) {
-          const market = marketMap[balance.marketId.toString()];
-          const value = balance.wei.times(market.oraclePrice);
-          return memo.plus(value.abs());
-        }
-        return memo;
-      }, INTEGERS.ZERO);
+    const borrow = balances.reduce((memo, balance) => {
+      if (balance.wei.lt(INTEGERS.ZERO)) {
+        const market = marketMap[balance.marketId.toString()];
+        const value = balance.wei.times(market.oraclePrice);
+        return memo.plus(value.abs());
+      }
+      return memo;
+    }, INTEGERS.ZERO);
 
     const mode = getLiquidationMode();
     let minValueLiquidated: BigNumber;
@@ -274,7 +274,8 @@ export default class DolomiteLiquidator {
     account: ApiAccount,
     marketMap: { [marketId: string]: ApiMarket },
   ): boolean => {
-    const supply = Object.values(account.balances)
+    const balances = Object.values(account.balances).filter((b): b is ApiBalance => !!b);
+    const supply = balances
       .reduce((memo, balance) => {
         if (balance.wei.gt(INTEGERS.ZERO)) {
           const market = marketMap[balance.marketId.toString()];
@@ -282,15 +283,14 @@ export default class DolomiteLiquidator {
         }
         return memo;
       }, INTEGERS.ZERO);
-    const borrow = Object.values(account.balances)
-      .reduce((memo, balance) => {
-        if (balance.wei.lt(INTEGERS.ZERO)) {
-          const market = marketMap[balance.marketId.toString()];
-          const value = balance.wei.times(market.oraclePrice);
-          return memo.plus(value.abs());
-        }
-        return memo;
-      }, INTEGERS.ZERO);
+    const borrow = balances.reduce((memo, balance) => {
+      if (balance.wei.lt(INTEGERS.ZERO)) {
+        const market = marketMap[balance.marketId.toString()];
+        const value = balance.wei.times(market.oraclePrice);
+        return memo.plus(value.abs());
+      }
+      return memo;
+    }, INTEGERS.ZERO);
 
     return supply.eq(INTEGERS.ZERO) && borrow.gt(INTEGERS.ZERO);
   }
@@ -305,6 +305,7 @@ export default class DolomiteLiquidator {
   ): number => {
     function sumBorrows(account: ApiAccount): BigNumber {
       return Object.values(account.balances)
+        .filter((b): b is ApiBalance => !!b)
         .reduce((memo, balance) => {
           const market = marketMap[balance.marketId.toString()];
           const value = balance.wei.times(market.oraclePrice);

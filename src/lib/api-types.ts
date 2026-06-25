@@ -37,7 +37,7 @@ export interface ApiAccount {
   number: Integer;
   effectiveUser: string;
   balances: {
-    [marketNumber: string]: ApiBalance;
+    [marketNumber: string]: ApiBalance | undefined;
   };
 }
 
