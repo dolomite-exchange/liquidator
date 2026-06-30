@@ -377,6 +377,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       heldBalance: heldBalance.wei.abs().toFixed(),
       owedWeiForLiquidation: owedWei.toFixed(),
       heldWeiForLiquidation: heldWei.toFixed(),
+      owedPrice: owedPrice.toFixed(),
       owedPriceAdj: owedPriceAdj.toFixed(),
       heldPrice: heldMarket.oraclePrice.toFixed(),
     });
@@ -396,9 +397,21 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
       heldBalance: heldBalance.wei.abs().toFixed(),
       owedWeiForLiquidation: owedWei.toFixed(),
       heldWeiForLiquidation: heldWei.toFixed(),
+      owedPrice: owedPrice.toFixed(),
       owedPriceAdj: owedPriceAdj.toFixed(),
       heldPrice: heldMarket.oraclePrice.toFixed(),
+      riskOverride: riskOverride
+        ? {
+          liquidationRewardOverride: riskOverride.liquidationRewardOverride.toFixed(6),
+          marginRatioOverride: riskOverride.marginRatioOverride.toFixed(6),
+        }
+        : null,
       partialLiquidation: isPartialLiquidationSupported,
+      diagnostics: {
+        heldMarketPremium: heldMarket.liquidationRewardPremium.toFixed(18),
+        owedMarketPremium: owedMarket.liquidationRewardPremium.toFixed(18),
+        liquidationReward: riskParams.liquidationReward.toFixed(),
+      },
     });
 
     const heldToken: MinimalApiToken = {
@@ -460,6 +473,7 @@ async function _liquidateAccountAndSellWithGenericLiquidity(
     let gasLimit: Integer | undefined;
     for (let i = 0; i < outputs.length; i += 1) {
       try {
+        // gasLimit = new BigNumber(10_000_000);
         gasLimit = await estimateGasLiquidateV6(
           liquidAccount,
           inputAmount,

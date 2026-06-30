@@ -2,6 +2,7 @@ import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Consta
 import { DateTime } from 'luxon';
 import { getLiquidatableDolomiteAccounts } from '../../src/clients/dolomite';
 import { getLargestBalanceUSD } from '../../src/helpers/balance-helpers';
+import { ApiBalance } from '../../src/lib/api-types';
 import Pageable from '../../src/lib/pageable';
 import AccountStore from '../../src/stores/account-store';
 import BalanceStore from '../../src/stores/balance-store';
@@ -10,6 +11,7 @@ import MarketStore from '../../src/stores/market-store';
 
 // eslint-disable-next-line max-len
 const ACCOUNT_ID_1 = '0xb5dd5cfa0577b53aeb7b6ed4662794d5a44affbe-103576997491961730661524320610884432955705929610587706488872870347971589683830';
+// eslint-disable-next-line max-len
 const ACCOUNT_ID_2 = '0x52256ef863a713ef349ae6e97a7e8f35785145de-70091649351367748290422611441766679494476833384245294727860561944953981138328';
 
 describe('balance-helpers', () => {
@@ -48,7 +50,7 @@ describe('balance-helpers', () => {
       expect(account).toBeDefined();
 
       const largestOwedBalance = getLargestBalanceUSD(
-        Object.values(account!.balances),
+        Object.values(account!.balances).filter((b): b is ApiBalance => !!b),
         true,
         marketMap,
         balanceMap,
@@ -58,7 +60,7 @@ describe('balance-helpers', () => {
       expect(largestOwedBalance.tokenAddress).toBe('0xff970a61a04b1ca14834a43f5de4533ebddb5cc8');
 
       const largestHeldBalance = getLargestBalanceUSD(
-        Object.values(account!.balances),
+        Object.values(account!.balances).filter((b): b is ApiBalance => !!b),
         false,
         marketMap,
         balanceMap,
@@ -92,7 +94,7 @@ describe('balance-helpers', () => {
       expect(account).toBeDefined();
 
       const largestHeldBalance = getLargestBalanceUSD(
-        Object.values(account!.balances),
+        Object.values(account!.balances).filter((b): b is ApiBalance => !!b),
         false,
         marketMap,
         balanceMap,

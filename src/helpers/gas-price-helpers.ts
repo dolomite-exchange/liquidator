@@ -13,8 +13,6 @@ import {
   isMantle,
 } from '../lib/chain-id';
 import logger from '../lib/logger';
-import Logger from '../lib/logger';
-import { dolomite } from './web3';
 
 export enum GasPriceType {
   STANDARD = 'STANDARD',
@@ -62,12 +60,12 @@ export function resetGasPriceWei(): GasPriceResult {
   return gasResult;
 }
 
-export async function updateGasPrice(dolomite: DolomiteMargin) {
+export async function updateGasPrice(_dolomite: DolomiteMargin) {
   let response: GasPriceResult;
   try {
-    response = await getGasPrices(dolomite);
+    response = await getGasPrices(_dolomite);
   } catch (error: any) {
-    Logger.error({
+    logger.error({
       at: 'updateGasPrice',
       message: 'Failed to retrieve gas prices',
       error,
@@ -75,7 +73,7 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
     return;
   }
 
-  Logger.info({
+  logger.info({
     at: 'updateGasPrice',
     message: 'Updating gas price',
     gasPrice: response,
@@ -132,8 +130,8 @@ export function isGasSpikeProtectionEnabled(): boolean {
   return process.env.GAS_SPIKE_PROTECTION === 'true';
 }
 
-async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
-  Logger.info({
+async function getGasPrices(_dolomite: DolomiteMargin): Promise<GasPriceResult> {
+  logger.info({
     message: '#getGasPrices: Fetching gas prices',
   });
 
@@ -153,7 +151,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
       gasLimit: STANDARD_BLOCK_GAS_LIMIT,
     };
   } else if (isArbitrum(networkId)) {
-    const result = await dolomite.arbitrumGasInfo!.getPricesInWei();
+    const result = await _dolomite.arbitrumGasInfo!.getPricesInWei();
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: result.perArbGasTotal,
@@ -162,7 +160,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
   } else if (isBase(networkId)) {
     return getStandardOrEip1559GasPrice();
   } else if (isBerachain(networkId)) {
-    return getBerachainGasPrice();
+    return getBerachainGasPrice(_dolomite);
   } else if (isBotanix(networkId)) {
     return getStandardOrEip1559GasPrice();
   } else if (isBsc(networkId)) {
@@ -180,7 +178,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
     };
   } else {
     const errorMessage = `Could not find network ID ${networkId}`;
-    Logger.error({
+    logger.error({
       at: 'getGasPrices',
       message: errorMessage,
     });
@@ -214,7 +212,7 @@ async function getStandardOrEip1559GasPrice(): Promise<GasPriceResult> {
 
 const TEN = new BigNumber(10);
 
-async function getBerachainGasPrice(): Promise<GasPriceResult> {
+async function getBerachainGasPrice(_dolomite: DolomiteMargin): Promise<GasPriceResult> {
   const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL);
   const feeData = await provider.getFeeData();
   if (feeData.maxPriorityFeePerGas === null || feeData.lastBaseFeePerGas === null) {
@@ -223,7 +221,7 @@ async function getBerachainGasPrice(): Promise<GasPriceResult> {
 
   let priorityFeeWei: BigNumber;
   try {
-    priorityFeeWei = await getPriorityFeeForBerachain();
+    priorityFeeWei = await getPriorityFeeForBerachain(_dolomite);
   } catch (e) {
     logger.error({
       message: 'Could not get priority fee for Berachain due to error',
@@ -240,7 +238,7 @@ async function getBerachainGasPrice(): Promise<GasPriceResult> {
   };
 }
 
-async function getPriorityFeeForBerachain(): Promise<BigNumber> {
+async function getPriorityFeeForBerachain(_dolomite: DolomiteMargin): Promise<BigNumber> {
   let wbtcPrice: Decimal;
   let beraPrice: Decimal;
   try {
@@ -248,8 +246,8 @@ async function getPriorityFeeForBerachain(): Promise<BigNumber> {
     wbtcPrice = new BigNumber(data.prices['0x0555e30da8f98308edb960aa94c0db47230d2b9c'])
     beraPrice = new BigNumber(data.prices['0x6969696969696969696969696969696969696969'])
   } catch (e) {
-    wbtcPrice = (await dolomite.getters.getMarketPrice(new BigNumber(4))).div(TEN.pow(28));
-    beraPrice = (await dolomite.getters.getMarketPrice(new BigNumber(1))).div(TEN.pow(18));
+    wbtcPrice = (await _dolomite.getters.getMarketPrice(new BigNumber(4))).div(TEN.pow(28));
+    beraPrice = (await _dolomite.getters.getMarketPrice(new BigNumber(1))).div(TEN.pow(18));
   }
   const gasLimit = new BigNumber(125_000);
 

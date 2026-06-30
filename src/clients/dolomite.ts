@@ -450,6 +450,9 @@ export async function getDolomiteMarkets(
       const isPartialLiquidationSupported = isPartialLiquidationSupportedResults[i].success
         ? dolomite.web3.eth.abi.decodeParameter('bool', isPartialLiquidationSupportedResults[i].returnData)
         : false;
+      if (market.token.symbol === 'iBERA' || market.token.symbol === 'WBERA') {
+        console.log('MARKET INFO: ', market.token.symbol, market.liquidationRewardPremium);
+      }
       const apiMarket: ApiMarket = {
         id: market.id,
         marketId: marketId.toNumber(),

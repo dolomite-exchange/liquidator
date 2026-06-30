@@ -24,7 +24,8 @@ import MarketStore from '../src/stores/market-store';
 const VAPORIZE_EXCESS = process.env.VAPORIZE_EXCESS === 'true';
 
 // const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
-const SMALL_BORROW_THRESHOLD = new BigNumber(0);
+const SMALL_BORROW_THRESHOLD = new BigNumber(100);
+// const SMALL_BORROW_THRESHOLD = new BigNumber(0);
 
 const TEN = new BigNumber('10');
 
@@ -41,7 +42,7 @@ const ONE_DOLLAR = new BigNumber(10).pow(36);
 
 const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | undefined>> = {
   [ChainId.ArbitrumOne]: {
-    41: new BigNumber('0.08'),
+    // 41: new BigNumber('0.08'),
   },
   [ChainId.Base]: {},
   [ChainId.Berachain]: {
@@ -98,6 +99,7 @@ async function start() {
     ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     networkId,
     subgraphUrl: process.env.SUBGRAPH_URL,
+    vaporizeExcess: VAPORIZE_EXCESS,
   });
 
   await marketStore._update();
@@ -122,6 +124,7 @@ async function start() {
   let smallLiquidBorrowCount = 0;
   let smallLiquidDebtAmount = INTEGERS.ZERO;
   const liquidAccounts: (ApiAccount & { borrowUSD: Decimal; supplyUSD: Decimal })[] = [];
+  const vaporAccounts: (ApiAccount & { borrowUSD: Decimal; supplyUSD: Decimal })[] = [];
   const allAccounts: (ApiAccount & { borrowUSD: Decimal; supplyUSD: Decimal })[] = [];
   const totalAccountsWithBadDebt = [] as (ApiAccount & { borrow: BigNumber; supply: BigNumber; })[];
   for (let i = 0; i < accounts.length; i += 1) {
@@ -172,15 +175,7 @@ async function start() {
     const marginRatio = (riskOverride?.marginRatioOverride ?? riskParams.liquidationRatio).div(DECIMAL_BASE);
     if (borrow.gt(supply) && !shouldIgnoreAccount(account)) {
       if (borrow.gt(SMALL_BORROW_THRESHOLD)) {
-        Logger.warn({
-          message: `Found bad debt for more than $${SMALL_BORROW_THRESHOLD.toFormat(2)}`,
-          account: account.id,
-          markets: Object.values(account.balances)
-            .filter((b): b is ApiBalance => !!b)
-            .map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
-          supplyUSD: supply.toFormat(6),
-          borrowUSD: borrow.toFormat(6),
-        });
+        vaporAccounts.push({ ...account, borrowUSD: borrow, supplyUSD: supply });
 
         if (supply.eq(INTEGERS.ZERO) && VAPORIZE_EXCESS) {
           await loadAccounts();
@@ -257,6 +252,9 @@ async function start() {
       .toFormat(2);
   }
 
+  Logger.info({
+    message: '==================== Debt Account Stats =========================',
+  });
   allAccounts.sort((a, b) => (a.borrowUSD.gt(b.borrowUSD) ? 1 : -1));
   Logger.info({
     message: 'Stats on accounts with debt',
@@ -265,6 +263,9 @@ async function start() {
     averageAccountDebt: `$${computeAverageAndFormat(allAccounts, a => a.borrowUSD)}`,
   });
 
+  Logger.info({
+    message: '==================== Supply Account Stats =========================',
+  });
   allAccounts.sort((a, b) => (a.supplyUSD.gt(b.supplyUSD) ? 1 : -1));
   Logger.info({
     message: 'Stats on accounts with supply',
@@ -273,15 +274,40 @@ async function start() {
     averageAccountSupply: `$${computeAverageAndFormat(allAccounts, a => a.supplyUSD)}`,
   });
 
-  liquidAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1)).forEach(account => {
-    Logger.warn({
-      message: 'Found liquid account!',
-      account: account.id,
-      markets: Object.values(account.balances).filter((b): b is ApiBalance => !!b).map(formatApiBalance),
-      supplyUSD: `$${account.supplyUSD.toFormat(66)}`,
-      borrowUSD: `$${account.borrowUSD.toFormat(66)}`,
+  if (liquidAccounts.length > 0) {
+    Logger.info({
+      message: '==================== Liquid Accounts =========================',
     });
-  });
+
+    liquidAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1)).forEach(account => {
+      Logger.warn({
+        message: 'Found liquid account!',
+        account: account.id,
+        markets: Object.values(account.balances).filter((b): b is ApiBalance => !!b).map(formatApiBalance),
+        supplyUSD: `$${account.supplyUSD.toFormat(66)}`,
+        borrowUSD: `$${account.borrowUSD.toFormat(66)}`,
+      });
+    });
+  }
+
+  if (vaporAccounts.length > 0) {
+    Logger.info({
+      message: '==================== Vapor Accounts =========================',
+    });
+
+    vaporAccounts.sort((a, b) => (a.borrowUSD.lt(b.borrowUSD) ? 1 : -1)).forEach(account => {
+      Logger.warn({
+        message: `Found bad debt for more than $${SMALL_BORROW_THRESHOLD.toFormat(2)}`,
+        account: account.id,
+        markets: Object.values(account.balances)
+          .filter((b): b is ApiBalance => !!b)
+          .map(b => [b.marketId.toFixed(), b.wei.toFixed()]),
+        supplyUSD: account.supplyUSD.toFormat(6),
+        borrowUSD: account.borrowUSD.toFormat(6),
+      });
+    });
+
+  }
 
   const totalAccountDebt = accounts.reduce((acc, account) => {
     const totalBorrowUsd = Object.values(account.balances)
