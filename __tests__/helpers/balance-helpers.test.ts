@@ -7,6 +7,7 @@ import AccountStore from '../../src/stores/account-store';
 import BalanceStore from '../../src/stores/balance-store';
 import BlockStore from '../../src/stores/block-store';
 import MarketStore from '../../src/stores/market-store';
+import { ApiBalance } from '../../src/lib/api-types';
 
 // eslint-disable-next-line max-len
 const ACCOUNT_ID_1 = '0xb5dd5cfa0577b53aeb7b6ed4662794d5a44affbe-103576997491961730661524320610884432955705929610587706488872870347971589683830';
@@ -48,7 +49,7 @@ describe('balance-helpers', () => {
       expect(account).toBeDefined();
 
       const largestOwedBalance = getLargestBalanceUSD(
-        Object.values(account!.balances),
+        Object.values(account!.balances).filter((b): b is ApiBalance => !!b),
         true,
         marketMap,
         balanceMap,
@@ -58,7 +59,7 @@ describe('balance-helpers', () => {
       expect(largestOwedBalance.tokenAddress).toBe('0xff970a61a04b1ca14834a43f5de4533ebddb5cc8');
 
       const largestHeldBalance = getLargestBalanceUSD(
-        Object.values(account!.balances),
+        Object.values(account!.balances).filter((b): b is ApiBalance => !!b),
         false,
         marketMap,
         balanceMap,
@@ -92,7 +93,7 @@ describe('balance-helpers', () => {
       expect(account).toBeDefined();
 
       const largestHeldBalance = getLargestBalanceUSD(
-        Object.values(account!.balances),
+        Object.values(account!.balances).filter((b): b is ApiBalance => !!b),
         false,
         marketMap,
         balanceMap,
