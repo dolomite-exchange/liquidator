@@ -220,6 +220,7 @@ async function getBerachainGasPrice(): Promise<GasPriceResult> {
   if (feeData.maxPriorityFeePerGas === null || feeData.lastBaseFeePerGas === null) {
     return Promise.reject(new Error('No gas data found!'));
   }
+  const blockPriorityFee = new BigNumber(feeData.maxPriorityFeePerGas.toString());
 
   let priorityFeeWei: BigNumber;
   try {
@@ -229,13 +230,13 @@ async function getBerachainGasPrice(): Promise<GasPriceResult> {
       message: 'Could not get priority fee for Berachain due to error',
       error: e,
     });
-    priorityFeeWei = new BigNumber(feeData.maxPriorityFeePerGas.toString());
+    priorityFeeWei = blockPriorityFee;
   }
 
   return {
     type: GasPriceType.EIP_1559,
     baseFeeWei: new BigNumber(feeData.lastBaseFeePerGas.toString()),
-    priorityFeeWei,
+    priorityFeeWei: BigNumber.maximum(priorityFeeWei, blockPriorityFee),
     gasLimit: STANDARD_BLOCK_GAS_LIMIT,
   };
 }
