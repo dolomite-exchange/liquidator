@@ -7,7 +7,7 @@ import './env';
 export type CallStruct = { target: string; callData: string };
 
 const multiCallWithExceptionHandlerAddress =
-  ModuleDeployments.MultiCallWithExceptionHandler[process.env.NETWORK_ID!].address;
+  ModuleDeployments.MultiCallWithExceptionHandlerV2[process.env.NETWORK_ID!].address;
 if (!multiCallWithExceptionHandlerAddress) {
   throw new Error('Could not find multiCallWithExceptionHandlerAddress');
 }
@@ -20,9 +20,13 @@ export async function aggregateWithExceptionHandler(
     MultiCallWithExceptionHandlerAbi,
     multiCallWithExceptionHandlerAddress,
   );
-  const { returnData } = await dolomite.contracts.callConstantContractFunction(
-    multiCallWithExceptionHandler.methods.aggregate(calls),
-    options,
-  );
-  return returnData;
+  try {
+    const { returnData } = await dolomite.contracts.callConstantContractFunction(
+      multiCallWithExceptionHandler.methods.aggregate(calls),
+      options,
+    );
+    return returnData;
+  } catch (e: any) {
+    return Promise.reject(new Error(`Could not perform multi-call due to error: ${e.message}`))
+  }
 }

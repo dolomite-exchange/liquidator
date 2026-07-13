@@ -32,7 +32,7 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_
 
 async function start() {
   const blockStore = new BlockStore();
-  const marketStore = new MarketStore(blockStore, false);
+  const marketStore = new MarketStore(blockStore, true);
 
   await blockStore._update();
 
