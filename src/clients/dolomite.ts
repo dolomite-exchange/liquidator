@@ -473,7 +473,7 @@ export async function getDolomiteMarkets(
   if (badMarkets.length !== 0) {
     Logger.info({
       message: 'Found markets with invalid oracle prices:',
-      badMarkets: badMarkets.join(', '),
+      badMarketIds: `[${badMarkets.join(', ')}]`,
     });
   }
 
