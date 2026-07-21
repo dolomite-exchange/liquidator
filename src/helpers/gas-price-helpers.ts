@@ -14,6 +14,7 @@ import {
 } from '../lib/chain-id';
 import logger from '../lib/logger';
 import Logger from '../lib/logger';
+import { Network } from '@dolomite-exchange/zap-sdk';
 import { dolomite } from './web3';
 
 export enum GasPriceType {
@@ -48,16 +49,22 @@ export type GasPriceResult = GasPriceStandard | GasPriceEip1559;
 const ONE_GWEI_IN_WEI_UNITS = new BigNumber('1000000000');
 const MULTIPLIER = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
 const ADDITION_WEI = new BigNumber(process.env.GAS_PRICE_ADDITION_WEI as string);
-const STANDARD_BLOCK_GAS_LIMIT = new BigNumber(15_000_000);
+const STANDARD_BLOCK_GAS_LIMIT = new BigNumber(16_000_000);
+const ARBITRUM_BLOCK_GAS_LIMIT = new BigNumber(32_000_000);
 
 let gasResult: GasPriceResult;
 resetGasPriceWei()
+
+function getBlockGasLimit(): BigNumber {
+  const networkId = Number(process.env.NETWORK_ID);
+  return networkId === Network.ARBITRUM_ONE ? ARBITRUM_BLOCK_GAS_LIMIT : STANDARD_BLOCK_GAS_LIMIT;
+}
 
 export function resetGasPriceWei(): GasPriceResult {
   gasResult = {
     type: GasPriceType.STANDARD,
     gasPriceWei: new BigNumber(process.env.INITIAL_GAS_PRICE_WEI as string),
-    gasLimit: STANDARD_BLOCK_GAS_LIMIT,
+    gasLimit: getBlockGasLimit(),
   }
   return gasResult;
 }
@@ -143,21 +150,21 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: new BigNumber(response.data.fast).times(ONE_GWEI_IN_WEI_UNITS),
-      gasLimit: STANDARD_BLOCK_GAS_LIMIT,
+      gasLimit: getBlockGasLimit(),
     };
   } else if (networkId === ChainId.XLayer) {
     const response = await axios.get('https://rpc.xlayer.tech/gasstation');
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: new BigNumber(response.data.fast).times(ONE_GWEI_IN_WEI_UNITS),
-      gasLimit: STANDARD_BLOCK_GAS_LIMIT,
+      gasLimit: getBlockGasLimit(),
     };
   } else if (isArbitrum(networkId)) {
     const result = await dolomite.arbitrumGasInfo!.getPricesInWei();
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: result.perArbGasTotal,
-      gasLimit: STANDARD_BLOCK_GAS_LIMIT,
+      gasLimit: getBlockGasLimit(),
     };
   } else if (isBase(networkId)) {
     return getStandardOrEip1559GasPrice();
@@ -200,7 +207,7 @@ async function getStandardOrEip1559GasPrice(): Promise<GasPriceResult> {
     return {
       type: GasPriceType.STANDARD,
       gasPriceWei: new BigNumber(feeData.gasPrice.toString()),
-      gasLimit: STANDARD_BLOCK_GAS_LIMIT,
+      gasLimit: getBlockGasLimit(),
     };
   }
 
@@ -208,7 +215,7 @@ async function getStandardOrEip1559GasPrice(): Promise<GasPriceResult> {
     type: GasPriceType.EIP_1559,
     baseFeeWei: new BigNumber(feeData.lastBaseFeePerGas.toString()),
     priorityFeeWei: new BigNumber(feeData.maxPriorityFeePerGas.toString()),
-    gasLimit: STANDARD_BLOCK_GAS_LIMIT,
+    gasLimit: getBlockGasLimit(),
   };
 }
 
@@ -237,7 +244,7 @@ async function getBerachainGasPrice(): Promise<GasPriceResult> {
     type: GasPriceType.EIP_1559,
     baseFeeWei: new BigNumber(feeData.lastBaseFeePerGas.toString()),
     priorityFeeWei: BigNumber.maximum(priorityFeeWei, blockPriorityFee),
-    gasLimit: STANDARD_BLOCK_GAS_LIMIT,
+    gasLimit: getBlockGasLimit(),
   };
 }
 

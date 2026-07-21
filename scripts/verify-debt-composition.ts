@@ -1,4 +1,11 @@
-import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
+import {
+  AmountDenomination,
+  AmountReference,
+  BigNumber,
+  ConfirmationType,
+  Decimal,
+  Integer,
+} from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import { writeFileSync } from 'node:fs';
 import v8 from 'v8';
@@ -7,8 +14,8 @@ import {
   getLiquidatableDolomiteAccountsWithCertainBorrowAsset,
   getLiquidatableDolomiteAccountsWithCertainSupplyAsset,
 } from '../src/clients/dolomite';
-import { updateGasPrice } from '../src/helpers/gas-price-helpers';
-import { dolomite } from '../src/helpers/web3';
+import { getGasPriceWeiWithModifications, updateGasPrice } from '../src/helpers/gas-price-helpers';
+import { dolomite, loadAccounts } from '../src/helpers/web3';
 import { ApiAccount, ApiBalance, ApiMarket } from '../src/lib/api-types';
 import '../src/lib/env';
 import { ChainId } from '../src/lib/chain-id';
@@ -17,6 +24,7 @@ import Pageable from '../src/lib/pageable';
 import AccountStore from '../src/stores/account-store';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
+import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 
 const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${1_000_000}`);
 // const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
@@ -27,6 +35,8 @@ const MARGIN_PREMIUM_BASE = new BigNumber('1000000000000000000');
 const MARGIN_PREMIUM_SPECULATIVE: BigNumber | undefined = undefined;
 
 const ONE_DOLLAR = new BigNumber(10).pow(36);
+
+const VAPORIZE_EXCESS = process.env.VAPORIZE_EXCESS === 'true';
 
 interface TransformedApiBalance extends ApiBalance {
   amountUsd: Decimal;
@@ -175,12 +185,6 @@ async function start() {
     return Promise.reject(new Error(message));
   }
 
-  for (let i = 0; i < marketCount.toNumber(); i++) {
-    if (!await dolomite.getters.getMarketIsClosing(new BigNumber(i))) {
-      console.log('market address:', await dolomite.getters.getMarketTokenAddress(new BigNumber(i)));
-    }
-  }
-
   const marketName = await dolomite.token.getName(await dolomite.getters.getMarketTokenAddress(marketId));
 
   Logger.info({
@@ -223,6 +227,7 @@ async function start() {
     );
     return nextAccounts;
   });
+  await vaporizeIfNecessary(supplyAccounts);
   formatAccountData(supplyAccounts, marketMap, marketId, 'supply');
 
   const borrowAccounts = await Pageable.getPageableValues(async (lastId) => {
@@ -234,6 +239,7 @@ async function start() {
     );
     return nextAccounts;
   });
+  await vaporizeIfNecessary(borrowAccounts);
   formatAccountData(borrowAccounts, marketMap, marketId, 'borrow');
 
   const totalSupplyAccountDebt = supplyAccounts.reduce((acc, account) => {
@@ -350,6 +356,56 @@ function getTransformedAccounts(
 
 function formatNumber(value: number): string {
   return value.toLocaleString('en-US', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function vaporizeIfNecessary(accounts: ApiAccount[]) {
+  if (!VAPORIZE_EXCESS) {
+    Logger.info({
+      message: 'Skipping vaporization. It is disabled. Set VAPORIZE_EXCESS=true to enable it.'
+    })
+    return;
+  }
+
+  const wallet = await loadAccounts();
+  let nonce = await dolomite.web3.eth.getTransactionCount(wallet);
+  for (const account of accounts) {
+    const supply = Object.values(account.balances)
+      .filter((b): b is ApiBalance => !!b)
+      .reduce((acc, b) => b.wei.gt(INTEGERS.ZERO) ? acc.plus(b.wei) : acc, INTEGERS.ZERO);
+    if (supply.eq(INTEGERS.ZERO)) {
+      await loadAccounts();
+      const vaporMarket = Object.values(account.balances)
+        .filter((b): b is ApiBalance => !!b)
+        .find(b => b.wei.lt(INTEGERS.ZERO));
+      const txResult = await dolomite.operation.initiate()
+        .vaporize({
+          primaryAccountOwner: dolomite.getDefaultAccount(),
+          primaryAccountId: INTEGERS.ZERO,
+          vaporAccountOwner: account.owner,
+          vaporAccountId: account.number,
+          vaporMarketId: new BigNumber(vaporMarket!.marketId),
+          payoutMarketId: new BigNumber(vaporMarket!.marketId !== 2 ? 2 : 0),
+          amount: {
+            value: INTEGERS.ZERO,
+            denomination: AmountDenomination.Principal,
+            reference: AmountReference.Target,
+          },
+        })
+        .commit({
+          gas: 10_000_000,
+          gasPrice: getGasPriceWeiWithModifications().toFixed(),
+          confirmationType: ConfirmationType.Hash,
+          nonce: nonce++,
+        });
+
+      Logger.info({
+        message: 'Vaporization transaction hash:',
+        transactionHash: txResult.transactionHash,
+      });
+
+      await sleep(3_000);
+    }
+  }
 }
 
 start().catch(error => {
