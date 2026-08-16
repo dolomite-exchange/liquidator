@@ -1,21 +1,18 @@
 import { BigNumber, Decimal, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import axios from 'axios';
 import { ethers } from 'ethers';
+import { Network } from '@dolomite-exchange/zap-sdk';
 import {
   ChainId,
   isArbitrum,
   isBase,
   isBerachain,
-  isBotanix,
   isBsc,
   isEthereum,
   isInk,
   isMantle,
 } from '../lib/chain-id';
-import logger from '../lib/logger';
 import Logger from '../lib/logger';
-import { Network } from '@dolomite-exchange/zap-sdk';
-import { dolomite } from './web3';
 
 export enum GasPriceType {
   STANDARD = 'STANDARD',
@@ -145,14 +142,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
   });
 
   const networkId = Number(process.env.NETWORK_ID);
-  if (networkId === ChainId.PolygonZkEvm) {
-    const response = await axios.get('https://gasstation.polygon.technology/zkevm');
-    return {
-      type: GasPriceType.STANDARD,
-      gasPriceWei: new BigNumber(response.data.fast).times(ONE_GWEI_IN_WEI_UNITS),
-      gasLimit: getBlockGasLimit(),
-    };
-  } else if (networkId === ChainId.XLayer) {
+  if (networkId === ChainId.XLayer) {
     const response = await axios.get('https://rpc.xlayer.tech/gasstation');
     return {
       type: GasPriceType.STANDARD,
@@ -169,9 +159,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<GasPriceResult> {
   } else if (isBase(networkId)) {
     return getStandardOrEip1559GasPrice();
   } else if (isBerachain(networkId)) {
-    return getBerachainGasPrice();
-  } else if (isBotanix(networkId)) {
-    return getStandardOrEip1559GasPrice();
+    return getBerachainGasPrice(dolomite);
   } else if (isBsc(networkId)) {
     return getStandardOrEip1559GasPrice();
   } else if (isEthereum(networkId)) {
@@ -221,7 +209,7 @@ async function getStandardOrEip1559GasPrice(): Promise<GasPriceResult> {
 
 const TEN = new BigNumber(10);
 
-async function getBerachainGasPrice(): Promise<GasPriceResult> {
+async function getBerachainGasPrice(dolomite: DolomiteMargin): Promise<GasPriceResult> {
   const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL);
   const feeData = await provider.getFeeData();
   if (feeData.maxPriorityFeePerGas === null || feeData.lastBaseFeePerGas === null) {
@@ -231,9 +219,9 @@ async function getBerachainGasPrice(): Promise<GasPriceResult> {
 
   let priorityFeeWei: BigNumber;
   try {
-    priorityFeeWei = await getPriorityFeeForBerachain();
+    priorityFeeWei = await getPriorityFeeForBerachain(dolomite);
   } catch (e) {
-    logger.error({
+    Logger.error({
       message: 'Could not get priority fee for Berachain due to error',
       error: e,
     });
@@ -248,7 +236,7 @@ async function getBerachainGasPrice(): Promise<GasPriceResult> {
   };
 }
 
-async function getPriorityFeeForBerachain(): Promise<BigNumber> {
+async function getPriorityFeeForBerachain(dolomite: DolomiteMargin): Promise<BigNumber> {
   let wbtcPrice: Decimal;
   let beraPrice: Decimal;
   try {

@@ -42,12 +42,12 @@ async function start() {
   });
 
   const launchTimestamp = LAUNCH_TIMESTAMP_MAP[dolomite.networkId];
-  let startTimestamp = 1704067200; // January 1, 2024 (00:00:00 UTC)
+  let startTimestamp = 1735689600; // January 1, 2025 (00:00:00 UTC)
   if (startTimestamp < launchTimestamp) {
     startTimestamp = launchTimestamp;
   }
 
-  const endTimestamp = 1735603200; // December 31, 2025 (00:00:00 UTC)
+  const endTimestamp = 1767139200; // December 31, 2025 (00:00:00 UTC)
   const timestamps: number[] = [];
   for (let i = startTimestamp; i < endTimestamp; i += 86400) {
     timestamps.push(i);

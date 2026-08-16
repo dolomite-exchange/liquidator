@@ -23,10 +23,19 @@ import Logger from '../src/lib/logger';
 import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 
+// const D_USD1_ADDRESS = '0xB973A7DCBfcF27C726F2112A8C8e7fe610691c99';
 const D_USDC_ADDRESS = '0x444868B6e8079ac2c55eea115250f92C2b2c4D14';
 const TEN = new BigNumber('10');
 const MIN_BALANCE_TO_SWAP_USD = new BigNumber('10');
 const MIN_BALANCE_TO_SWAP_USD_ETHEREUM = new BigNumber('100');
+
+const USDC_MARKET_ID_MAP = {
+  [ChainId.Ethereum]: 2,
+};
+
+const USD1_MARKET_ID_MAP = {
+  [ChainId.Ethereum]: 1,
+};
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL!);
 
@@ -67,6 +76,18 @@ async function start() {
 
   await loadAccounts();
 
+  const skippedMarketIds: number[] = process.env.IGNORED_MARKETS?.split(',').map(m => {
+    const marketId = parseInt(m, 10);
+    if (Number.isNaN(marketId)) {
+      throw new Error(`Invalid market ID in IGNORED_MARKETS, found: ${m}`);
+    }
+    return marketId;
+  }) ?? [];
+
+  if (dolomite.networkId === ChainId.Ethereum) {
+    skippedMarketIds.push(USD1_MARKET_ID_MAP[dolomite.networkId], USDC_MARKET_ID_MAP[dolomite.networkId]);
+  }
+
   Logger.info({
     message: 'DolomiteMargin data',
     dolomiteMargin: libraryDolomiteMargin,
@@ -75,6 +96,7 @@ async function start() {
     ignoredMarkets: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     minBalanceToSwapUsd: `$${minBalanceToSwapUsd.toFormat(2)}`,
     networkId,
+    skippedMarketIds: skippedMarketIds.join(', '),
     solidAccount: SOLID_ACCOUNT.owner,
     subgraphUrl: process.env.SUBGRAPH_URL,
     treasuryAddress: treasury,
@@ -88,10 +110,10 @@ async function start() {
   });
 
   const markets = Object.values(marketStore.getMarketMap());
-  const dUsdc = new ethers.Contract(D_USDC_ADDRESS, DolomiteERC4626Abi, provider) as DolomiteERC4626;
-  const usdcToken: MinimalApiToken = {
-    marketId: new ZapBigNumber((await dUsdc.marketId()).toString()),
-    symbol: 'USDC',
+  const dToken = new ethers.Contract(D_USDC_ADDRESS, DolomiteERC4626Abi, provider) as DolomiteERC4626;
+  const swapToken: MinimalApiToken = {
+    marketId: new ZapBigNumber((await dToken.marketId()).toString()),
+    symbol: (await dToken.symbol()).substring(1),
   };
 
   let transaction: ContractTransaction | undefined;
@@ -101,7 +123,8 @@ async function start() {
     if (
       !market.borrowLiquidity
       || market.borrowLiquidity.eq(INTEGERS.ZERO)
-      || market.marketId === usdcToken.marketId.toNumber()
+      || market.marketId === swapToken.marketId.toNumber()
+      || skippedMarketIds.includes(market.marketId)
     ) {
       // eslint-disable-next-line no-continue
       continue;
@@ -118,7 +141,7 @@ async function start() {
       continue;
     }
 
-    const result = await swap(market, usdcToken, balance, balanceUSD, nonce);
+    const result = await swap(market, swapToken, balance, balanceUSD, nonce);
     if (result.transaction) {
       transaction = result.transaction;
     }
@@ -130,18 +153,18 @@ async function start() {
   }
 
   const balance = await dolomite.token.getBalance(
-    D_USDC_ADDRESS,
+    dToken.address,
     SOLID_ACCOUNT.owner,
   );
-  const [totalAssets, totalSupply] = await Promise.all([dUsdc.totalAssets(), dUsdc.totalSupply()]);
-  if (balance.gt(new BigNumber(100).times(TEN.pow(6)))) {
+  const [totalAssets, totalSupply] = await Promise.all([dToken.totalAssets(), dToken.totalSupply()]);
+  if (balance.gt(new BigNumber(100).times(TEN.pow(6))) && networkId !== ChainId.Ethereum) {
     Logger.info({
-      message: 'Transferring dUSDC to Safe',
+      message: `Transferring d${swapToken.symbol} to Safe`,
       balance: balance.div(TEN.pow(6)).toFormat(2),
       balanceUSD: `$${balance.times(totalAssets.toString()).div(totalSupply.toString()).div(TEN.pow(6)).toFormat(2)}`,
     });
     const result = await dolomite.token.transfer(
-      D_USDC_ADDRESS,
+      dToken.address,
       SOLID_ACCOUNT.owner,
       treasury,
       balance,

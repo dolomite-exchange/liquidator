@@ -47,7 +47,7 @@ if (NETWORK_ID === ChainId.ArbitrumOne) {
     throw new Error('Invalid ODOS referral code');
   }
 }
-if (NETWORK_ID === ChainId.Berachain || NETWORK_ID === ChainId.Botanix) {
+if (NETWORK_ID === ChainId.Berachain) {
   if (!referralInfo.oogaBoogaApiKey) {
     throw new Error('No API key found for Ooga Booga');
   }

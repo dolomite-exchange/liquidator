@@ -52,12 +52,10 @@ const NETWORK_TO_PRICE_OVERRIDE_MAP: Record<ChainId, Record<string, Decimal | un
   [ChainId.ArbitrumOne]: {},
   [ChainId.Base]: {},
   [ChainId.Berachain]: {},
-  [ChainId.Botanix]: {},
   [ChainId.Bsc]: {},
   [ChainId.Ethereum]: {},
   [ChainId.Ink]: {},
   [ChainId.Mantle]: {},
-  [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},
 }
 

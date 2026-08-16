@@ -7,11 +7,9 @@ const NETWORK_TO_ENV_FILE_MAP = {
   [ChainId.ArbitrumOne]: path.resolve(process.cwd(), 'liquidator.arbitrum-one.production.env'),
   [ChainId.Base]: path.resolve(process.cwd(), 'liquidator.base.production.env'),
   [ChainId.Berachain]: path.resolve(process.cwd(), 'liquidator.berachain.production.env'),
-  [ChainId.Botanix]: path.resolve(process.cwd(), 'liquidator.botanix.production.env'),
   [ChainId.Bsc]: path.resolve(process.cwd(), 'liquidator.bsc.production.env'),
   [ChainId.Ethereum]: path.resolve(process.cwd(), 'liquidator.ethereum.production.env'),
   [ChainId.Mantle]: path.resolve(process.cwd(), 'liquidator.mantle.production.env'),
-  [ChainId.PolygonZkEvm]: path.resolve(process.cwd(), 'liquidator.polygon-zkevm.production.env'),
   [ChainId.XLayer]: path.resolve(process.cwd(), 'liquidator.x-layer.production.env'),
 }
 
@@ -19,11 +17,9 @@ const NETWORK_TO_STATS_ENV_FILE_MAP = {
   [ChainId.ArbitrumOne]: path.resolve(process.cwd(), 'stats.arbitrum-one.production.env'),
   [ChainId.Base]: path.resolve(process.cwd(), 'stats.base.production.env'),
   [ChainId.Berachain]: path.resolve(process.cwd(), 'stats.berachain.production.env'),
-  [ChainId.Botanix]: path.resolve(process.cwd(), 'stats.botanix.production.env'),
   [ChainId.Bsc]: path.resolve(process.cwd(), 'stats.bsc.production.env'),
   [ChainId.Ethereum]: path.resolve(process.cwd(), 'stats.ethereum.production.env'),
   [ChainId.Mantle]: path.resolve(process.cwd(), 'stats.mantle.production.env'),
-  [ChainId.PolygonZkEvm]: path.resolve(process.cwd(), 'stats.polygon-zkevm.production.env'),
   [ChainId.XLayer]: path.resolve(process.cwd(), 'stats.x-layer.production.env'),
 }
 
