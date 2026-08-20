@@ -12,11 +12,9 @@ const LAUNCH_TIMESTAMP_MAP: Record<Network, number> = {
   [Network.ARBITRUM_ONE]: 1665619200, // October 13, 2022, at 00:00:00 AM UTC
   [Network.BASE]: 1734566400, // December 19, 2024, at 00:00:00 AM UTC
   [Network.BERACHAIN]: 1737763200, // January 25, 2025, at 00:00:00 AM UTC
-  [Network.BOTANIX]: 1750636800, // June 23, 2025, at 00:00:00 AM UTC
   [Network.ETHEREUM]: 1750550400, // June 22, 2025, at 00:00:00 AM UTC
   [Network.INK]: 1734566400, // December 19, 2024, at 00:00:00 AM UTC
   [Network.MANTLE]: 1714348800, // April 29, 2024, at 00:00:00 AM UTC
-  [Network.POLYGON_ZKEVM]: 1706832000, // February 2, 2025, at 00:00:00 AM UTC
   [Network.X_LAYER]: 1714348800, // April 29, 2025, at 00:00:00 AM UTC
 }
 
