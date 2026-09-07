@@ -247,13 +247,13 @@ async function getPriorityFeeForBerachain(dolomite: DolomiteMargin): Promise<Big
     wbtcPrice = (await dolomite.getters.getMarketPrice(new BigNumber(4))).div(TEN.pow(28));
     beraPrice = (await dolomite.getters.getMarketPrice(new BigNumber(1))).div(TEN.pow(18));
   }
-  const gasLimit = new BigNumber(125_000);
+  const gasLimit = new BigNumber(38_000);
 
   return wbtcPrice
     .div(TEN.pow(8))
     .div(beraPrice)
     .div(gasLimit)
     .times(TEN.pow(18))
-    .times(1.05) // Add a 5% buffer
+    .times(1.03) // Add a 3% buffer
     .integerValue();
 }
