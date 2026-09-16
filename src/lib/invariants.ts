@@ -65,6 +65,12 @@ export function checkExists(key: string) {
   }
 }
 
+export function checkEnumValue(key: string, allowedValues: readonly string[]) {
+  if (!process.env[key] || !allowedValues.includes(process.env[key]!)) {
+    throw new Error(`${key} is not provided or invalid. Must be one of: ${allowedValues.join(', ')}`);
+  }
+}
+
 export function checkLiquidationModeIsSet(enumKey: string = 'LIQUIDATION_MODE') {
   checkExists(enumKey);
   if (!Object.values(LiquidationMode).includes(process.env[enumKey]! as LiquidationMode)) {

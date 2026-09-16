@@ -5,6 +5,7 @@ import v8 from 'v8';
 import '../src/lib/env';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
+import { NOTIFI_ENVIRONMENTS } from './clients/notifi';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
 import { dolomite, initializeDolomiteLiquidations, liquidatorProxyV6, loadAccounts } from './helpers/web3';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
@@ -15,6 +16,7 @@ import {
   checkBooleanValue,
   checkConditionally,
   checkDuration,
+  checkEnumValue,
   checkEthereumAddress,
   checkExists,
   checkJsNumber,
@@ -24,6 +26,7 @@ import {
 } from './lib/invariants';
 import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
 import Logger from './lib/logger';
+import NotifiPositionHealthPublisher from './lib/notifi-position-health-publisher';
 import AccountStore from './stores/account-store';
 import AsyncActionRetryStore from './stores/async-action-retry-store';
 import AsyncActionStore from './stores/async-action-store';
@@ -68,6 +71,14 @@ checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
 checkBigNumberAndGreaterThanOrEqual('MIN_VALUE_LIQUIDATED', '1000000000000000000000000'); // 1e24
 checkBigNumberAndGreaterThanOrEqual('MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL', process.env.MIN_VALUE_LIQUIDATED!);
 checkJsNumber('NETWORK_ID');
+checkBooleanValue('NOTIFI_ENABLED');
+checkConditionally(process.env.NOTIFI_ENABLED === 'true', () => {
+  checkEnumValue('NOTIFI_ENVIRONMENT', NOTIFI_ENVIRONMENTS);
+  checkExists('NOTIFI_POSITION_HEALTH_EVENT_TYPE_ID');
+  checkDuration('NOTIFI_PUBLISH_INTERVAL_MS', 1000);
+  checkExists('NOTIFI_SECRET');
+  checkExists('NOTIFI_SID');
+});
 checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkMarketIdList('OWED_PREFERENCES', 1));
 checkDuration('RISK_PARAMS_POLL_INTERVAL_MS', 1000);
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 10);
@@ -126,6 +137,7 @@ async function start() {
     riskParamsStore,
   );
   const gasPriceUpdater = new GasPriceUpdater();
+  const notifiPositionHealthPublisher = new NotifiPositionHealthPublisher(accountStore, marketStore, riskParamsStore);
   const liquidationMode = getLiquidationMode();
 
   await loadAccounts();
@@ -175,6 +187,9 @@ async function start() {
     minValueLiquidated: process.env.MIN_VALUE_LIQUIDATED,
     minValueLiquidatedForExternalSell: process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL,
     networkId,
+    notifiEnabled: process.env.NOTIFI_ENABLED,
+    notifiEnvironment: process.env.NOTIFI_ENVIRONMENT,
+    notifiPositionHealthEventTypeId: process.env.NOTIFI_POSITION_HEALTH_EVENT_TYPE_ID,
     sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
@@ -188,6 +203,7 @@ async function start() {
     glvLiquidityPollIntervalMillis: process.env.GLV_LIQUIDITY_POLL_INTERVAL_MS,
     liquidatePollIntervalMillis: process.env.LIQUIDATE_POLL_INTERVAL_MS,
     marketPollIntervalMillis: process.env.MARKET_POLL_INTERVAL_MS,
+    notifiPublishIntervalMillis: process.env.NOTIFI_PUBLISH_INTERVAL_MS,
     riskParamsPollIntervalMillis: process.env.RISK_PARAMS_POLL_INTERVAL_MS,
   });
 
@@ -241,6 +257,10 @@ async function start() {
 
   if (process.env.GLV_LIQUIDITY_POLL_ENABLED === 'true') {
     glvLiquidityStore.start();
+  }
+
+  if (process.env.NOTIFI_ENABLED === 'true') {
+    notifiPositionHealthPublisher.start();
   }
 
   if (
