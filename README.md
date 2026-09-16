@@ -106,7 +106,10 @@ in the Dolomite interface, and Notifi notifies them whenever a published health 
 chose. The topic is not throttled on Notifi's side, so the publish interval is also how often a user whose position
 stays below their threshold hears about it. Publishes happen at multiples of the interval since the epoch (on the hour
 with the default) rather than on a timer started at boot, so restarting the bot never sends an extra round: a freshly
-started bot waits for the next boundary.
+started bot waits for the next boundary. Each round first asks Notifi which positions have active alerts on the topic
+and publishes only those, so the volume of events scales with subscriptions rather than with open positions. That
+matters because Notifi counts every published event against the tenant's monthly notification quota. If Notifi rate
+limits a round, the rest of it is left for the next interval.
 
 The publisher authenticates with the tenant's service SID and secret from the Notifi Admin Console (Account Settings),
 supplied via `NOTIFI_SID` and `NOTIFI_SECRET`. Keep them in the git-ignored `*.production.env` files, never in `.env`.

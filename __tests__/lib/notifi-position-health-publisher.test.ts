@@ -1,6 +1,11 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { DateTime } from 'luxon';
-import { logInToNotifi, NotifiAuthorization, publishNotifiFusionMessages } from '../../src/clients/notifi';
+import {
+  getNotifiActiveAlerts,
+  logInToNotifi,
+  NotifiAuthorization,
+  publishNotifiFusionMessages,
+} from '../../src/clients/notifi';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../../src/lib/api-types';
 import NotifiPositionHealthPublisher from '../../src/lib/notifi-position-health-publisher';
 import { DECIMAL_BASE } from '../../src/lib/utils';
@@ -11,6 +16,7 @@ import RiskParamsStore from '../../src/stores/risk-params-store';
 
 jest.mock('../../src/clients/notifi');
 
+const getNotifiActiveAlertsMock = getNotifiActiveAlerts as jest.Mock;
 const logInToNotifiMock = logInToNotifi as jest.Mock;
 const publishNotifiFusionMessagesMock = publishNotifiFusionMessages as jest.Mock;
 
@@ -42,6 +48,7 @@ describe('NotifiPositionHealthPublisher', () => {
     marketStore.getMarketMap = jest.fn().mockImplementation(() => getTestMarketMap());
     riskParamsStore.getDolomiteRiskParams = jest.fn().mockImplementation(() => getTestRiskParams());
     logInToNotifiMock.mockImplementation(async () => getTestAuthorization(DateTime.utc().plus({ hours: 1 })));
+    mockSubscriptions([`${OWNER}-0`, `${OWNER}-1`, `${OWNER}-2`]);
     publishNotifiFusionMessagesMock.mockImplementation(async (_token, messages) => ({
       indexToResultIdMap: messages.reduce((memo, _message, i) => {
         memo[i] = `result-${i}`;
@@ -57,6 +64,7 @@ describe('NotifiPositionHealthPublisher', () => {
       expect(await publisher._publish()).toEqual(false);
 
       expect(logInToNotifiMock).not.toHaveBeenCalled();
+      expect(getNotifiActiveAlertsMock).not.toHaveBeenCalled();
       expect(publishNotifiFusionMessagesMock).not.toHaveBeenCalled();
     });
 
@@ -66,6 +74,7 @@ describe('NotifiPositionHealthPublisher', () => {
       expect(await publisher._publish()).toEqual(false);
 
       expect(logInToNotifiMock).not.toHaveBeenCalled();
+      expect(getNotifiActiveAlertsMock).not.toHaveBeenCalled();
       expect(publishNotifiFusionMessagesMock).not.toHaveBeenCalled();
     });
 
@@ -75,10 +84,20 @@ describe('NotifiPositionHealthPublisher', () => {
       expect(await publisher._publish()).toEqual(false);
 
       expect(logInToNotifiMock).not.toHaveBeenCalled();
+      expect(getNotifiActiveAlertsMock).not.toHaveBeenCalled();
       expect(publishNotifiFusionMessagesMock).not.toHaveBeenCalled();
     });
 
-    it('publishes every position with debt, skipping account number 0', async () => {
+    it('publishes nothing when no positions are subscribed', async () => {
+      mockSubscriptions([]);
+
+      expect(await publisher._publish()).toEqual(true);
+
+      expect(getNotifiActiveAlertsMock).toHaveBeenCalledWith(TOKEN, EVENT_TYPE_ID);
+      expect(publishNotifiFusionMessagesMock).not.toHaveBeenCalled();
+    });
+
+    it('publishes only the subscribed positions with debt, skipping account number 0', async () => {
       expect(await publisher._publish()).toEqual(true);
 
       expect(logInToNotifiMock).toHaveBeenCalledWith('sid', 'secret');
@@ -104,6 +123,15 @@ describe('NotifiPositionHealthPublisher', () => {
       ]);
     });
 
+    it('matches subscription values regardless of case', async () => {
+      mockSubscriptions([`${OWNER.toUpperCase()}-1`]);
+
+      await publisher._publish();
+
+      const [, messages] = publishNotifiFusionMessagesMock.mock.calls[0];
+      expect(messages.map(m => m.variablesJson.positionId)).toEqual([`${OWNER}-1`]);
+    });
+
     it('rounds the health factor down to two decimal places', async () => {
       accountStore.getLiquidatableDolomiteAccounts = jest.fn().mockImplementation(() => [
         getTestAccount('1', { [WETH_MARKET_ID]: '230', [USDC_MARKET_ID]: '-110' }), // 1.8181...
@@ -117,16 +145,63 @@ describe('NotifiPositionHealthPublisher', () => {
     });
 
     it('publishes in batches of 100', async () => {
-      accountStore.getLiquidatableDolomiteAccounts = jest.fn().mockImplementation(() => {
-        return Array.from({ length: 250 }, (_, i) => {
-          return getTestAccount((i + 1).toString(), { [WETH_MARKET_ID]: '230', [USDC_MARKET_ID]: '-100' });
-        });
-      });
+      mockPositions(250);
 
       await publisher._publish();
 
       expect(publishNotifiFusionMessagesMock).toHaveBeenCalledTimes(3);
       expect(publishNotifiFusionMessagesMock.mock.calls.map(([, messages]) => messages.length)).toEqual([100, 100, 50]);
+    });
+
+    it('stops the round when Notifi rate limits, leaving the rest for the next interval', async () => {
+      mockPositions(250);
+      publishNotifiFusionMessagesMock.mockRejectedValueOnce(getTestHttpError(429));
+
+      expect(await publisher._publish()).toEqual(true);
+
+      expect(publishNotifiFusionMessagesMock).toHaveBeenCalledTimes(1);
+      expect(logInToNotifiMock).toHaveBeenCalledTimes(1);
+      await flushLogger();
+    });
+
+    it('logs in again and retries the batch once when the token is rejected', async () => {
+      publishNotifiFusionMessagesMock.mockRejectedValueOnce(getTestHttpError(401));
+
+      expect(await publisher._publish()).toEqual(true);
+
+      expect(logInToNotifiMock).toHaveBeenCalledTimes(2);
+      expect(publishNotifiFusionMessagesMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('moves on to the next batch after any other failure, keeping the token', async () => {
+      mockPositions(250);
+      publishNotifiFusionMessagesMock.mockRejectedValueOnce(getTestHttpError(500));
+
+      expect(await publisher._publish()).toEqual(true);
+
+      expect(publishNotifiFusionMessagesMock).toHaveBeenCalledTimes(3);
+      expect(logInToNotifiMock).toHaveBeenCalledTimes(1);
+      await flushLogger();
+    });
+
+    it('stops the round when logging in fails', async () => {
+      logInToNotifiMock.mockRejectedValueOnce(new Error('Log in failed'));
+
+      expect(await publisher._publish()).toEqual(true);
+
+      expect(logInToNotifiMock).toHaveBeenCalledTimes(1);
+      expect(getNotifiActiveAlertsMock).not.toHaveBeenCalled();
+      expect(publishNotifiFusionMessagesMock).not.toHaveBeenCalled();
+      await flushLogger();
+    });
+
+    it('stops the round when the active alerts cannot be listed', async () => {
+      getNotifiActiveAlertsMock.mockRejectedValueOnce(getTestHttpError(500));
+
+      expect(await publisher._publish()).toEqual(true);
+
+      expect(publishNotifiFusionMessagesMock).not.toHaveBeenCalled();
+      await flushLogger();
     });
 
     it('reuses a token that is not about to expire', async () => {
@@ -138,25 +213,12 @@ describe('NotifiPositionHealthPublisher', () => {
     });
 
     it('logs in again when the token is about to expire', async () => {
-      logInToNotifiMock.mockImplementation(async () => getTestAuthorization(DateTime.utc().plus({ minutes: 1 })));
+      logInToNotifiMock.mockImplementationOnce(async () => getTestAuthorization(DateTime.utc().plus({ minutes: 1 })));
 
       await publisher._publish();
       await publisher._publish();
 
       expect(logInToNotifiMock).toHaveBeenCalledTimes(2);
-    });
-
-    it('logs in again after a failed publish without throwing', async () => {
-      publishNotifiFusionMessagesMock.mockRejectedValueOnce(new Error('401 Unauthorized'));
-
-      expect(await publisher._publish()).toEqual(true);
-      await publisher._publish();
-
-      expect(logInToNotifiMock).toHaveBeenCalledTimes(2);
-      expect(publishNotifiFusionMessagesMock).toHaveBeenCalledTimes(2);
-
-      // The logger prints error stacks on the next tick; let it flush so it does not log after the test is done
-      await new Promise(resolve => setImmediate(resolve));
     });
   });
 
@@ -230,7 +292,33 @@ describe('NotifiPositionHealthPublisher', () => {
       expect(publishMock).toHaveBeenCalledTimes(4);
     });
   });
+
+  /** Makes Notifi report an active alert for each of these position IDs */
+  function mockSubscriptions(positionIds: string[]): void {
+    getNotifiActiveAlertsMock.mockImplementation(async () => positionIds.map((positionId, i) => ({
+      id: `alert-${i}`,
+      subscriptionValue: positionId,
+    })));
+  }
+
+  /** `count` subscribed positions, each with a health factor of 2.00 */
+  function mockPositions(count: number): void {
+    const accounts = Array.from({ length: count }, (_, i) => {
+      return getTestAccount((i + 1).toString(), { [WETH_MARKET_ID]: '230', [USDC_MARKET_ID]: '-100' });
+    });
+    accountStore.getLiquidatableDolomiteAccounts = jest.fn().mockImplementation(() => accounts);
+    mockSubscriptions(accounts.map(account => account.id));
+  }
 });
+
+/** The logger prints error stacks on the next tick; let it flush so nothing logs after a test is done */
+function flushLogger(): Promise<void> {
+  return new Promise(resolve => setImmediate(resolve));
+}
+
+function getTestHttpError(status: number): Error {
+  return Object.assign(new Error(`Request failed with status code ${status}`), { response: { status } });
+}
 
 function getTestAuthorization(expiry: DateTime): NotifiAuthorization {
   return {
@@ -310,11 +398,13 @@ function getTestAccount(accountNumber: string, weiByMarketId: Record<number, str
 
 function getTestAccounts(): ApiAccount[] {
   return [
-    // The user's Dolomite Balance; never published even though it has debt
+    // The user's Dolomite Balance; never published even though it has debt and is subscribed
     getTestAccount('0', { [WETH_MARKET_ID]: '230', [USDC_MARKET_ID]: '-100' }),
-    // A position with a health factor of exactly 2.00
+    // A subscribed position with a health factor of exactly 2.00
     getTestAccount('1', { [WETH_MARKET_ID]: '230', [USDC_MARKET_ID]: '-100' }),
-    // A position without debt, so no health factor to publish
+    // A subscribed position without debt, so no health factor to publish
     getTestAccount('2', { [WETH_MARKET_ID]: '230' }),
+    // A position with debt that nobody subscribed to
+    getTestAccount('3', { [WETH_MARKET_ID]: '230', [USDC_MARKET_ID]: '-100' }),
   ];
 }
