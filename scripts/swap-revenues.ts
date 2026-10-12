@@ -10,7 +10,11 @@ import DolomiteRegistryAbi from '../src/abis/dolomite-registry.json';
 import { DolomiteERC4626 } from '../src/abis/DolomiteERC4626';
 import { getDolomiteRiskParams, SOLID_ACCOUNT } from '../src/clients/dolomite';
 import { zap } from '../src/helpers/dolomite-helpers';
-import { getTypedGasPriceWeiWithModifications, updateGasPrice } from '../src/helpers/gas-price-helpers';
+import {
+  getDefaultGasLimit,
+  getTypedGasPriceWeiWithModifications,
+  updateGasPrice,
+} from '../src/helpers/gas-price-helpers';
 import {
   estimateGasSwapViaGenericTraderProxy,
   swapViaGenericTraderProxy,
@@ -168,7 +172,10 @@ async function start() {
       SOLID_ACCOUNT.owner,
       treasury,
       balance,
-      getTypedGasPriceWeiWithModifications(),
+      {
+        gas: getDefaultGasLimit().toFixed(),
+        ...getTypedGasPriceWeiWithModifications(),
+      },
     );
     Logger.info({
       message: `Transaction hash: ${result.transactionHash}`,
