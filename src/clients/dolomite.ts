@@ -56,17 +56,13 @@ import { aggregateWithExceptionHandler } from '../lib/multi-call-with-exception-
 import Pageable from '../lib/pageable';
 import '../lib/env';
 import { chunkArray, DECIMAL_BASE } from '../lib/utils';
+import { postToSubgraph } from './subgraph';
 
 const { defaultAbiCoder } = ethers.utils;
 
 const defaultAxiosConfig = {
   headers: { 'Accept-Encoding': 'gzip,deflate,compress' },
 };
-
-const subgraphUrl = process.env.SUBGRAPH_URL ?? '';
-if (!subgraphUrl) {
-  throw new Error('SUBGRAPH_URL is not set')
-}
 
 export const SOLID_ACCOUNT = {
   owner: process.env.ACCOUNT_WALLET_ADDRESS as string,
@@ -99,8 +95,7 @@ async function getAccounts(
   lastId: string | undefined,
   extraVariables: object = {},
 ): Promise<{ accounts: ApiAccount[] }> {
-  const accounts: ApiAccount[] = await axios.post(
-    subgraphUrl,
+  const accounts: ApiAccount[] = await postToSubgraph(
     {
       query,
       variables: {
@@ -206,8 +201,7 @@ export async function getAllDolomiteUsersWithPositions(
                   id
                 }
               }`;
-  const accounts = await axios.post(
-    subgraphUrl,
+  const accounts = await postToSubgraph(
     {
       query,
       variables: {
@@ -289,8 +283,7 @@ export async function getApiAccountsFromAddresses(
       }
     }
 `;
-  const accounts = await axios.post(
-    subgraphUrl,
+  const accounts = await postToSubgraph(
     {
       query,
       variables: {
@@ -343,8 +336,7 @@ export async function getDolomiteMarkets(
   lastId: string | undefined,
   filterOutBadPrices: boolean,
 ): Promise<{ markets: ApiMarket[] }> {
-  const result: GraphqlMarketResult = await axios.post(
-    subgraphUrl,
+  const result: GraphqlMarketResult = await postToSubgraph(
     {
       query: `query getMarketRiskInfos($blockNumber: Int, $lastId: ID) {
                 marketRiskInfos(
@@ -481,8 +473,7 @@ export async function getDolomiteMarkets(
 }
 
 export async function getDolomiteRiskParams(blockNumber: number): Promise<{ riskParams: ApiRiskParam }> {
-  const subgraphResult: any = await axios.post(
-    subgraphUrl,
+  const subgraphResult: any = await postToSubgraph(
     {
       query: `query getDolomiteMargins($blockNumber: Int) {
         dolomiteMargins(block: { number: $blockNumber }) {
@@ -638,8 +629,7 @@ export async function getLiquidationsBetweenTimestamps(
   upperTimestamp: number,
   lastId: string,
 ): Promise<{ liquidations: ApiLiquidation[] }> {
-  const result = await axios.post(
-    subgraphUrl,
+  const result = await postToSubgraph(
     {
       query: `query getLiquidationsBetweenTimestamps($lowerTimestamp: BigInt, $upperTimestamp: BigInt, $lastId: ID) {
         liquidations(
@@ -762,8 +752,7 @@ export async function getTotalYield(blockNumbers: number[], user: address): Prom
     totalYield: new BigNumber(0),
   }
   for (let i = 0; i < queryChunks.length; i += 1) {
-    const result = await axios.post(
-      subgraphUrl,
+    const result = await postToSubgraph(
       {
         query: `query getAmmDataForUser {
         ${queryChunks[i]}
@@ -843,8 +832,7 @@ export async function getTotalValueLockedAndFees(
       return memo;
     }, {} as Record<string, BigNumber>)
 
-    const interestRates = await axios.post(
-      subgraphUrl,
+    const interestRates = await postToSubgraph(
       {
         query: `query getTvlAndInterestRatesByMarkets { ${queryChunks[i]} }`,
       },
@@ -896,8 +884,7 @@ export async function getTotalTradeVolume(startBlockNumber: number, endBlockNumb
       }
     `;
 
-  const { start, end } = await axios.post(
-    subgraphUrl,
+  const { start, end } = await postToSubgraph(
     {
       query: `query getTotalTradeVolume { ${query} }`,
     },
@@ -925,8 +912,7 @@ export async function getTotalTransactions(startBlockNumber: number, endBlockNum
       }
     `;
 
-  const { start, end } = await axios.post(
-    subgraphUrl,
+  const { start, end } = await postToSubgraph(
     {
       query: `query getTotalTransactions { ${query} }`,
     },
@@ -952,8 +938,7 @@ export async function getTotalUniqueUsers(startBlockNumber: number, endBlockNumb
       }
     `;
 
-  const { start, end } = await axios.post(
-    subgraphUrl,
+  const { start, end } = await postToSubgraph(
     {
       query: `query getTotalTransactions { ${query} }`,
     },
@@ -985,8 +970,7 @@ export async function getRetryableAsyncDeposits(
   blockNumber: number,
   lastId: string | undefined,
 ): Promise<{ withdrawals: ApiAsyncAction[] }> {
-  const withdrawals: ApiAsyncAction[] = await axios.post(
-    subgraphUrl,
+  const withdrawals: ApiAsyncAction[] = await postToSubgraph(
     {
       query: `query getAsyncDeposits(
         $blockNumber: Int,
@@ -1065,8 +1049,7 @@ export async function getRetryableAsyncWithdrawals(
   blockNumber: number,
   lastId: string | undefined,
 ): Promise<{ withdrawals: ApiAsyncWithdrawal[] }> {
-  const withdrawals: ApiAsyncWithdrawal[] = await axios.post(
-    subgraphUrl,
+  const withdrawals: ApiAsyncWithdrawal[] = await postToSubgraph(
     {
       query: `query getAsyncWithdrawals(
         $blockNumber: Int,
