@@ -12,6 +12,7 @@ import { ReferralOutput } from '@dolomite-exchange/zap-sdk/dist/src/lib/ApiTypes
 import { type ContractTransaction, ethers } from 'ethers';
 import { DateTime } from 'luxon';
 import { SOLID_ACCOUNT } from '../clients/dolomite';
+import { getActiveSubgraphUrl, onActiveSubgraphUrlChange } from '../clients/subgraph';
 import { getAccountRiskOverride } from '../lib/account-risk-override-getter';
 import { ApiAccount, ApiBalance, ApiMarket, ApiRiskParam } from '../lib/api-types';
 import { ChainId } from '../lib/chain-id';
@@ -65,7 +66,7 @@ const BLOCK_TAG = 'latest';
 const USE_PROXY_SERVER = false;
 export const zap = new DolomiteZap({
   network: NETWORK_ID,
-  subgraphUrl: process.env.SUBGRAPH_URL!,
+  subgraphUrl: getActiveSubgraphUrl(),
   web3Provider: new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL, NETWORK_ID),
   cacheSeconds: ONE_HOUR,
   defaultIsLiquidation: IS_LIQUIDATION,
@@ -80,6 +81,11 @@ export const zap = new DolomiteZap({
 if (zap.validAggregators.length === 0) {
   throw new Error('No zap aggregators found!');
 }
+
+// The zap SDK takes a single subgraph, so keep it on the one the rest of the bot is using
+onActiveSubgraphUrlChange(subgraphUrl => {
+  zap.subgraphUrl = subgraphUrl;
+});
 
 export async function emitWithdrawalExecuted(action: ApiAsyncAction): Promise<TxResult | undefined> {
   Logger.info({
