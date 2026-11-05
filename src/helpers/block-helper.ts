@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { getActiveSubgraphBlockNumber } from '../clients/subgraph';
+import { updateActiveSubgraph } from '../clients/subgraph';
 import Logger from '../lib/logger';
 import { dolomite } from './web3';
 
@@ -13,7 +13,7 @@ export async function getSubgraphBlockNumber(
     return Promise.resolve({ blockNumber: Number(process.env.BLOCK_NUMBER), blockTimestamp: lastBlockTimestamp });
   }
 
-  const gqlBlockNumber = (await getActiveSubgraphBlockNumber()) ?? defaultBlockNumber;
+  const gqlBlockNumber = (await updateActiveSubgraph()) ?? defaultBlockNumber;
 
   let web3BlockNumber: number;
   try {
