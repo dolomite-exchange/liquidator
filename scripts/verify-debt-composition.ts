@@ -26,7 +26,9 @@ import BlockStore from '../src/stores/block-store';
 import MarketStore from '../src/stores/market-store';
 import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
 
-const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${1_000_000}`);
+// const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${1_000_000}`);
+// const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${100_000}`);
+const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${1_000}`);
 // const LARGE_AMOUNT_THRESHOLD_USD = new BigNumber(`${0}`);
 
 const TEN = new BigNumber('10');

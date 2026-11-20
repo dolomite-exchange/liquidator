@@ -23,8 +23,9 @@ import MarketStore from '../src/stores/market-store';
 
 const VAPORIZE_EXCESS = process.env.VAPORIZE_EXCESS === 'true';
 
-// const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
-const SMALL_BORROW_THRESHOLD = new BigNumber(0);
+const SMALL_BORROW_THRESHOLD = new BigNumber(1_000);
+// const SMALL_BORROW_THRESHOLD = new BigNumber(100);
+// const SMALL_BORROW_THRESHOLD = new BigNumber(0);
 
 const TEN = new BigNumber('10');
 
