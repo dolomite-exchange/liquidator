@@ -40,6 +40,7 @@ declare global {
       RISK_PARAMS_POLL_INTERVAL_MS
       SEQUENTIAL_TRANSACTION_DELAY_MS
       SUBGRAPH_URL
+      SUBGRAPH_URLS
     }
   }
 }

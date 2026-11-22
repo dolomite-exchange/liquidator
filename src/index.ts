@@ -5,6 +5,7 @@ import v8 from 'v8';
 import '../src/lib/env';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
+import { SUBGRAPH_URLS } from './clients/subgraph';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
 import { dolomite, initializeDolomiteLiquidations, liquidatorProxyV6, loadAccounts } from './helpers/web3';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
@@ -71,7 +72,7 @@ checkJsNumber('NETWORK_ID');
 checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkMarketIdList('OWED_PREFERENCES', 1));
 checkDuration('RISK_PARAMS_POLL_INTERVAL_MS', 1000);
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 10);
-checkExists('SUBGRAPH_URL');
+checkConditionally(!process.env.SUBGRAPH_URLS, () => checkExists('SUBGRAPH_URL'));
 
 if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
   Logger.info(`Setting auto kill in ${process.env.AUTO_DOWN_FREQUENCY_SECONDS} seconds...`);
@@ -176,7 +177,7 @@ async function start() {
     minValueLiquidatedForExternalSell: process.env.MIN_VALUE_LIQUIDATED_FOR_GENERIC_SELL,
     networkId,
     sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
-    subgraphUrl: process.env.SUBGRAPH_URL,
+    subgraphUrls: SUBGRAPH_URLS,
   });
 
   Logger.info({
