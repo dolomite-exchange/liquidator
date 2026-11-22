@@ -12,6 +12,7 @@ import {
   isInk,
   isMantle,
 } from '../lib/chain-id';
+import BerachainOracleAbi from '../abis/berachain-oracle.json';
 import Logger from '../lib/logger';
 
 export enum GasPriceType {
@@ -247,7 +248,15 @@ async function getPriorityFeeForBerachain(dolomite: DolomiteMargin): Promise<Big
     wbtcPrice = (await dolomite.getters.getMarketPrice(new BigNumber(4))).div(TEN.pow(28));
     beraPrice = (await dolomite.getters.getMarketPrice(new BigNumber(1))).div(TEN.pow(18));
   }
-  const gasLimit = new BigNumber(30_000);
+
+  let gasLimit: BigNumber;
+  try {
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL!);
+    const contract = new ethers.Contract('0x622c8d85f0197efd2e4730ad5d78cf39c715b49d', BerachainOracleAbi, provider);
+    gasLimit = new BigNumber(await contract.functions.gasLimit());
+  } catch (e) {
+    gasLimit = new BigNumber(20_000);
+  }
 
   return wbtcPrice
     .div(TEN.pow(8))
